@@ -38,13 +38,6 @@ gh attestation verify securock_darwin_arm64.tar.gz --repo securock/securock
 gh attestation verify ./securock --repo securock/securock
 ```
 
-Homebrew, from this repository (HEAD):
-
-```bash
-brew tap securock/securock https://github.com/securock/securock
-brew install --HEAD securock
-```
-
 Or build from source:
 
 ```bash
