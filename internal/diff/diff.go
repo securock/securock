@@ -184,8 +184,9 @@ func trustRelevant(a, b Side) bool {
 func worstEvidence(a, b lockfile.EvidenceState) lockfile.EvidenceState {
 	order := map[lockfile.EvidenceState]int{
 		lockfile.EvidenceVerified: 0,
-		lockfile.EvidenceUnknown:  1,
-		lockfile.EvidenceMissing:  2,
+		lockfile.EvidencePresent:  1,
+		lockfile.EvidenceUnknown:  2,
+		lockfile.EvidenceMissing:  3,
 	}
 	if order[b] > order[a] {
 		return b

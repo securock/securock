@@ -25,6 +25,18 @@ The artifact failed at least one enabled policy rule. Typical reasons:
 Securock could not complete an evidence lookup, or the ecosystem does
 not yet expose that evidence. Unknown is not the same as verified.
 
+## Evidence states
+
+| State | Meaning |
+| --- | --- |
+| `unknown` | lookup skipped or failed |
+| `missing` | lookup succeeded and found no evidence |
+| `present` | registry returned provenance or signatures; not cryptographically verified |
+| `verified` | cryptographic verification succeeded |
+
+v0.1 npm collection can emit `present`, never `verified`. `verified`
+is reserved for Sigstore and registry-key verification.
+
 Offline scans leave provenance and signature as `unknown`.
 
 ## Evidence Securock records
@@ -33,12 +45,12 @@ Offline scans leave provenance and signature as `unknown`.
 | --- | --- | --- |
 | digest | from the language lockfile | from the language lockfile |
 | vulnerabilities | OSV ids | OSV ids |
-| provenance | presence of an npm provenance attestation | `unknown` |
-| signature | presence of npm `dist.signatures` | `unknown` |
+| provenance | npm provenance attestation present | `unknown` |
+| signature | npm `dist.signatures` present | `unknown` |
 
-For npm provenance and signatures, v0.1 records that the registry
-returned the evidence. It does not yet perform full Sigstore or
-registry-key cryptographic verification.
+v0.1 records presence only. It does not perform full Sigstore or
+registry-key cryptographic verification, so it will not emit
+`verified`.
 
 ## What Securock does not guarantee
 

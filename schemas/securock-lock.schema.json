@@ -106,7 +106,7 @@
     },
     "evidenceState": {
       "type": "string",
-      "enum": ["unknown", "verified", "missing"]
+      "enum": ["unknown", "missing", "present", "verified"]
     }
   }
 }

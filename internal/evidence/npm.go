@@ -111,7 +111,7 @@ func (c *NPM) provenance(ctx context.Context, dep ecosystem.Dependency) lockfile
 	}
 	for _, att := range parsed.Attestations {
 		if isProvenance(att.PredicateType) {
-			return lockfile.EvidenceVerified
+			return lockfile.EvidencePresent
 		}
 	}
 	return lockfile.EvidenceMissing
@@ -144,7 +144,7 @@ func (c *NPM) signature(ctx context.Context, dep ecosystem.Dependency) lockfile.
 	if len(parsed.Dist.Signatures) == 0 {
 		return lockfile.EvidenceMissing
 	}
-	return lockfile.EvidenceVerified
+	return lockfile.EvidencePresent
 }
 
 func (c *NPM) get(ctx context.Context, endpoint string) (*http.Response, error) {

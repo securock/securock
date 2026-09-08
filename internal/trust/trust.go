@@ -14,11 +14,11 @@ func Evaluate(art *lockfile.Artifact, pol policy.Document) {
 	if pol.Rules.RequireDigest && art.Digest == "" {
 		reasons = append(reasons, "missing digest")
 	}
-	if pol.Rules.RequireProvenance && art.Evidence.Provenance != lockfile.EvidenceVerified {
-		reasons = append(reasons, "provenance not verified")
+	if pol.Rules.RequireProvenance && !art.Evidence.Provenance.Present() {
+		reasons = append(reasons, "provenance not present")
 	}
-	if pol.Rules.RequireSignature && art.Evidence.Signature != lockfile.EvidenceVerified {
-		reasons = append(reasons, "signature not verified")
+	if pol.Rules.RequireSignature && !art.Evidence.Signature.Present() {
+		reasons = append(reasons, "signature not present")
 	}
 
 	if len(reasons) > 0 {

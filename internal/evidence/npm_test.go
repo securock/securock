@@ -43,7 +43,7 @@ func TestNPMEvidence(t *testing.T) {
 	}
 
 	react := got[evidence.Key(ecosystem.Dependency{Ecosystem: "npm", Name: "react", Version: "19.2.0"})]
-	if react.Provenance != lockfile.EvidenceVerified || react.Signature != lockfile.EvidenceVerified {
+	if react.Provenance != lockfile.EvidencePresent || react.Signature != lockfile.EvidencePresent {
 		t.Fatalf("react = %+v", react)
 	}
 	left := got[evidence.Key(ecosystem.Dependency{Ecosystem: "npm", Name: "leftpad", Version: "1.0.0"})]

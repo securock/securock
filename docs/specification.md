@@ -69,4 +69,6 @@ They must not include a path.
 - trust reasons sorted lexicographically
 - empty optional collections omitted
 
-JSON output follows the same field set and sort order.
+Evidence states are `unknown`, `missing`, `present`, and `verified`.
+`present` means the evidence was observed. `verified` is reserved for
+cryptographic verification.

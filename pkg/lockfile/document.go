@@ -14,9 +14,14 @@ type EvidenceState string
 
 const (
 	EvidenceUnknown  EvidenceState = "unknown"
-	EvidenceVerified EvidenceState = "verified"
 	EvidenceMissing  EvidenceState = "missing"
+	EvidencePresent  EvidenceState = "present"
+	EvidenceVerified EvidenceState = "verified"
 )
+
+func (s EvidenceState) Present() bool {
+	return s == EvidencePresent || s == EvidenceVerified
+}
 
 type Document struct {
 	Version   int        `json:"version" yaml:"version"`
