@@ -30,7 +30,7 @@ func Scan(ctx context.Context, opts Options) (*Result, error) {
 		path = "."
 	}
 
-	deps, names, err := ecosystem.Collect(path)
+	deps, err := ecosystem.Collect(path)
 	if err != nil {
 		return nil, err
 	}
@@ -58,10 +58,7 @@ func Scan(ctx context.Context, opts Options) (*Result, error) {
 	}
 
 	doc := lockfile.Document{
-		Version: lockfile.SchemaVersion,
-		Source: lockfile.Source{
-			Ecosystems: names,
-		},
+		Version:   lockfile.SchemaVersion,
 		Artifacts: make([]lockfile.Artifact, 0, len(deps)),
 	}
 
@@ -71,6 +68,8 @@ func Scan(ctx context.Context, opts Options) (*Result, error) {
 			Name:      dep.Name,
 			Version:   dep.Version,
 			Digest:    dep.Digest,
+			Resolver:  dep.Resolver,
+			Registry:  dep.Registry,
 			Evidence: lockfile.Evidence{
 				Provenance: provenance.State(),
 				Signature:  lockfile.EvidenceUnknown,
@@ -81,6 +80,10 @@ func Scan(ctx context.Context, opts Options) (*Result, error) {
 		}
 		trust.Evaluate(&art, opts.Policy)
 		doc.Artifacts = append(doc.Artifacts, art)
+		doc.Source.Ecosystems = append(doc.Source.Ecosystems, dep.Ecosystem)
+		if dep.Resolver != "" {
+			doc.Source.Resolvers = append(doc.Source.Resolvers, dep.Resolver)
+		}
 	}
 
 	lockfile.Canonicalize(&doc)

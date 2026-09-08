@@ -7,6 +7,8 @@ import (
 
 type Dependency struct {
 	Ecosystem string
+	Resolver  string
+	Registry  string
 	Name      string
 	Version   string
 	Digest    string

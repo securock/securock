@@ -72,6 +72,9 @@ func writeScan(w io.Writer, doc lockfile.Document, format string) error {
 func writeScanText(w io.Writer, doc lockfile.Document) error {
 	trusted, untrusted, unknown := scanner.Summary(doc)
 	fmt.Fprintf(w, "ecosystems  %s\n", strings.Join(doc.Source.Ecosystems, ", "))
+	if len(doc.Source.Resolvers) > 0 {
+		fmt.Fprintf(w, "resolvers   %s\n", strings.Join(doc.Source.Resolvers, ", "))
+	}
 	fmt.Fprintf(w, "artifacts   %d\n", len(doc.Artifacts))
 	fmt.Fprintf(w, "trusted     %d\n", trusted)
 	fmt.Fprintf(w, "untrusted   %d\n", untrusted)

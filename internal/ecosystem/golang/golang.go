@@ -60,6 +60,8 @@ func (Ecosystem) Dependencies(path string) ([]core.Dependency, error) {
 		seen[key] = struct{}{}
 		deps = append(deps, core.Dependency{
 			Ecosystem: "go",
+			Resolver:  "go",
+			Registry:  "https://proxy.golang.org",
 			Name:      name,
 			Version:   version,
 			Digest:    core.NormalizeDigest(hash),

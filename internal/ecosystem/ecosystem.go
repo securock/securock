@@ -19,25 +19,29 @@ func Detect(path string) []Ecosystem {
 	return Prefer(found)
 }
 
-func Collect(path string) ([]Dependency, []string, error) {
+func Collect(path string) ([]Dependency, error) {
 	ecosystems := Detect(path)
 	if len(ecosystems) == 0 {
-		return nil, nil, fmt.Errorf("no supported lockfile found in %s", path)
+		return nil, fmt.Errorf("no supported lockfile found in %s", path)
 	}
 
 	seen := make(map[string]struct{})
 	var deps []Dependency
-	names := make([]string, 0, len(ecosystems))
 
 	for _, e := range ecosystems {
-		names = append(names, e.Name())
 		got, err := e.Dependencies(path)
 		if err != nil {
-			return nil, nil, fmt.Errorf("%s: %w", e.Name(), err)
+			return nil, fmt.Errorf("%s: %w", e.Name(), err)
 		}
 		for _, dep := range got {
 			if dep.Name == "" || dep.Version == "" {
 				continue
+			}
+			if dep.Ecosystem == "" {
+				dep.Ecosystem = e.Name()
+			}
+			if dep.Resolver == "" {
+				dep.Resolver = e.Name()
 			}
 			key := dep.Ecosystem + ":" + dep.Name + "@" + dep.Version
 			if _, ok := seen[key]; ok {
@@ -48,5 +52,5 @@ func Collect(path string) ([]Dependency, []string, error) {
 		}
 	}
 
-	return deps, names, nil
+	return deps, nil
 }

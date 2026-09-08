@@ -18,6 +18,11 @@
           "type": "array",
           "items": { "type": "string" },
           "uniqueItems": true
+        },
+        "resolvers": {
+          "type": "array",
+          "items": { "type": "string" },
+          "uniqueItems": true
         }
       }
     },
@@ -34,11 +39,16 @@
       "properties": {
         "ecosystem": {
           "type": "string",
-          "enum": ["npm", "pnpm", "cargo", "go", "pypi"]
+          "enum": ["npm", "cargo", "go", "pypi"]
         },
         "name": { "type": "string", "minLength": 1 },
         "version": { "type": "string", "minLength": 1 },
         "digest": { "type": "string" },
+        "resolver": {
+          "type": "string",
+          "enum": ["npm", "pnpm", "cargo", "go", "uv"]
+        },
+        "registry": { "type": "string" },
         "evidence": { "$ref": "#/$defs/evidence" },
         "trust": { "$ref": "#/$defs/trust" }
       }

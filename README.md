@@ -54,6 +54,8 @@ artifacts:
     name: react
     version: 19.2.0
     digest: sha256:...
+    resolver: npm
+    registry: https://registry.npmjs.org
     evidence:
       provenance: unknown
       signature: unknown
@@ -63,13 +65,13 @@ artifacts:
 
 ## Supported ecosystems
 
-| Ecosystem | Lockfile |
-| --- | --- |
-| npm | `package-lock.json` |
-| pnpm | `pnpm-lock.yaml` |
-| cargo | `Cargo.lock` |
-| go | `go.sum` |
-| pypi | `uv.lock` |
+| Ecosystem | Resolver | Lockfile | Status |
+| --- | --- | --- | --- |
+| npm | npm | `package-lock.json` | stable target |
+| npm | pnpm | `pnpm-lock.yaml` | stable target |
+| cargo | cargo | `Cargo.lock` | experimental |
+| go | go | `go.sum` | experimental |
+| pypi | uv | `uv.lock` | experimental |
 
 ## License
 

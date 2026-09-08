@@ -73,6 +73,8 @@ func fromPackages(packages map[string]lockPackage) []core.Dependency {
 		}
 		deps = append(deps, core.Dependency{
 			Ecosystem: "npm",
+			Resolver:  "npm",
+			Registry:  "https://registry.npmjs.org",
 			Name:      name,
 			Version:   pkg.Version,
 			Digest:    core.NormalizeDigest(pkg.Integrity),
@@ -89,6 +91,8 @@ func fromDependencies(deps map[string]v1Dep) []core.Dependency {
 			if name != "" && dep.Version != "" {
 				out = append(out, core.Dependency{
 					Ecosystem: "npm",
+					Resolver:  "npm",
+					Registry:  "https://registry.npmjs.org",
 					Name:      name,
 					Version:   dep.Version,
 					Digest:    core.NormalizeDigest(dep.Integrity),

@@ -42,7 +42,9 @@ func (Ecosystem) Dependencies(path string) ([]core.Dependency, error) {
 			continue
 		}
 		deps = append(deps, core.Dependency{
-			Ecosystem: "pnpm",
+			Ecosystem: "npm",
+			Resolver:  "pnpm",
+			Registry:  "https://registry.npmjs.org",
 			Name:      name,
 			Version:   version,
 			Digest:    core.NormalizeDigest(pkg.Resolution.Integrity),

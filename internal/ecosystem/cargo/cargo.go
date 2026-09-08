@@ -48,6 +48,8 @@ func (Ecosystem) Dependencies(path string) ([]core.Dependency, error) {
 		}
 		deps = append(deps, core.Dependency{
 			Ecosystem: "cargo",
+			Resolver:  "cargo",
+			Registry:  "https://index.crates.io",
 			Name:      pkg.Name,
 			Version:   pkg.Version,
 			Digest:    core.NormalizeDigest(pkg.Checksum),

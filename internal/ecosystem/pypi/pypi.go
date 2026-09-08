@@ -41,6 +41,8 @@ func (Ecosystem) Dependencies(path string) ([]core.Dependency, error) {
 		}
 		deps = append(deps, core.Dependency{
 			Ecosystem: "pypi",
+			Resolver:  "uv",
+			Registry:  "https://pypi.org/simple",
 			Name:      pkg.Name,
 			Version:   pkg.Version,
 			Digest:    digest(pkg),

@@ -28,4 +28,9 @@ func TestDependencies(t *testing.T) {
 	if len(got) != 3 {
 		t.Fatalf("got %d deps, want 3: %#v", len(got), got)
 	}
+	for _, dep := range deps {
+		if dep.Ecosystem != "npm" || dep.Resolver != "pnpm" {
+			t.Fatalf("ecosystem/resolver = %s/%s, want npm/pnpm", dep.Ecosystem, dep.Resolver)
+		}
+	}
 }

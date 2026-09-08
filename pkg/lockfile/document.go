@@ -26,6 +26,7 @@ type Document struct {
 
 type Source struct {
 	Ecosystems []string `json:"ecosystems,omitempty" yaml:"ecosystems,omitempty"`
+	Resolvers  []string `json:"resolvers,omitempty" yaml:"resolvers,omitempty"`
 }
 
 type Artifact struct {
@@ -33,6 +34,8 @@ type Artifact struct {
 	Name      string   `json:"name" yaml:"name"`
 	Version   string   `json:"version" yaml:"version"`
 	Digest    string   `json:"digest,omitempty" yaml:"digest,omitempty"`
+	Resolver  string   `json:"resolver,omitempty" yaml:"resolver,omitempty"`
+	Registry  string   `json:"registry,omitempty" yaml:"registry,omitempty"`
 	Evidence  Evidence `json:"evidence" yaml:"evidence"`
 	Trust     Trust    `json:"trust" yaml:"trust"`
 }
