@@ -30,6 +30,12 @@ uv.lock
 curl -fsSL https://securock.sh/install | sh
 ```
 
+Verify a downloaded binary against GitHub artifact attestations:
+
+```bash
+gh attestation verify ./securock --repo securock/securock
+```
+
 Or build from source:
 
 ```bash
