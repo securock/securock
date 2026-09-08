@@ -1,0 +1,12 @@
+lockfileVersion: '9.0'
+
+packages:
+  react@19.2.0:
+    resolution:
+      integrity: sha256-n4bQgYhMfWWaL+qgxVrQFaO/TxsrC4Is0V1sFbDwCgg=
+  '@scope/pkg@1.2.3':
+    resolution:
+      integrity: sha256-n4bQgYhMfWWaL+qgxVrQFaO/TxsrC4Is0V1sFbDwCgg=
+  lodash@4.17.21(react@19.2.0):
+    resolution:
+      integrity: sha256-n4bQgYhMfWWaL+qgxVrQFaO/TxsrC4Is0V1sFbDwCgg=

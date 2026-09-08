@@ -1,0 +1,6 @@
+dist/
+/securock
+/securock.exe
+*.test
+coverage.out
+.DS_Store

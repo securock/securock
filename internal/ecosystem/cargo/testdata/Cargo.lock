@@ -1,0 +1,16 @@
+version = 3
+
+[[package]]
+name = "fixture"
+version = "0.1.0"
+
+[[package]]
+name = "serde"
+version = "1.0.210"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"
+
+[[package]]
+name = "local-path"
+version = "0.2.0"
+source = "path+file:///tmp/local-path"

@@ -1,0 +1,92 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://securock.dev/schema/securock-lock.schema.json",
+  "title": "securock.lock",
+  "type": "object",
+  "required": ["version", "artifacts"],
+  "additionalProperties": false,
+  "properties": {
+    "version": {
+      "type": "integer",
+      "const": 1
+    },
+    "generated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "path": { "type": "string" },
+        "ecosystems": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "artifacts": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/artifact" }
+    }
+  },
+  "$defs": {
+    "artifact": {
+      "type": "object",
+      "required": ["ecosystem", "name", "version", "evidence", "trust"],
+      "additionalProperties": false,
+      "properties": {
+        "ecosystem": {
+          "type": "string",
+          "enum": ["npm", "pnpm", "cargo", "go", "pypi"]
+        },
+        "name": { "type": "string", "minLength": 1 },
+        "version": { "type": "string", "minLength": 1 },
+        "digest": { "type": "string" },
+        "evidence": { "$ref": "#/$defs/evidence" },
+        "trust": { "$ref": "#/$defs/trust" }
+      }
+    },
+    "evidence": {
+      "type": "object",
+      "required": ["provenance", "signature"],
+      "additionalProperties": false,
+      "properties": {
+        "provenance": { "$ref": "#/$defs/evidenceState" },
+        "signature": { "$ref": "#/$defs/evidenceState" },
+        "vulnerabilities": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/vulnerability" }
+        }
+      }
+    },
+    "vulnerability": {
+      "type": "object",
+      "required": ["id"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string" },
+        "modified": { "type": "string" }
+      }
+    },
+    "trust": {
+      "type": "object",
+      "required": ["status"],
+      "additionalProperties": false,
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": ["trusted", "untrusted", "unknown"]
+        },
+        "reasons": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "evidenceState": {
+      "type": "string",
+      "enum": ["unknown", "verified", "missing"]
+    }
+  }
+}
