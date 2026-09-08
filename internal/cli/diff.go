@@ -2,6 +2,7 @@ package cli
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/securock/securock/internal/diff"
 	"github.com/securock/securock/internal/lock"
@@ -19,30 +20,49 @@ func newDiffCommand(opts *options) *cobra.Command {
 			path := projectPath(args)
 			pol, err := policy.Load(opts.policy)
 			if err != nil {
+				return opErr(err)
+			}
+			net, err := scanOptions(opts, pol)
+			if err != nil {
 				return err
 			}
 
 			lockPath := lock.Path(path, opts.lockPath)
 			locked, err := lock.Read(lockPath)
 			if err != nil {
-				return err
+				return opErr(err)
 			}
 
 			result, err := scanner.Scan(cmd.Context(), scanner.Options{
 				Path:    path,
 				Offline: opts.offline,
+				Network: net,
 				Policy:  pol,
 			})
 			if err != nil {
-				return err
+				return opErr(err)
 			}
 
 			got := diff.Compare(locked, result.Document)
-			diff.Write(cmd.OutOrStdout(), got)
+			if err := writeDiff(cmd, got, opts.format); err != nil {
+				return opErr(err)
+			}
 			if opts.noFail || !got.TrustDrift() {
 				return nil
 			}
-			return fmt.Errorf("trust drift detected")
+			return trustErr("trust drift detected")
 		},
+	}
+}
+
+func writeDiff(cmd *cobra.Command, got diff.Result, format string) error {
+	switch strings.ToLower(format) {
+	case "json":
+		return diff.WriteJSON(cmd.OutOrStdout(), got)
+	case "text", "":
+		diff.Write(cmd.OutOrStdout(), got)
+		return nil
+	default:
+		return opErr(fmt.Errorf("unsupported format %q", format))
 	}
 }

@@ -11,6 +11,7 @@ type Dependency struct {
 	Registry  string
 	Name      string
 	Version   string
+	Filename  string
 	Digest    string
 }
 

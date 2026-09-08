@@ -23,10 +23,22 @@ func (s EvidenceState) Present() bool {
 	return s == EvidencePresent || s == EvidenceVerified
 }
 
+type VulnState string
+
+const (
+	VulnUnknown VulnState = "unknown"
+	VulnChecked VulnState = "checked"
+)
+
 type Document struct {
 	Version   int        `json:"version" yaml:"version"`
 	Source    Source     `json:"source,omitempty" yaml:"source,omitempty"`
+	Policy    PolicyRef  `json:"policy,omitempty" yaml:"policy,omitempty"`
 	Artifacts []Artifact `json:"artifacts" yaml:"artifacts"`
+}
+
+type PolicyRef struct {
+	Digest string `json:"digest,omitempty" yaml:"digest,omitempty"`
 }
 
 type Source struct {
@@ -47,6 +59,7 @@ type ArtifactSource struct {
 type Artifact struct {
 	Subject  Subject        `json:"subject" yaml:"subject"`
 	Version  string         `json:"version" yaml:"version"`
+	Filename string         `json:"filename,omitempty" yaml:"filename,omitempty"`
 	Digest   string         `json:"digest,omitempty" yaml:"digest,omitempty"`
 	Source   ArtifactSource `json:"source,omitempty" yaml:"source,omitempty"`
 	Evidence Evidence       `json:"evidence" yaml:"evidence"`
@@ -54,9 +67,14 @@ type Artifact struct {
 }
 
 type Evidence struct {
-	Provenance      EvidenceState   `json:"provenance" yaml:"provenance"`
-	Signature       EvidenceState   `json:"signature" yaml:"signature"`
-	Vulnerabilities []Vulnerability `json:"vulnerabilities,omitempty" yaml:"vulnerabilities,omitempty"`
+	Provenance      EvidenceState `json:"provenance" yaml:"provenance"`
+	Signature       EvidenceState `json:"signature" yaml:"signature"`
+	Vulnerabilities VulnEvidence  `json:"vulnerabilities" yaml:"vulnerabilities"`
+}
+
+type VulnEvidence struct {
+	State VulnState       `json:"state" yaml:"state"`
+	Items []Vulnerability `json:"items,omitempty" yaml:"items,omitempty"`
 }
 
 type Vulnerability struct {
@@ -77,7 +95,11 @@ func (a Artifact) SubjectID() string {
 }
 
 func (a Artifact) ArtifactID() string {
-	return a.SubjectID() + "@" + a.Version
+	id := a.SubjectID() + "@" + a.Version
+	if a.Filename != "" {
+		return id + "#" + a.Filename
+	}
+	return id
 }
 
 func (a Artifact) Identity() string {

@@ -14,7 +14,9 @@ func NormalizeDigest(raw string) string {
 
 	switch {
 	case strings.HasPrefix(raw, "h1:"):
-		return fromBase64("sha256", strings.TrimPrefix(raw, "h1:"))
+		return "goh1:" + strings.TrimPrefix(raw, "h1:")
+	case strings.HasPrefix(raw, "goh1:"):
+		return raw
 	case strings.HasPrefix(raw, "sha256:"):
 		return raw
 	case strings.HasPrefix(raw, "sha512:"):

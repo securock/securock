@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/securock/securock/internal/decode"
 	"github.com/securock/securock/pkg/lockfile"
 	"gopkg.in/yaml.v3"
 )
@@ -34,6 +35,9 @@ func Write(path string, doc lockfile.Document) error {
 
 func Encode(path string, doc lockfile.Document) ([]byte, error) {
 	lockfile.Canonicalize(&doc)
+	if err := lockfile.Validate(doc); err != nil {
+		return nil, err
+	}
 	switch strings.ToLower(filepath.Ext(path)) {
 	case ".json":
 		raw, err := json.MarshalIndent(doc, "", "  ")
@@ -64,13 +68,16 @@ func Read(path string) (lockfile.Document, error) {
 	var doc lockfile.Document
 	switch strings.ToLower(filepath.Ext(path)) {
 	case ".json":
-		err = json.Unmarshal(raw, &doc)
+		err = decode.JSON(raw, &doc)
 	default:
-		err = yaml.Unmarshal(raw, &doc)
+		err = decode.YAML(raw, &doc)
 	}
 	if err != nil {
 		return lockfile.Document{}, fmt.Errorf("parse %s: %w", path, err)
 	}
 	lockfile.Canonicalize(&doc)
+	if err := lockfile.Validate(doc); err != nil {
+		return lockfile.Document{}, fmt.Errorf("validate %s: %w", path, err)
+	}
 	return doc, nil
 }

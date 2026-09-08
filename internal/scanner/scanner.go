@@ -7,6 +7,7 @@ import (
 
 	"github.com/securock/securock/internal/ecosystem"
 	"github.com/securock/securock/internal/evidence"
+	"github.com/securock/securock/internal/network"
 	"github.com/securock/securock/internal/osv"
 	"github.com/securock/securock/internal/provenance"
 	"github.com/securock/securock/internal/trust"
@@ -17,6 +18,7 @@ import (
 type Options struct {
 	Path     string
 	Offline  bool
+	Network  policy.Network
 	Policy   policy.Document
 	Client   osv.Client
 	Evidence evidence.Collector
@@ -31,6 +33,9 @@ func Scan(ctx context.Context, opts Options) (*Result, error) {
 	if path == "" {
 		path = "."
 	}
+	if opts.Policy.Version == 0 && opts.Policy.Rules == (policy.Rules{}) && opts.Policy.Network.Mode == "" && len(opts.Policy.Network.Registries) == 0 {
+		opts.Policy = policy.Default()
+	}
 
 	deps, err := ecosystem.Collect(path)
 	if err != nil {
@@ -44,19 +49,41 @@ func Scan(ctx context.Context, opts Options) (*Result, error) {
 		if n := cmp.Compare(a.Name, b.Name); n != 0 {
 			return n
 		}
-		return cmp.Compare(a.Version, b.Version)
+		if n := cmp.Compare(a.Version, b.Version); n != 0 {
+			return n
+		}
+		return cmp.Compare(a.Filename, b.Filename)
 	})
+
+	mode := opts.Network.ResolvedMode()
+	if opts.Offline {
+		mode = policy.ModeOffline
+	}
+	allowlist := opts.Network.Registries
+	if len(allowlist) == 0 {
+		allowlist = opts.Policy.Network.Registries
+	}
+
+	var query []ecosystem.Dependency
+	allowed := make(map[string]bool, len(deps))
+	for _, dep := range deps {
+		key := dep.Ecosystem + ":" + dep.Name + "@" + dep.Version
+		if network.Allow(mode, allowlist, dep) {
+			query = append(query, dep)
+			allowed[key] = true
+		}
+	}
 
 	var (
 		vulns map[string][]lockfile.Vulnerability
 		ev    map[string]evidence.Record
 	)
-	if !opts.Offline {
+	if len(query) > 0 {
 		client := opts.Client
 		if client == nil {
 			client = osv.New()
 		}
-		vulns, err = client.Query(ctx, deps)
+		vulns, err = client.Query(ctx, query)
 		if err != nil {
 			return nil, err
 		}
@@ -64,14 +91,20 @@ func Scan(ctx context.Context, opts Options) (*Result, error) {
 		if collector == nil {
 			collector = evidence.NewNPM()
 		}
-		ev, err = collector.Collect(ctx, deps)
+		ev, err = collector.Collect(ctx, query)
 		if err != nil {
 			return nil, err
 		}
 	}
 
+	fp, err := policy.Fingerprint(opts.Policy)
+	if err != nil {
+		return nil, err
+	}
+
 	doc := lockfile.Document{
 		Version:   lockfile.SchemaVersion,
+		Policy:    lockfile.PolicyRef{Digest: fp},
 		Artifacts: make([]lockfile.Artifact, 0, len(deps)),
 	}
 
@@ -81,8 +114,9 @@ func Scan(ctx context.Context, opts Options) (*Result, error) {
 				Ecosystem: dep.Ecosystem,
 				Name:      dep.Name,
 			},
-			Version: dep.Version,
-			Digest:  dep.Digest,
+			Version:  dep.Version,
+			Filename: dep.Filename,
+			Digest:   dep.Digest,
 			Source: lockfile.ArtifactSource{
 				Resolver: dep.Resolver,
 				Registry: dep.Registry,
@@ -90,14 +124,21 @@ func Scan(ctx context.Context, opts Options) (*Result, error) {
 			Evidence: lockfile.Evidence{
 				Provenance: provenance.State(),
 				Signature:  lockfile.EvidenceUnknown,
+				Vulnerabilities: lockfile.VulnEvidence{
+					State: lockfile.VulnUnknown,
+				},
 			},
 		}
-		if rec, ok := ev[dep.Ecosystem+":"+dep.Name+"@"+dep.Version]; ok {
+		key := dep.Ecosystem + ":" + dep.Name + "@" + dep.Version
+		if rec, ok := ev[evidence.Key(dep)]; ok {
 			art.Evidence.Provenance = rec.Provenance
 			art.Evidence.Signature = rec.Signature
 		}
-		if vulns != nil {
-			art.Evidence.Vulnerabilities = vulns[dep.Ecosystem+":"+dep.Name+"@"+dep.Version]
+		if allowed[key] {
+			art.Evidence.Vulnerabilities.State = lockfile.VulnChecked
+			if vulns != nil {
+				art.Evidence.Vulnerabilities.Items = vulns[key]
+			}
 		}
 		trust.Evaluate(&art, opts.Policy)
 		doc.Artifacts = append(doc.Artifacts, art)

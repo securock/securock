@@ -18,21 +18,26 @@ func newLockCommand(opts *options) *cobra.Command {
 			path := projectPath(args)
 			pol, err := policy.Load(opts.policy)
 			if err != nil {
+				return opErr(err)
+			}
+			net, err := scanOptions(opts, pol)
+			if err != nil {
 				return err
 			}
 
 			result, err := scanner.Scan(cmd.Context(), scanner.Options{
 				Path:    path,
 				Offline: opts.offline,
+				Network: net,
 				Policy:  pol,
 			})
 			if err != nil {
-				return err
+				return opErr(err)
 			}
 
 			out := lock.Path(path, opts.lockPath)
 			if err := lock.Write(out, result.Document); err != nil {
-				return err
+				return opErr(err)
 			}
 			fmt.Fprintf(cmd.OutOrStdout(), "wrote %s\n", out)
 
@@ -41,10 +46,10 @@ func newLockCommand(opts *options) *cobra.Command {
 				return nil
 			}
 			if untrusted > 0 {
-				return fmt.Errorf("untrusted artifacts: %d", untrusted)
+				return trustErr("untrusted artifacts: %d", untrusted)
 			}
 			if unknown > 0 {
-				return fmt.Errorf("unknown artifacts: %d", unknown)
+				return trustErr("unknown artifacts: %d", unknown)
 			}
 			return nil
 		},

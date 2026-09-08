@@ -17,9 +17,12 @@ func TestCanonicalize(t *testing.T) {
 			{Subject: lockfile.Subject{Ecosystem: "npm", Name: "lodash"}, Version: "4.17.21"},
 		},
 	}
-	doc.Artifacts[0].Evidence.Vulnerabilities = []lockfile.Vulnerability{
-		{ID: "GHSA-b"},
-		{ID: "GHSA-a"},
+	doc.Artifacts[0].Evidence.Vulnerabilities = lockfile.VulnEvidence{
+		State: lockfile.VulnChecked,
+		Items: []lockfile.Vulnerability{
+			{ID: "GHSA-b"},
+			{ID: "GHSA-a"},
+		},
 	}
 	lockfile.Canonicalize(&doc)
 
@@ -29,7 +32,7 @@ func TestCanonicalize(t *testing.T) {
 	if doc.Artifacts[0].Subject.Name != "lodash" {
 		t.Fatalf("first artifact = %s", doc.Artifacts[0].Subject.Name)
 	}
-	if doc.Artifacts[1].Evidence.Vulnerabilities[0].ID != "GHSA-a" {
+	if doc.Artifacts[1].Evidence.Vulnerabilities.Items[0].ID != "GHSA-a" {
 		t.Fatalf("vulns not sorted: %#v", doc.Artifacts[1].Evidence.Vulnerabilities)
 	}
 }
@@ -44,5 +47,9 @@ func TestSubjectIdentity(t *testing.T) {
 	}
 	if art.ArtifactID() != "npm:react@19.2.0" {
 		t.Fatalf("artifact id = %s", art.ArtifactID())
+	}
+	art.Filename = "react-19.2.0.tgz"
+	if art.ArtifactID() != "npm:react@19.2.0#react-19.2.0.tgz" {
+		t.Fatalf("artifact id with filename = %s", art.ArtifactID())
 	}
 }

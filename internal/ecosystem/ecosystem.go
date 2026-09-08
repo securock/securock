@@ -25,7 +25,7 @@ func Collect(path string) ([]Dependency, error) {
 		return nil, fmt.Errorf("no supported lockfile found in %s", path)
 	}
 
-	seen := make(map[string]struct{})
+	seen := make(map[string]string)
 	var deps []Dependency
 
 	for _, e := range ecosystems {
@@ -43,14 +43,25 @@ func Collect(path string) ([]Dependency, error) {
 			if dep.Resolver == "" {
 				dep.Resolver = e.Name()
 			}
-			key := dep.Ecosystem + ":" + dep.Name + "@" + dep.Version
-			if _, ok := seen[key]; ok {
-				continue
+			key := depKey(dep)
+			if prev, ok := seen[key]; ok {
+				if prev == dep.Digest {
+					continue
+				}
+				return nil, fmt.Errorf("artifact conflict detected\n\n%s\n\n%s\n%s", key, prev, dep.Digest)
 			}
-			seen[key] = struct{}{}
+			seen[key] = dep.Digest
 			deps = append(deps, dep)
 		}
 	}
 
 	return deps, nil
+}
+
+func depKey(dep Dependency) string {
+	key := dep.Ecosystem + ":" + dep.Name + "@" + dep.Version
+	if dep.Filename != "" {
+		return key + "#" + dep.Filename
+	}
+	return key
 }

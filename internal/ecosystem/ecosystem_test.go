@@ -1,6 +1,9 @@
 package ecosystem_test
 
 import (
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/securock/securock/internal/ecosystem"
@@ -19,6 +22,31 @@ func TestPreferPnpmOverNpm(t *testing.T) {
 	}
 	if got[0].Name() != "pnpm" || got[1].Name() != "go" {
 		t.Fatalf("unexpected order: %v", names(got))
+	}
+}
+
+func TestCollectArtifactConflict(t *testing.T) {
+	dir := t.TempDir()
+	raw := `{
+  "name": "fixture",
+  "lockfileVersion": 3,
+  "packages": {
+    "node_modules/foo": {
+      "version": "1.0.0",
+      "integrity": "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+    },
+    "node_modules/nested/node_modules/foo": {
+      "version": "1.0.0",
+      "integrity": "sha256-BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB="
+    }
+  }
+}`
+	if err := os.WriteFile(filepath.Join(dir, "package-lock.json"), []byte(raw), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	_, err := ecosystem.Collect(dir)
+	if err == nil || !strings.Contains(err.Error(), "artifact conflict") {
+		t.Fatalf("expected conflict, got %v", err)
 	}
 }
 

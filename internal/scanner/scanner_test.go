@@ -2,6 +2,8 @@ package scanner_test
 
 import (
 	"context"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/securock/securock/internal/ecosystem"
@@ -37,7 +39,7 @@ func TestScanOffline(t *testing.T) {
 		t.Fatalf("got %d artifacts", len(result.Document.Artifacts))
 	}
 	trusted, untrusted, unknown := scanner.Summary(result.Document)
-	if trusted != 3 || untrusted != 0 || unknown != 0 {
+	if trusted != 0 || untrusted != 0 || unknown != 3 {
 		t.Fatalf("summary = %d/%d/%d", trusted, untrusted, unknown)
 	}
 }
@@ -69,4 +71,50 @@ func TestScanWithVulnerabilities(t *testing.T) {
 	if untrusted != 1 {
 		t.Fatalf("untrusted = %d, want 1", untrusted)
 	}
+}
+
+func TestScanPrivateNotQueried(t *testing.T) {
+	dir := t.TempDir()
+	raw := `{
+  "name": "fixture",
+  "lockfileVersion": 3,
+  "packages": {
+    "node_modules/@company/internal-auth": {
+      "version": "1.0.0",
+      "resolved": "https://npm.company.example/@company/internal-auth/-/internal-auth-1.0.0.tgz",
+      "integrity": "sha256-n4bQgYhMfWWaL+qgxVrQFaO/TxsrC4Is0V1sFbDwCgg="
+    }
+  }
+}`
+	if err := os.WriteFile(filepath.Join(dir, "package-lock.json"), []byte(raw), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	client := &countingOSV{}
+	result, err := scanner.Scan(context.Background(), scanner.Options{
+		Path:   dir,
+		Policy: policy.Default(),
+		Client: client,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if client.n != 0 {
+		t.Fatalf("queried %d private packages", client.n)
+	}
+	if result.Document.Artifacts[0].Evidence.Vulnerabilities.State != lockfile.VulnUnknown {
+		t.Fatalf("state = %s", result.Document.Artifacts[0].Evidence.Vulnerabilities.State)
+	}
+	if result.Document.Artifacts[0].Trust.Status != lockfile.StatusUnknown {
+		t.Fatalf("trust = %s", result.Document.Artifacts[0].Trust.Status)
+	}
+}
+
+type countingOSV struct {
+	n int
+}
+
+func (c *countingOSV) Query(_ context.Context, deps []ecosystem.Dependency) (map[string][]lockfile.Vulnerability, error) {
+	c.n += len(deps)
+	return map[string][]lockfile.Vulnerability{}, nil
 }

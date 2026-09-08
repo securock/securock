@@ -27,20 +27,25 @@ func newScanCommand(opts *options) *cobra.Command {
 func runScan(cmd *cobra.Command, opts *options, path string) error {
 	pol, err := policy.Load(opts.policy)
 	if err != nil {
+		return opErr(err)
+	}
+	net, err := scanOptions(opts, pol)
+	if err != nil {
 		return err
 	}
 
 	result, err := scanner.Scan(cmd.Context(), scanner.Options{
 		Path:    path,
 		Offline: opts.offline,
+		Network: net,
 		Policy:  pol,
 	})
 	if err != nil {
-		return err
+		return opErr(err)
 	}
 
 	if err := writeScan(cmd.OutOrStdout(), result.Document, opts.format); err != nil {
-		return err
+		return opErr(err)
 	}
 
 	_, untrusted, unknown := scanner.Summary(result.Document)
@@ -48,10 +53,10 @@ func runScan(cmd *cobra.Command, opts *options, path string) error {
 		return nil
 	}
 	if untrusted > 0 {
-		return fmt.Errorf("untrusted artifacts: %d", untrusted)
+		return trustErr("untrusted artifacts: %d", untrusted)
 	}
 	if unknown > 0 {
-		return fmt.Errorf("unknown artifacts: %d", unknown)
+		return trustErr("unknown artifacts: %d", unknown)
 	}
 	return nil
 }
@@ -87,8 +92,8 @@ func writeScanText(w io.Writer, doc lockfile.Document) error {
 			if art.Trust.Status != lockfile.StatusUntrusted {
 				continue
 			}
-			ids := make([]string, 0, len(art.Evidence.Vulnerabilities))
-			for _, v := range art.Evidence.Vulnerabilities {
+			ids := make([]string, 0, len(art.Evidence.Vulnerabilities.Items))
+			for _, v := range art.Evidence.Vulnerabilities.Items {
 				ids = append(ids, v.ID)
 			}
 			extra := strings.Join(art.Trust.Reasons, ", ")

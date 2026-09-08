@@ -24,8 +24,8 @@ func TestDependencies(t *testing.T) {
 	for _, dep := range deps {
 		got[dep.Name+"@"+dep.Version] = dep.Digest
 	}
-	if _, ok := got["github.com/spf13/cobra@v1.9.1"]; !ok {
-		t.Fatalf("missing cobra: %#v", got)
+	if got["github.com/spf13/cobra@v1.9.1"] != "goh1:n4bQgYhMfWWaL+qgxVrQFaO/TxsrC4Is0V1sFbDwCgg=" {
+		t.Fatalf("cobra digest = %q", got["github.com/spf13/cobra@v1.9.1"])
 	}
 	if _, ok := got["golang.org/x/sys@v0.0.0-20220811171246-acb485596380"]; !ok {
 		t.Fatalf("missing sys: %#v", got)

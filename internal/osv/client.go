@@ -5,10 +5,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"time"
 
 	"github.com/securock/securock/internal/ecosystem"
+	"github.com/securock/securock/internal/httpx"
 	"github.com/securock/securock/pkg/lockfile"
 )
 
@@ -101,6 +103,9 @@ func (c *HTTPClient) queryBatch(ctx context.Context, deps []ecosystem.Dependency
 	if err != nil {
 		return err
 	}
+	req.GetBody = func() (io.ReadCloser, error) {
+		return io.NopCloser(bytes.NewReader(raw)), nil
+	}
 	req.Header.Set("Content-Type", "application/json")
 	if c.UserAgent != "" {
 		req.Header.Set("User-Agent", c.UserAgent)
@@ -111,7 +116,7 @@ func (c *HTTPClient) queryBatch(ctx context.Context, deps []ecosystem.Dependency
 		httpClient = http.DefaultClient
 	}
 
-	res, err := httpClient.Do(req)
+	res, err := httpx.Do(ctx, httpClient, req)
 	if err != nil {
 		return fmt.Errorf("osv query: %w", err)
 	}

@@ -6,29 +6,40 @@ import (
 )
 
 func Evaluate(art *lockfile.Artifact, pol policy.Document) {
-	var reasons []string
+	var untrusted []string
+	var unknown []string
 
-	if pol.Rules.RequireNoVulnerabilities && len(art.Evidence.Vulnerabilities) > 0 {
-		reasons = append(reasons, "known vulnerabilities")
+	if pol.Rules.RequireNoVulnerabilities {
+		switch art.Evidence.Vulnerabilities.State {
+		case lockfile.VulnChecked:
+			if len(art.Evidence.Vulnerabilities.Items) > 0 {
+				untrusted = append(untrusted, "known vulnerabilities")
+			}
+		default:
+			unknown = append(unknown, "vulnerabilities not checked")
+		}
 	}
 	if pol.Rules.RequireDigest && art.Digest == "" {
-		reasons = append(reasons, "missing digest")
+		untrusted = append(untrusted, "missing digest")
 	}
 	if pol.Rules.RequireProvenance && !art.Evidence.Provenance.Present() {
-		reasons = append(reasons, "provenance not present")
+		untrusted = append(untrusted, "provenance not present")
 	}
 	if pol.Rules.RequireSignature && !art.Evidence.Signature.Present() {
-		reasons = append(reasons, "signature not present")
+		untrusted = append(untrusted, "signature not present")
 	}
 
-	if len(reasons) > 0 {
+	switch {
+	case len(untrusted) > 0:
 		art.Trust.Status = lockfile.StatusUntrusted
-		art.Trust.Reasons = reasons
-		return
+		art.Trust.Reasons = untrusted
+	case len(unknown) > 0:
+		art.Trust.Status = lockfile.StatusUnknown
+		art.Trust.Reasons = unknown
+	default:
+		art.Trust.Status = lockfile.StatusTrusted
+		art.Trust.Reasons = nil
 	}
-
-	art.Trust.Status = lockfile.StatusTrusted
-	art.Trust.Reasons = nil
 }
 
 func MarkUnknown(art *lockfile.Artifact, reason string) {

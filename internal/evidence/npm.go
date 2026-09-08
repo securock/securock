@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/securock/securock/internal/ecosystem"
+	"github.com/securock/securock/internal/httpx"
 	"github.com/securock/securock/pkg/lockfile"
 )
 
@@ -85,8 +86,18 @@ func (c *NPM) lookup(ctx context.Context, dep ecosystem.Dependency) Record {
 	}
 }
 
+func (c *NPM) registryFor(dep ecosystem.Dependency) string {
+	if dep.Registry != "" {
+		return dep.Registry
+	}
+	if c.Registry != "" {
+		return c.Registry
+	}
+	return "https://registry.npmjs.org"
+}
+
 func (c *NPM) provenance(ctx context.Context, dep ecosystem.Dependency) lockfile.EvidenceState {
-	endpoint := strings.TrimRight(c.Registry, "/") + npmAttestationsPath + url.PathEscape(dep.Name) + "@" + url.PathEscape(dep.Version)
+	endpoint := strings.TrimRight(c.registryFor(dep), "/") + npmAttestationsPath + url.PathEscape(dep.Name) + "@" + url.PathEscape(dep.Version)
 	res, err := c.get(ctx, endpoint)
 	if err != nil {
 		return lockfile.EvidenceUnknown
@@ -118,7 +129,7 @@ func (c *NPM) provenance(ctx context.Context, dep ecosystem.Dependency) lockfile
 }
 
 func (c *NPM) signature(ctx context.Context, dep ecosystem.Dependency) lockfile.EvidenceState {
-	endpoint := strings.TrimRight(c.Registry, "/") + "/" + encodeNPMName(dep.Name) + "/" + url.PathEscape(dep.Version)
+	endpoint := strings.TrimRight(c.registryFor(dep), "/") + "/" + encodeNPMName(dep.Name) + "/" + url.PathEscape(dep.Version)
 	res, err := c.get(ctx, endpoint)
 	if err != nil {
 		return lockfile.EvidenceUnknown
@@ -159,7 +170,7 @@ func (c *NPM) get(ctx context.Context, endpoint string) (*http.Response, error) 
 	if httpClient == nil {
 		httpClient = http.DefaultClient
 	}
-	return httpClient.Do(req)
+	return httpx.Do(ctx, httpClient, req)
 }
 
 func encodeNPMName(name string) string {

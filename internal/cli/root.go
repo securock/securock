@@ -4,11 +4,13 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/securock/securock/pkg/policy"
 	"github.com/spf13/cobra"
 )
 
 type options struct {
 	offline  bool
+	network  string
 	format   string
 	lockPath string
 	policy   string
@@ -28,7 +30,8 @@ func NewRoot(version, commit, date string) *cobra.Command {
 	}
 	root.SetVersionTemplate("{{.Version}}\n")
 
-	root.PersistentFlags().BoolVar(&opts.offline, "offline", false, "skip remote vulnerability lookups")
+	root.PersistentFlags().BoolVar(&opts.offline, "offline", false, "skip remote lookups")
+	root.PersistentFlags().StringVar(&opts.network, "network", "", "network mode: public-only, offline, or allow-all")
 	root.PersistentFlags().StringVar(&opts.format, "format", "text", "output format: text or json")
 	root.PersistentFlags().StringVar(&opts.lockPath, "lock", "", "path to securock.lock")
 	root.PersistentFlags().StringVar(&opts.policy, "policy", "", "path to a policy file")
@@ -55,7 +58,11 @@ func NewRoot(version, commit, date string) *cobra.Command {
 func Execute(version, commit, date string) {
 	if err := NewRoot(version, commit, date).Execute(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
+		var e exitError
+		if asExit(err, &e) {
+			os.Exit(e.code)
+		}
+		os.Exit(exitFail)
 	}
 }
 
@@ -70,6 +77,21 @@ func formatVersion(version, commit, date string) string {
 		date = "unknown"
 	}
 	return fmt.Sprintf("%s (commit %s, built %s)", version, commit, date)
+}
+
+func scanOptions(opts *options, pol policy.Document) (policy.Network, error) {
+	net := pol.Network
+	if opts.network != "" {
+		mode := policy.Mode(opts.network)
+		if !policy.ValidMode(mode) || mode == "" {
+			return policy.Network{}, opErr(fmt.Errorf("unknown network mode %q", opts.network))
+		}
+		net.Mode = mode
+	}
+	if opts.offline {
+		net.Mode = policy.ModeOffline
+	}
+	return net, nil
 }
 
 func projectPath(args []string) string {

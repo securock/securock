@@ -12,4 +12,9 @@ func TestNormalizeDigest(t *testing.T) {
 	if got != want {
 		t.Fatalf("got %q, want %q", got, want)
 	}
+
+	h1 := core.NormalizeDigest("h1:n4bQgYhMfWWaL+qgxVrQFaO/TxsrC4Is0V1sFbDwCgg=")
+	if h1 != "goh1:n4bQgYhMfWWaL+qgxVrQFaO/TxsrC4Is0V1sFbDwCgg=" {
+		t.Fatalf("h1 digest = %q", h1)
+	}
 }

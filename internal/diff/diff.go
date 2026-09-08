@@ -1,6 +1,7 @@
 package diff
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"slices"
@@ -10,28 +11,35 @@ import (
 )
 
 type Side struct {
-	Versions    []string
-	Digests     []string
-	Provenance  lockfile.EvidenceState
-	Signature   lockfile.EvidenceState
-	Vulns       []string
-	Trust       lockfile.Status
-	TrustReason []string
+	Versions    []string               `json:"versions,omitempty"`
+	Digests     []string               `json:"digests,omitempty"`
+	Provenance  lockfile.EvidenceState `json:"provenance,omitempty"`
+	Signature   lockfile.EvidenceState `json:"signature,omitempty"`
+	VulnState   lockfile.VulnState     `json:"vuln_state,omitempty"`
+	Vulns       []string               `json:"vulnerabilities,omitempty"`
+	Trust       lockfile.Status        `json:"trust,omitempty"`
+	TrustReason []string               `json:"reasons,omitempty"`
 }
 
 type Change struct {
-	Subject string
-	Before  Side
-	After   Side
+	Subject string `json:"subject"`
+	Before  Side   `json:"before"`
+	After   Side   `json:"after"`
 }
 
 type Result struct {
-	Changes []Change
-	Added   []string
-	Removed []string
+	Changes      []Change
+	Added        []string
+	Removed      []string
+	PolicyBefore string
+	PolicyAfter  string
 }
 
 func Compare(locked, current lockfile.Document) Result {
+	result := Result{
+		PolicyBefore: locked.Policy.Digest,
+		PolicyAfter:  current.Policy.Digest,
+	}
 	before := summarize(locked.Artifacts)
 	after := summarize(current.Artifacts)
 
@@ -49,7 +57,6 @@ func Compare(locked, current lockfile.Document) Result {
 	}
 	slices.Sort(ids)
 
-	var result Result
 	for _, id := range ids {
 		prev, hadPrev := before[id]
 		next, hadNext := after[id]
@@ -66,6 +73,9 @@ func Compare(locked, current lockfile.Document) Result {
 }
 
 func (r Result) TrustDrift() bool {
+	if r.PolicyBefore != r.PolicyAfter {
+		return true
+	}
 	if len(r.Added) > 0 || len(r.Removed) > 0 {
 		return true
 	}
@@ -79,6 +89,9 @@ func (r Result) TrustDrift() bool {
 
 func (r Result) TrustChanges() int {
 	n := len(r.Added) + len(r.Removed)
+	if r.PolicyBefore != r.PolicyAfter {
+		n++
+	}
 	for _, c := range r.Changes {
 		if trustRelevant(c.Before, c.After) {
 			n++
@@ -95,6 +108,11 @@ func Write(w io.Writer, r Result) {
 	}
 	fmt.Fprintln(w)
 
+	if r.PolicyBefore != r.PolicyAfter {
+		fmt.Fprintf(w, "\npolicy\n")
+		writeField(w, "digest", r.PolicyBefore, r.PolicyAfter, false)
+	}
+
 	for _, id := range r.Removed {
 		fmt.Fprintf(w, "\n%s\n  removed\n", id)
 	}
@@ -107,6 +125,7 @@ func Write(w io.Writer, r Result) {
 		writeDigest(w, c.Before.Digests, c.After.Digests)
 		writeState(w, "provenance", c.Before.Provenance, c.After.Provenance)
 		writeState(w, "signature", c.Before.Signature, c.After.Signature)
+		writeField(w, "vuln state", string(c.Before.VulnState), string(c.After.VulnState), false)
 		writeField(w, "vulnerabilities", ids(c.Before.Vulns), ids(c.After.Vulns), false)
 		writeField(w, "trust", string(c.Before.Trust), string(c.After.Trust), false)
 		writeField(w, "reason", join(c.Before.TrustReason), join(c.After.TrustReason), false)
@@ -149,9 +168,10 @@ func sideOf(arts []lockfile.Artifact) Side {
 		if art.Digest != "" {
 			s.Digests = append(s.Digests, art.Digest)
 		}
-		for _, v := range art.Evidence.Vulnerabilities {
+		for _, v := range art.Evidence.Vulnerabilities.Items {
 			s.Vulns = append(s.Vulns, v.ID)
 		}
+		s.VulnState = worstVuln(s.VulnState, art.Evidence.Vulnerabilities.State)
 		s.Provenance = worstEvidence(s.Provenance, art.Evidence.Provenance)
 		s.Signature = worstEvidence(s.Signature, art.Evidence.Signature)
 		s.Trust = worstTrust(s.Trust, art.Trust.Status)
@@ -173,18 +193,31 @@ func changed(a, b Side) bool {
 		join(a.Digests) != join(b.Digests) ||
 		a.Provenance != b.Provenance ||
 		a.Signature != b.Signature ||
+		a.VulnState != b.VulnState ||
 		join(a.Vulns) != join(b.Vulns) ||
 		a.Trust != b.Trust ||
 		join(a.TrustReason) != join(b.TrustReason)
 }
 
 func trustRelevant(a, b Side) bool {
-	return join(a.Digests) != join(b.Digests) ||
+	return join(a.Versions) != join(b.Versions) ||
+		join(a.Digests) != join(b.Digests) ||
 		a.Provenance != b.Provenance ||
 		a.Signature != b.Signature ||
+		a.VulnState != b.VulnState ||
 		join(a.Vulns) != join(b.Vulns) ||
 		a.Trust != b.Trust ||
 		join(a.TrustReason) != join(b.TrustReason)
+}
+
+func worstVuln(a, b lockfile.VulnState) lockfile.VulnState {
+	if a == "" {
+		return b
+	}
+	if a == lockfile.VulnUnknown || b == lockfile.VulnUnknown {
+		return lockfile.VulnUnknown
+	}
+	return b
 }
 
 func worstEvidence(a, b lockfile.EvidenceState) lockfile.EvidenceState {
@@ -259,4 +292,34 @@ func ids(in []string) string {
 		return "none"
 	}
 	return join(in)
+}
+
+type PolicyChange struct {
+	Before string `json:"before,omitempty"`
+	After  string `json:"after,omitempty"`
+}
+
+type Report struct {
+	SchemaVersion int           `json:"schema_version"`
+	TrustDrift    bool          `json:"trust_drift"`
+	Policy        *PolicyChange `json:"policy,omitempty"`
+	Added         []string      `json:"added,omitempty"`
+	Removed       []string      `json:"removed,omitempty"`
+	Changes       []Change      `json:"changes,omitempty"`
+}
+
+func WriteJSON(w io.Writer, r Result) error {
+	rep := Report{
+		SchemaVersion: 1,
+		TrustDrift:    r.TrustDrift(),
+		Added:         r.Added,
+		Removed:       r.Removed,
+		Changes:       r.Changes,
+	}
+	if r.PolicyBefore != "" || r.PolicyAfter != "" {
+		rep.Policy = &PolicyChange{Before: r.PolicyBefore, After: r.PolicyAfter}
+	}
+	enc := json.NewEncoder(w)
+	enc.SetIndent("", "  ")
+	return enc.Encode(rep)
 }

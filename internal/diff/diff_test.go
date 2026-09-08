@@ -78,7 +78,10 @@ func TestCompareVulnerabilityIDs(t *testing.T) {
 			Subject: lockfile.Subject{Ecosystem: "npm", Name: "foo"},
 			Version: "1.0.0",
 			Evidence: lockfile.Evidence{
-				Vulnerabilities: []lockfile.Vulnerability{{ID: "CVE-A"}},
+				Vulnerabilities: lockfile.VulnEvidence{
+					State: lockfile.VulnChecked,
+					Items: []lockfile.Vulnerability{{ID: "CVE-A"}},
+				},
 			},
 			Trust: lockfile.Trust{Status: lockfile.StatusUntrusted, Reasons: []string{"known vulnerabilities"}},
 		},
@@ -88,7 +91,10 @@ func TestCompareVulnerabilityIDs(t *testing.T) {
 			Subject: lockfile.Subject{Ecosystem: "npm", Name: "foo"},
 			Version: "1.0.0",
 			Evidence: lockfile.Evidence{
-				Vulnerabilities: []lockfile.Vulnerability{{ID: "CVE-B"}},
+				Vulnerabilities: lockfile.VulnEvidence{
+					State: lockfile.VulnChecked,
+					Items: []lockfile.Vulnerability{{ID: "CVE-B"}},
+				},
 			},
 			Trust: lockfile.Trust{Status: lockfile.StatusUntrusted, Reasons: []string{"known vulnerabilities"}},
 		},
@@ -97,6 +103,43 @@ func TestCompareVulnerabilityIDs(t *testing.T) {
 	got := diff.Compare(locked, current)
 	if !got.TrustDrift() {
 		t.Fatal("vulnerability id swap must be trust drift")
+	}
+}
+
+func TestComparePolicyDigest(t *testing.T) {
+	locked := lockfile.Document{
+		Policy: lockfile.PolicyRef{Digest: "sha256:aaa"},
+		Artifacts: []lockfile.Artifact{
+			{Subject: lockfile.Subject{Ecosystem: "npm", Name: "foo"}, Version: "1.0.0"},
+		},
+	}
+	current := lockfile.Document{
+		Policy: lockfile.PolicyRef{Digest: "sha256:bbb"},
+		Artifacts: []lockfile.Artifact{
+			{Subject: lockfile.Subject{Ecosystem: "npm", Name: "foo"}, Version: "1.0.0"},
+		},
+	}
+	got := diff.Compare(locked, current)
+	if !got.TrustDrift() {
+		t.Fatal("policy digest change must be trust drift")
+	}
+}
+
+func TestWriteJSON(t *testing.T) {
+	got := diff.Compare(
+		lockfile.Document{Policy: lockfile.PolicyRef{Digest: "sha256:aaa"}},
+		lockfile.Document{Policy: lockfile.PolicyRef{Digest: "sha256:bbb"}},
+	)
+	var buf bytes.Buffer
+	if err := diff.WriteJSON(&buf, got); err != nil {
+		t.Fatal(err)
+	}
+	out := buf.String()
+	if !strings.Contains(out, `"schema_version": 1`) {
+		t.Fatalf("missing schema_version:\n%s", out)
+	}
+	if !strings.Contains(out, `"trust_drift": true`) {
+		t.Fatalf("missing trust_drift:\n%s", out)
 	}
 }
 

@@ -4,6 +4,8 @@ source:
     - npm
   resolvers:
     - npm
+policy:
+  digest: sha256:de0a30aebfb6c56c7568b4ce1cf17e9d4f99844f6ed150e620142f89124b63f9
 artifacts:
   - subject:
       ecosystem: npm
@@ -16,5 +18,9 @@ artifacts:
     evidence:
       provenance: unknown
       signature: unknown
+      vulnerabilities:
+        state: unknown
     trust:
-      status: trusted
+      status: unknown
+      reasons:
+        - vulnerabilities not checked

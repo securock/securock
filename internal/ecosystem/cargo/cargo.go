@@ -6,6 +6,7 @@ import (
 
 	"github.com/pelletier/go-toml/v2"
 	"github.com/securock/securock/internal/ecosystem/core"
+	"github.com/securock/securock/internal/network"
 )
 
 const lockfileName = "Cargo.lock"
@@ -46,10 +47,14 @@ func (Ecosystem) Dependencies(path string) ([]core.Dependency, error) {
 		if !strings.Contains(pkg.Source, "crates.io") && !strings.HasPrefix(pkg.Source, "registry+") {
 			continue
 		}
+		registry := network.RegistryURL(pkg.Source)
+		if strings.Contains(pkg.Source, "crates.io") && registry == "" {
+			registry = "https://index.crates.io"
+		}
 		deps = append(deps, core.Dependency{
 			Ecosystem: "cargo",
 			Resolver:  "cargo",
-			Registry:  "https://index.crates.io",
+			Registry:  registry,
 			Name:      pkg.Name,
 			Version:   pkg.Version,
 			Digest:    core.NormalizeDigest(pkg.Checksum),

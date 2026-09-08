@@ -2,11 +2,12 @@ package cli
 
 import (
 	"fmt"
+	"strings"
 
+	"github.com/securock/securock/internal/diff"
 	"github.com/securock/securock/internal/lock"
 	"github.com/securock/securock/internal/policy"
 	"github.com/securock/securock/internal/scanner"
-	"github.com/securock/securock/internal/verify"
 	"github.com/spf13/cobra"
 )
 
@@ -19,35 +20,43 @@ func newVerifyCommand(opts *options) *cobra.Command {
 			path := projectPath(args)
 			pol, err := policy.Load(opts.policy)
 			if err != nil {
+				return opErr(err)
+			}
+			net, err := scanOptions(opts, pol)
+			if err != nil {
 				return err
 			}
 
 			lockPath := lock.Path(path, opts.lockPath)
 			locked, err := lock.Read(lockPath)
 			if err != nil {
-				return err
+				return opErr(err)
 			}
 
 			result, err := scanner.Scan(cmd.Context(), scanner.Options{
 				Path:    path,
 				Offline: opts.offline,
+				Network: net,
 				Policy:  pol,
 			})
 			if err != nil {
-				return err
+				return opErr(err)
 			}
 
-			findings := verify.Compare(locked, result.Document)
-			if len(findings.Findings) == 0 {
+			got := diff.Compare(locked, result.Document)
+			if strings.ToLower(opts.format) == "json" {
+				if err := diff.WriteJSON(cmd.OutOrStdout(), got); err != nil {
+					return opErr(err)
+				}
+			} else if !got.TrustDrift() {
 				fmt.Fprintf(cmd.OutOrStdout(), "ok  %d artifacts\n", len(result.Document.Artifacts))
+			} else {
+				diff.Write(cmd.OutOrStdout(), got)
+			}
+			if opts.noFail || !got.TrustDrift() {
 				return nil
 			}
-
-			fmt.Fprintln(cmd.OutOrStdout(), findings.Error())
-			if opts.noFail {
-				return nil
-			}
-			return fmt.Errorf("verify failed (%d findings)", len(findings.Findings))
+			return trustErr("trust drift detected")
 		},
 	}
 }

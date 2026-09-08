@@ -24,12 +24,15 @@ func Canonicalize(doc *Document) {
 		if n := cmp.Compare(a.Version, b.Version); n != 0 {
 			return n
 		}
+		if n := cmp.Compare(a.Filename, b.Filename); n != 0 {
+			return n
+		}
 		return cmp.Compare(a.Source.Resolver, b.Source.Resolver)
 	})
 
 	for i := range doc.Artifacts {
 		art := &doc.Artifacts[i]
-		slices.SortFunc(art.Evidence.Vulnerabilities, func(a, b Vulnerability) int {
+		slices.SortFunc(art.Evidence.Vulnerabilities.Items, func(a, b Vulnerability) int {
 			return cmp.Compare(a.ID, b.ID)
 		})
 		slices.Sort(art.Trust.Reasons)

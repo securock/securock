@@ -1,14 +1,13 @@
 package policy
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 
+	"github.com/securock/securock/internal/decode"
 	"github.com/securock/securock/pkg/policy"
-	"gopkg.in/yaml.v3"
 )
 
 func Load(path string) (policy.Document, error) {
@@ -24,15 +23,15 @@ func Load(path string) (policy.Document, error) {
 	var doc policy.Document
 	switch strings.ToLower(filepath.Ext(path)) {
 	case ".json":
-		err = json.Unmarshal(raw, &doc)
+		err = decode.JSON(raw, &doc)
 	default:
-		err = yaml.Unmarshal(raw, &doc)
+		err = decode.YAML(raw, &doc)
 	}
 	if err != nil {
 		return policy.Document{}, fmt.Errorf("parse policy: %w", err)
 	}
-	if doc.Version == 0 {
-		doc.Version = 1
+	if err := policy.Validate(doc); err != nil {
+		return policy.Document{}, fmt.Errorf("validate policy: %w", err)
 	}
 	return doc, nil
 }

@@ -16,14 +16,21 @@
       "properties": {
         "ecosystems": {
           "type": "array",
-          "items": { "type": "string" },
+          "items": { "type": "string", "enum": ["npm", "cargo", "go", "pypi"] },
           "uniqueItems": true
         },
         "resolvers": {
           "type": "array",
-          "items": { "type": "string" },
+          "items": { "type": "string", "enum": ["npm", "pnpm", "cargo", "go", "uv"] },
           "uniqueItems": true
         }
+      }
+    },
+    "policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "digest": { "type": "string" }
       }
     },
     "artifacts": {
@@ -39,6 +46,7 @@
       "properties": {
         "subject": { "$ref": "#/$defs/subject" },
         "version": { "type": "string", "minLength": 1 },
+        "filename": { "type": "string" },
         "digest": { "type": "string" },
         "source": { "$ref": "#/$defs/artifactSource" },
         "evidence": { "$ref": "#/$defs/evidence" },
@@ -70,12 +78,21 @@
     },
     "evidence": {
       "type": "object",
-      "required": ["provenance", "signature"],
+      "required": ["provenance", "signature", "vulnerabilities"],
       "additionalProperties": false,
       "properties": {
         "provenance": { "$ref": "#/$defs/evidenceState" },
         "signature": { "$ref": "#/$defs/evidenceState" },
-        "vulnerabilities": {
+        "vulnerabilities": { "$ref": "#/$defs/vulnEvidence" }
+      }
+    },
+    "vulnEvidence": {
+      "type": "object",
+      "required": ["state"],
+      "additionalProperties": false,
+      "properties": {
+        "state": { "type": "string", "enum": ["unknown", "checked"] },
+        "items": {
           "type": "array",
           "items": { "$ref": "#/$defs/vulnerability" }
         }
@@ -86,7 +103,7 @@
       "required": ["id"],
       "additionalProperties": false,
       "properties": {
-        "id": { "type": "string" }
+        "id": { "type": "string", "minLength": 1 }
       }
     },
     "trust": {

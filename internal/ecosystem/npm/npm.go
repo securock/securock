@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/securock/securock/internal/ecosystem/core"
+	"github.com/securock/securock/internal/network"
 )
 
 const lockfileName = "package-lock.json"
@@ -50,11 +51,13 @@ type lockPackage struct {
 	Name      string `json:"name"`
 	Version   string `json:"version"`
 	Integrity string `json:"integrity"`
+	Resolved  string `json:"resolved"`
 }
 
 type v1Dep struct {
 	Version      string           `json:"version"`
 	Integrity    string           `json:"integrity"`
+	Resolved     string           `json:"resolved"`
 	Dependencies map[string]v1Dep `json:"dependencies"`
 }
 
@@ -74,7 +77,7 @@ func fromPackages(packages map[string]lockPackage) []core.Dependency {
 		deps = append(deps, core.Dependency{
 			Ecosystem: "npm",
 			Resolver:  "npm",
-			Registry:  "https://registry.npmjs.org",
+			Registry:  npmRegistry(pkg.Resolved),
 			Name:      name,
 			Version:   pkg.Version,
 			Digest:    core.NormalizeDigest(pkg.Integrity),
@@ -92,7 +95,7 @@ func fromDependencies(deps map[string]v1Dep) []core.Dependency {
 				out = append(out, core.Dependency{
 					Ecosystem: "npm",
 					Resolver:  "npm",
-					Registry:  "https://registry.npmjs.org",
+					Registry:  npmRegistry(dep.Resolved),
 					Name:      name,
 					Version:   dep.Version,
 					Digest:    core.NormalizeDigest(dep.Integrity),
@@ -105,6 +108,10 @@ func fromDependencies(deps map[string]v1Dep) []core.Dependency {
 	}
 	walk(deps)
 	return out
+}
+
+func npmRegistry(resolved string) string {
+	return network.Origin(resolved)
 }
 
 func packageName(key string) string {

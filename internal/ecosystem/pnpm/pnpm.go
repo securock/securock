@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/securock/securock/internal/ecosystem/core"
+	"github.com/securock/securock/internal/network"
 	"gopkg.in/yaml.v3"
 )
 
@@ -44,7 +45,7 @@ func (Ecosystem) Dependencies(path string) ([]core.Dependency, error) {
 		deps = append(deps, core.Dependency{
 			Ecosystem: "npm",
 			Resolver:  "pnpm",
-			Registry:  "https://registry.npmjs.org",
+			Registry:  network.Origin(pkg.Resolution.Tarball),
 			Name:      name,
 			Version:   version,
 			Digest:    core.NormalizeDigest(pkg.Resolution.Integrity),
@@ -60,6 +61,7 @@ type pnpmLock struct {
 type pnpmPackage struct {
 	Resolution struct {
 		Integrity string `yaml:"integrity"`
+		Tarball   string `yaml:"tarball"`
 	} `yaml:"resolution"`
 }
 

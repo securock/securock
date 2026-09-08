@@ -13,6 +13,9 @@ func TestEvaluateTrusted(t *testing.T) {
 		Evidence: lockfile.Evidence{
 			Provenance: lockfile.EvidenceUnknown,
 			Signature:  lockfile.EvidenceUnknown,
+			Vulnerabilities: lockfile.VulnEvidence{
+				State: lockfile.VulnChecked,
+			},
 		},
 	}
 	trust.Evaluate(&art, policy.Default())
@@ -24,7 +27,10 @@ func TestEvaluateTrusted(t *testing.T) {
 func TestEvaluateUntrustedVulns(t *testing.T) {
 	art := lockfile.Artifact{
 		Evidence: lockfile.Evidence{
-			Vulnerabilities: []lockfile.Vulnerability{{ID: "GHSA-test"}},
+			Vulnerabilities: lockfile.VulnEvidence{
+				State: lockfile.VulnChecked,
+				Items: []lockfile.Vulnerability{{ID: "GHSA-test"}},
+			},
 		},
 	}
 	trust.Evaluate(&art, policy.Default())
@@ -46,7 +52,12 @@ func TestEvaluateRequireProvenancePresent(t *testing.T) {
 	}
 
 	present := lockfile.Artifact{
-		Evidence: lockfile.Evidence{Provenance: lockfile.EvidencePresent},
+		Evidence: lockfile.Evidence{
+			Provenance: lockfile.EvidencePresent,
+			Vulnerabilities: lockfile.VulnEvidence{
+				State: lockfile.VulnChecked,
+			},
+		},
 	}
 	trust.Evaluate(&present, pol)
 	if present.Trust.Status != lockfile.StatusTrusted {
@@ -54,8 +65,24 @@ func TestEvaluateRequireProvenancePresent(t *testing.T) {
 	}
 }
 
+func TestEvaluateOfflineUnknown(t *testing.T) {
+	art := lockfile.Artifact{
+		Evidence: lockfile.Evidence{
+			Vulnerabilities: lockfile.VulnEvidence{State: lockfile.VulnUnknown},
+		},
+	}
+	trust.Evaluate(&art, policy.Default())
+	if art.Trust.Status != lockfile.StatusUnknown {
+		t.Fatalf("status = %s, want unknown", art.Trust.Status)
+	}
+}
+
 func TestEvaluateRequireDigest(t *testing.T) {
-	art := lockfile.Artifact{}
+	art := lockfile.Artifact{
+		Evidence: lockfile.Evidence{
+			Vulnerabilities: lockfile.VulnEvidence{State: lockfile.VulnChecked},
+		},
+	}
 	pol := policy.Default()
 	pol.Rules.RequireDigest = true
 	trust.Evaluate(&art, pol)
