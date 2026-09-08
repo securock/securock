@@ -8,8 +8,8 @@ fail CI:
 - **Dependency substitution** — a subject appears whose identity was not
   in `securock.lock`
 - **Artifact modification** — the digest for a subject changes
-- **Trust-state changes** — provenance, signature, vulnerability count,
-  or trust status drifts between lock and the current tree
+- **Trust-state changes** — provenance, signature, vulnerability IDs,
+  trust status, or trust reasons drift between lock and the current tree
 - **Known vulnerable dependency changes** — OSV reports an advisory for
   a locked or updated artifact when the default policy is enabled
 - **Package-manager disguise** — switching npm ↔ pnpm does not rewrite

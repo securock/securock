@@ -71,3 +71,53 @@ func TestCompareTrustDrift(t *testing.T) {
 		t.Fatalf("missing drift footer:\n%s", out)
 	}
 }
+
+func TestCompareVulnerabilityIDs(t *testing.T) {
+	locked := lockfile.Document{Artifacts: []lockfile.Artifact{
+		{
+			Subject: lockfile.Subject{Ecosystem: "npm", Name: "foo"},
+			Version: "1.0.0",
+			Evidence: lockfile.Evidence{
+				Vulnerabilities: []lockfile.Vulnerability{{ID: "CVE-A"}},
+			},
+			Trust: lockfile.Trust{Status: lockfile.StatusUntrusted, Reasons: []string{"known vulnerabilities"}},
+		},
+	}}
+	current := lockfile.Document{Artifacts: []lockfile.Artifact{
+		{
+			Subject: lockfile.Subject{Ecosystem: "npm", Name: "foo"},
+			Version: "1.0.0",
+			Evidence: lockfile.Evidence{
+				Vulnerabilities: []lockfile.Vulnerability{{ID: "CVE-B"}},
+			},
+			Trust: lockfile.Trust{Status: lockfile.StatusUntrusted, Reasons: []string{"known vulnerabilities"}},
+		},
+	}}
+
+	got := diff.Compare(locked, current)
+	if !got.TrustDrift() {
+		t.Fatal("vulnerability id swap must be trust drift")
+	}
+}
+
+func TestCompareTrustReason(t *testing.T) {
+	locked := lockfile.Document{Artifacts: []lockfile.Artifact{
+		{
+			Subject: lockfile.Subject{Ecosystem: "npm", Name: "foo"},
+			Version: "1.0.0",
+			Trust:   lockfile.Trust{Status: lockfile.StatusUntrusted, Reasons: []string{"provenance not present"}},
+		},
+	}}
+	current := lockfile.Document{Artifacts: []lockfile.Artifact{
+		{
+			Subject: lockfile.Subject{Ecosystem: "npm", Name: "foo"},
+			Version: "1.0.0",
+			Trust:   lockfile.Trust{Status: lockfile.StatusUntrusted, Reasons: []string{"known vulnerabilities"}},
+		},
+	}}
+
+	got := diff.Compare(locked, current)
+	if !got.TrustDrift() {
+		t.Fatal("trust reason change must be trust drift")
+	}
+}

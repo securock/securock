@@ -107,8 +107,9 @@ func Write(w io.Writer, r Result) {
 		writeDigest(w, c.Before.Digests, c.After.Digests)
 		writeState(w, "provenance", c.Before.Provenance, c.After.Provenance)
 		writeState(w, "signature", c.Before.Signature, c.After.Signature)
-		fmt.Fprintf(w, "  %-14s%d → %d\n", "vulnerabilities", len(c.Before.Vulns), len(c.After.Vulns))
+		writeField(w, "vulnerabilities", ids(c.Before.Vulns), ids(c.After.Vulns), false)
 		writeField(w, "trust", string(c.Before.Trust), string(c.After.Trust), false)
+		writeField(w, "reason", join(c.Before.TrustReason), join(c.After.TrustReason), false)
 	}
 
 	if r.TrustDrift() {
@@ -154,6 +155,7 @@ func sideOf(arts []lockfile.Artifact) Side {
 		s.Provenance = worstEvidence(s.Provenance, art.Evidence.Provenance)
 		s.Signature = worstEvidence(s.Signature, art.Evidence.Signature)
 		s.Trust = worstTrust(s.Trust, art.Trust.Status)
+		s.TrustReason = append(s.TrustReason, art.Trust.Reasons...)
 	}
 	slices.Sort(s.Versions)
 	s.Versions = slices.Compact(s.Versions)
@@ -161,6 +163,8 @@ func sideOf(arts []lockfile.Artifact) Side {
 	s.Digests = slices.Compact(s.Digests)
 	slices.Sort(s.Vulns)
 	s.Vulns = slices.Compact(s.Vulns)
+	slices.Sort(s.TrustReason)
+	s.TrustReason = slices.Compact(s.TrustReason)
 	return s
 }
 
@@ -169,16 +173,18 @@ func changed(a, b Side) bool {
 		join(a.Digests) != join(b.Digests) ||
 		a.Provenance != b.Provenance ||
 		a.Signature != b.Signature ||
-		len(a.Vulns) != len(b.Vulns) ||
-		a.Trust != b.Trust
+		join(a.Vulns) != join(b.Vulns) ||
+		a.Trust != b.Trust ||
+		join(a.TrustReason) != join(b.TrustReason)
 }
 
 func trustRelevant(a, b Side) bool {
 	return join(a.Digests) != join(b.Digests) ||
 		a.Provenance != b.Provenance ||
 		a.Signature != b.Signature ||
-		len(a.Vulns) != len(b.Vulns) ||
-		a.Trust != b.Trust
+		join(a.Vulns) != join(b.Vulns) ||
+		a.Trust != b.Trust ||
+		join(a.TrustReason) != join(b.TrustReason)
 }
 
 func worstEvidence(a, b lockfile.EvidenceState) lockfile.EvidenceState {
@@ -243,6 +249,14 @@ func displayName(subjectID string) string {
 }
 
 func join(in []string) string {
-	slices.Sort(in)
-	return strings.Join(in, ", ")
+	cp := append([]string(nil), in...)
+	slices.Sort(cp)
+	return strings.Join(cp, ", ")
+}
+
+func ids(in []string) string {
+	if len(in) == 0 {
+		return "none"
+	}
+	return join(in)
 }
