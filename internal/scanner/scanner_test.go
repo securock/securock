@@ -41,6 +41,17 @@ func TestScanOffline(t *testing.T) {
 	}
 }
 
+type fakeEvidence map[string]lockfile.EvidenceState
+
+func (f fakeEvidence) Collect(_ context.Context, deps []ecosystem.Dependency) (map[string]lockfile.EvidenceState, error) {
+	out := make(map[string]lockfile.EvidenceState, len(deps))
+	for _, dep := range deps {
+		key := dep.Ecosystem + ":" + dep.Name + "@" + dep.Version
+		out[key] = f[key]
+	}
+	return out, nil
+}
+
 func TestScanWithVulnerabilities(t *testing.T) {
 	result, err := scanner.Scan(context.Background(), scanner.Options{
 		Path:   "../ecosystem/npm/testdata",
@@ -48,6 +59,7 @@ func TestScanWithVulnerabilities(t *testing.T) {
 		Client: fakeOSV{vulns: map[string][]lockfile.Vulnerability{
 			"npm:react@19.2.0": {{ID: "GHSA-test"}},
 		}},
+		Evidence: fakeEvidence{},
 	})
 	if err != nil {
 		t.Fatal(err)

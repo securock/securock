@@ -6,6 +6,7 @@ import (
 	"slices"
 
 	"github.com/securock/securock/internal/ecosystem"
+	"github.com/securock/securock/internal/evidence"
 	"github.com/securock/securock/internal/osv"
 	"github.com/securock/securock/internal/provenance"
 	"github.com/securock/securock/internal/trust"
@@ -14,10 +15,11 @@ import (
 )
 
 type Options struct {
-	Path    string
-	Offline bool
-	Policy  policy.Document
-	Client  osv.Client
+	Path     string
+	Offline  bool
+	Policy   policy.Document
+	Client   osv.Client
+	Evidence evidence.Collector
 }
 
 type Result struct {
@@ -45,13 +47,24 @@ func Scan(ctx context.Context, opts Options) (*Result, error) {
 		return cmp.Compare(a.Version, b.Version)
 	})
 
-	var vulns map[string][]lockfile.Vulnerability
+	var (
+		vulns map[string][]lockfile.Vulnerability
+		prov  map[string]lockfile.EvidenceState
+	)
 	if !opts.Offline {
 		client := opts.Client
 		if client == nil {
 			client = osv.New()
 		}
 		vulns, err = client.Query(ctx, deps)
+		if err != nil {
+			return nil, err
+		}
+		collector := opts.Evidence
+		if collector == nil {
+			collector = evidence.NewNPM()
+		}
+		prov, err = collector.Collect(ctx, deps)
 		if err != nil {
 			return nil, err
 		}
@@ -78,6 +91,9 @@ func Scan(ctx context.Context, opts Options) (*Result, error) {
 				Provenance: provenance.State(),
 				Signature:  lockfile.EvidenceUnknown,
 			},
+		}
+		if state, ok := prov[dep.Ecosystem+":"+dep.Name+"@"+dep.Version]; ok {
+			art.Evidence.Provenance = state
 		}
 		if vulns != nil {
 			art.Evidence.Vulnerabilities = vulns[dep.Ecosystem+":"+dep.Name+"@"+dep.Version]
