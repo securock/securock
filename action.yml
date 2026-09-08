@@ -1,0 +1,88 @@
+name: Securock
+description: Run securock verify and report trust drift
+author: securock
+branding:
+  icon: shield
+  color: gray-dark
+inputs:
+  path:
+    description: Project directory
+    default: "."
+  command:
+    description: "verify, diff, or both"
+    default: both
+  offline:
+    description: Skip remote vulnerability lookups
+    default: "false"
+  comment:
+    description: Comment a trust report on pull requests
+    default: "true"
+  token:
+    description: GitHub token for PR comments
+    default: ${{ github.token }}
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
+      with:
+        go-version-file: ${{ github.action_path }}/go.mod
+        cache-dependency-path: ${{ github.action_path }}/go.sum
+    - name: Install securock
+      shell: bash
+      run: go install ./cmd/securock
+      working-directory: ${{ github.action_path }}
+    - name: Run securock
+      id: run
+      shell: bash
+      env:
+        COMMAND: ${{ inputs.command }}
+        WORKDIR: ${{ inputs.path }}
+        OFFLINE: ${{ inputs.offline }}
+        SECUROCK_REPORT: ${{ runner.temp }}/securock-report.txt
+      run: "${{ github.action_path }}/action/run.sh"
+    - name: Comment trust report
+      if: ${{ always() && inputs.comment == 'true' && github.event_name == 'pull_request' && steps.run.outcome != 'skipped' }}
+      uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
+      env:
+        SECUROCK_REPORT: ${{ runner.temp }}/securock-report.txt
+      with:
+        github-token: ${{ inputs.token }}
+        script: |
+          const fs = require('fs');
+          const path = process.env.SECUROCK_REPORT;
+          let report = '(no report)';
+          if (path && fs.existsSync(path)) {
+            report = fs.readFileSync(path, 'utf8').trim() || '(empty report)';
+          }
+          const body = [
+            '## Securock Trust Report',
+            '',
+            '```',
+            report,
+            '```',
+          ].join('\n');
+          const { data: comments } = await github.rest.issues.listComments({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            issue_number: context.issue.number,
+          });
+          const existing = comments.find((c) => c.body && c.body.startsWith('## Securock Trust Report'));
+          if (existing) {
+            await github.rest.issues.updateComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              comment_id: existing.id,
+              body,
+            });
+            return;
+          }
+          await github.rest.issues.createComment({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            issue_number: context.issue.number,
+            body,
+          });
+    - name: Fail on trust drift
+      if: ${{ steps.run.outputs.failed == 'true' }}
+      shell: bash
+      run: exit 1
