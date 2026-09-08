@@ -51,11 +51,11 @@ brews:
     homepage: https://securock.dev
     description: Supply-chain trust layer for software dependencies
     license: Apache-2.0
-    directory: Formula
+    directory: .
     skip_upload: true
     repository:
       owner: securock
-      name: homebrew-tap
+      name: securock
     test: |
       system "#{bin}/securock", "version"
 

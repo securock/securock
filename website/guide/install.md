@@ -3,6 +3,9 @@
 ```sh
 curl -fsSL https://securock.sh/install | sh
 
+brew tap securock/securock https://github.com/securock/securock
+brew install --HEAD securock
+
 go install github.com/securock/securock/cmd/securock@latest
 ```
 
