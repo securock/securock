@@ -4,3 +4,6 @@ dist/
 *.test
 coverage.out
 .DS_Store
+website/node_modules/
+website/.vitepress/dist/
+website/.vitepress/cache/
