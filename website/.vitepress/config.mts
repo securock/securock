@@ -20,6 +20,7 @@ export default defineConfig({
           { text: 'Usage', link: '/guide/usage' },
           { text: 'GitHub Action', link: '/guide/action' },
           { text: 'Evidence', link: '/guide/evidence' },
+          { text: 'Privacy', link: 'https://github.com/securock/securock/blob/main/docs/privacy.md' },
         ],
       },
       {

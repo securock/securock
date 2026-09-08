@@ -19,5 +19,5 @@ features:
   - title: diff
     details: See version, digest, evidence, vulnerability IDs, and trust reasons.
   - title: verify
-    details: Fail CI unless the current tree matches the locked trust state.
+    details: Fail CI on the same trust-relevant drift that diff reports.
 ---

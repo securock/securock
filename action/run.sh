@@ -49,6 +49,16 @@ esac
 
 cat "$report"
 
+if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
+  {
+    echo "## Securock Trust Report"
+    echo
+    echo '```'
+    cat "$report"
+    echo '```'
+  } >> "$GITHUB_STEP_SUMMARY"
+fi
+
 if [ "$failed" = true ]; then
   echo "failed=true" >>"$GITHUB_OUTPUT"
 else

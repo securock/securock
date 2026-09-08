@@ -4,12 +4,17 @@
 
 `trusted` means Securock's active policy did not fail the artifact.
 
-The default policy requires that OSV returned no known vulnerabilities.
-Digest, provenance, and signature checks are optional policy rules and
-are off by default.
+The default policy requires that OSV was queried and returned no
+known vulnerabilities. Unchecked vulnerabilities (`state: unknown`)
+are `unknown`, not `trusted`. Digest, provenance, and signature checks
+are optional policy rules and are off by default.
 
 `trusted` is not a guarantee that a package is safe, authentic, or
 free of malicious behavior.
+
+Policy files are fail-closed: unknown fields, versions, and network
+modes are errors. Typos such as `require_provenace` do not silently
+disable a rule.
 
 ## What "untrusted" means
 
@@ -37,7 +42,11 @@ not yet expose that evidence. Unknown is not the same as verified.
 v0.1 npm collection can emit `present`, never `verified`. `verified`
 is reserved for Sigstore and registry-key verification.
 
-Offline scans leave provenance and signature as `unknown`.
+Offline scans leave provenance, signature, and vulnerability state
+as `unknown`. That is not a clean bill of health.
+
+Private registries are not queried in the default `public-only`
+network mode. See [Privacy](privacy.md).
 
 ## Evidence Securock records
 

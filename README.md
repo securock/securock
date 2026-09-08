@@ -66,7 +66,15 @@ writes `securock.lock`, `diff` shows trust drift after a dependency
 change, and `verify` fails when the current tree does not match the
 locked trust state.
 
-`scan` is the default command. Use `--offline` to skip OSV lookups.
+`scan` is the default command. `--offline` skips OSV and registry
+lookups and records vulnerability state as `unknown`, which is not
+trusted under the default policy. `--network public-only` (default)
+does not send private-registry package names off-machine. See
+[Privacy](docs/privacy.md).
+
+`--format json` is a stable API on `scan`, `diff`, and `verify`.
+Exit `1` is a trust violation. Exit `2` is a configuration or
+operational error.
 
 Walk through `lock → update → diff → verify` in
 [`examples/npm`](examples/npm).
@@ -82,14 +90,14 @@ jobs:
   securock:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: securock/securock@main
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: securock/securock@<commit-sha>
         with:
           command: both
 ```
 
-The action builds the CLI from the same git ref, runs `diff` and/or
-`verify`, and posts a `Securock Trust Report` comment on pull requests.
+Pin the action to a full commit SHA. The action writes a trust report
+to `$GITHUB_STEP_SUMMARY` even when it cannot comment on a fork PR.
 
 ## Lockfile
 
@@ -107,8 +115,10 @@ artifacts:
     evidence:
       provenance: unknown
       signature: unknown
+      vulnerabilities:
+        state: unknown
     trust:
-      status: trusted
+      status: unknown
 ```
 
 ## Supported ecosystems
@@ -130,6 +140,7 @@ Apache-2.0
 - [securock.dev](https://securock.dev)
 - [Lockfile specification](docs/specification.md)
 - [Trust model](docs/trust-model.md)
+- [Privacy](docs/privacy.md)
 - [Threat model](docs/threat-model.md)
 - [GitHub rulesets](docs/github-rulesets.md)
 - [Contributing](CONTRIBUTING.md)

@@ -9,6 +9,10 @@ Do not open a public issue for an unreleased vulnerability.
 
 We aim to acknowledge reports within 5 business days.
 
+Securock may send public dependency names and versions to OSV and
+the npm registry. Private registries are not queried in the default
+`public-only` network mode. See [Privacy](docs/privacy.md).
+
 ## Supported versions
 
 Only the latest tagged release is supported until v1.0.

@@ -5,11 +5,14 @@ dependency, inspect trust drift, then verify.
 
 ```bash
 cd examples/npm
-securock lock --offline
+securock lock --offline --no-fail
 securock verify --offline
 ```
 
-`securock.lock` in this directory is the snapshot for `ms@2.1.3`.
+`--offline` does not query OSV. The default policy treats unchecked
+vulnerabilities as `unknown`, so `lock` exits `1` unless `--no-fail`
+is set. `securock.lock` in this directory is that unknown snapshot for
+`ms@2.1.3`.
 
 Simulate a dependency change:
 

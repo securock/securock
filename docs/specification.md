@@ -34,20 +34,26 @@ source:
     - npm
   resolvers:
     - pnpm
+policy:
+  digest: sha256:...
 artifacts:
   - subject:
       ecosystem: npm
       name: react
     version: 19.2.0
-    digest: sha256:...
+    digest: sha512:...
     source:
       resolver: pnpm
       registry: https://registry.npmjs.org
     evidence:
       provenance: unknown
       signature: unknown
+      vulnerabilities:
+        state: unknown
     trust:
-      status: trusted
+      status: unknown
+      reasons:
+        - vulnerabilities not checked
 ```
 
 Subject identity is `ecosystem:name` and does not include a version.
@@ -60,6 +66,30 @@ pnpm to npm must not rewrite every subject identity.
 
 `source.ecosystems` and `source.resolvers` are optional sorted lists.
 They must not include a path.
+
+`policy.digest` is a SHA-256 of the canonical policy document used to
+compute `trust`. It must not include a file path.
+
+Vulnerability evidence is not a bare list. `state: checked` means
+OSV was queried. `unknown` means it was not. An empty `items` list
+with `state: unknown` is not the same as zero vulnerabilities.
+
+Digest prefixes keep ecosystem meaning:
+
+| Prefix | Meaning |
+| --- | --- |
+| `sha256:` / `sha512:` | content hash of the package artifact (npm SRI, Cargo checksum, PyPI file) |
+| `goh1:` | Go module directory hash from `go.sum` (`h1:`) |
+
+PyPI may emit one artifact per wheel or sdist, distinguished by
+`filename`.
+
+The same `ecosystem:name@version` with two different digests is an
+artifact conflict and must fail the scan, except when `filename`
+distinguishes PyPI files.
+
+Unknown lockfile fields, schema versions, ecosystems, evidence
+states, and trust statuses are errors.
 
 ## Canonical encoding
 

@@ -12,9 +12,17 @@ securock diff
 securock verify
 ```
 
-`lock` writes the file. `diff` compares the current tree to the locked
-subjects and prints trust drift. `verify` fails when subjects are added,
-removed, digest-changed, or untrusted.
+`lock` writes the file. `diff` shows what changed. `verify` uses the
+same comparison and fails when there is trust-relevant drift.
+
+Exit codes:
+
+- `0` success / no trust drift
+- `1` trust violation
+- `2` configuration or operational error
+
+`--format json` prints a `schema_version: 1` report from `diff` and
+`verify`.
 
 ## Identity
 
