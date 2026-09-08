@@ -90,3 +90,12 @@ artifacts:
 ## License
 
 Apache-2.0
+
+## Docs
+
+- [Lockfile specification](docs/specification.md)
+- [Trust model](docs/trust-model.md)
+- [Threat model](docs/threat-model.md)
+- [Contributing](CONTRIBUTING.md)
+- [Security policy](SECURITY.md)
+
