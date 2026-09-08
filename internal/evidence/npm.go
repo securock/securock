@@ -3,7 +3,6 @@ package evidence
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"net/url"
 	"strings"
@@ -34,8 +33,8 @@ func NewNPM() *NPM {
 	}
 }
 
-func (c *NPM) Collect(ctx context.Context, deps []ecosystem.Dependency) (map[string]lockfile.EvidenceState, error) {
-	out := make(map[string]lockfile.EvidenceState)
+func (c *NPM) Collect(ctx context.Context, deps []ecosystem.Dependency) (map[string]Record, error) {
+	out := make(map[string]Record)
 	var npmDeps []ecosystem.Dependency
 	for _, dep := range deps {
 		if dep.Ecosystem != "npm" {
@@ -66,12 +65,9 @@ func (c *NPM) Collect(ctx context.Context, deps []ecosystem.Dependency) (map[str
 			}
 			defer func() { <-sem }()
 
-			state, err := c.lookup(ctx, dep)
-			if err != nil {
-				state = lockfile.EvidenceUnknown
-			}
+			rec := c.lookup(ctx, dep)
 			mu.Lock()
-			out[Key(dep)] = state
+			out[Key(dep)] = rec
 			mu.Unlock()
 		}(dep)
 	}
@@ -82,32 +78,27 @@ func (c *NPM) Collect(ctx context.Context, deps []ecosystem.Dependency) (map[str
 	return out, nil
 }
 
-func (c *NPM) lookup(ctx context.Context, dep ecosystem.Dependency) (lockfile.EvidenceState, error) {
-	endpoint := strings.TrimRight(c.Registry, "/") + npmAttestationsPath + url.PathEscape(dep.Name) + "@" + url.PathEscape(dep.Version)
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
-	if err != nil {
-		return lockfile.EvidenceUnknown, err
+func (c *NPM) lookup(ctx context.Context, dep ecosystem.Dependency) Record {
+	return Record{
+		Provenance: c.provenance(ctx, dep),
+		Signature:  c.signature(ctx, dep),
 	}
-	if c.UserAgent != "" {
-		req.Header.Set("User-Agent", c.UserAgent)
-	}
+}
 
-	httpClient := c.HTTP
-	if httpClient == nil {
-		httpClient = http.DefaultClient
-	}
-	res, err := httpClient.Do(req)
+func (c *NPM) provenance(ctx context.Context, dep ecosystem.Dependency) lockfile.EvidenceState {
+	endpoint := strings.TrimRight(c.Registry, "/") + npmAttestationsPath + url.PathEscape(dep.Name) + "@" + url.PathEscape(dep.Version)
+	res, err := c.get(ctx, endpoint)
 	if err != nil {
-		return lockfile.EvidenceUnknown, err
+		return lockfile.EvidenceUnknown
 	}
 	defer res.Body.Close()
 
 	switch res.StatusCode {
 	case http.StatusNotFound:
-		return lockfile.EvidenceMissing, nil
+		return lockfile.EvidenceMissing
 	case http.StatusOK:
 	default:
-		return lockfile.EvidenceUnknown, fmt.Errorf("npm attestations: %s", res.Status)
+		return lockfile.EvidenceUnknown
 	}
 
 	var parsed struct {
@@ -116,14 +107,66 @@ func (c *NPM) lookup(ctx context.Context, dep ecosystem.Dependency) (lockfile.Ev
 		} `json:"attestations"`
 	}
 	if err := json.NewDecoder(res.Body).Decode(&parsed); err != nil {
-		return lockfile.EvidenceUnknown, err
+		return lockfile.EvidenceUnknown
 	}
 	for _, att := range parsed.Attestations {
 		if isProvenance(att.PredicateType) {
-			return lockfile.EvidenceVerified, nil
+			return lockfile.EvidenceVerified
 		}
 	}
-	return lockfile.EvidenceMissing, nil
+	return lockfile.EvidenceMissing
+}
+
+func (c *NPM) signature(ctx context.Context, dep ecosystem.Dependency) lockfile.EvidenceState {
+	endpoint := strings.TrimRight(c.Registry, "/") + "/" + encodeNPMName(dep.Name) + "/" + url.PathEscape(dep.Version)
+	res, err := c.get(ctx, endpoint)
+	if err != nil {
+		return lockfile.EvidenceUnknown
+	}
+	defer res.Body.Close()
+
+	switch res.StatusCode {
+	case http.StatusNotFound:
+		return lockfile.EvidenceMissing
+	case http.StatusOK:
+	default:
+		return lockfile.EvidenceUnknown
+	}
+
+	var parsed struct {
+		Dist struct {
+			Signatures []json.RawMessage `json:"signatures"`
+		} `json:"dist"`
+	}
+	if err := json.NewDecoder(res.Body).Decode(&parsed); err != nil {
+		return lockfile.EvidenceUnknown
+	}
+	if len(parsed.Dist.Signatures) == 0 {
+		return lockfile.EvidenceMissing
+	}
+	return lockfile.EvidenceVerified
+}
+
+func (c *NPM) get(ctx context.Context, endpoint string) (*http.Response, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
+	if err != nil {
+		return nil, err
+	}
+	if c.UserAgent != "" {
+		req.Header.Set("User-Agent", c.UserAgent)
+	}
+	httpClient := c.HTTP
+	if httpClient == nil {
+		httpClient = http.DefaultClient
+	}
+	return httpClient.Do(req)
+}
+
+func encodeNPMName(name string) string {
+	if i := strings.Index(name, "/"); i > 0 {
+		return name[:i] + "%2F" + name[i+1:]
+	}
+	return name
 }
 
 func isProvenance(predicateType string) bool {

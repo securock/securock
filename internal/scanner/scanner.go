@@ -49,7 +49,7 @@ func Scan(ctx context.Context, opts Options) (*Result, error) {
 
 	var (
 		vulns map[string][]lockfile.Vulnerability
-		prov  map[string]lockfile.EvidenceState
+		ev    map[string]evidence.Record
 	)
 	if !opts.Offline {
 		client := opts.Client
@@ -64,7 +64,7 @@ func Scan(ctx context.Context, opts Options) (*Result, error) {
 		if collector == nil {
 			collector = evidence.NewNPM()
 		}
-		prov, err = collector.Collect(ctx, deps)
+		ev, err = collector.Collect(ctx, deps)
 		if err != nil {
 			return nil, err
 		}
@@ -92,8 +92,9 @@ func Scan(ctx context.Context, opts Options) (*Result, error) {
 				Signature:  lockfile.EvidenceUnknown,
 			},
 		}
-		if state, ok := prov[dep.Ecosystem+":"+dep.Name+"@"+dep.Version]; ok {
-			art.Evidence.Provenance = state
+		if rec, ok := ev[dep.Ecosystem+":"+dep.Name+"@"+dep.Version]; ok {
+			art.Evidence.Provenance = rec.Provenance
+			art.Evidence.Signature = rec.Signature
 		}
 		if vulns != nil {
 			art.Evidence.Vulnerabilities = vulns[dep.Ecosystem+":"+dep.Name+"@"+dep.Version]

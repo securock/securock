@@ -11,13 +11,17 @@ import (
 	"github.com/securock/securock/pkg/lockfile"
 )
 
-func TestNPMProvenance(t *testing.T) {
+func TestNPMEvidence(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/-/npm/v1/attestations/react@19.2.0":
 			w.Write([]byte(`{"attestations":[{"predicateType":"https://slsa.dev/provenance/v1"}]}`))
+		case "/react/19.2.0":
+			w.Write([]byte(`{"dist":{"signatures":[{"keyid":"abc","sig":"def"}]}}`))
 		case "/-/npm/v1/attestations/leftpad@1.0.0":
 			http.NotFound(w, r)
+		case "/leftpad/1.0.0":
+			w.Write([]byte(`{"dist":{}}`))
 		default:
 			http.NotFound(w, r)
 		}
@@ -37,10 +41,13 @@ func TestNPMProvenance(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got[evidence.Key(ecosystem.Dependency{Ecosystem: "npm", Name: "react", Version: "19.2.0"})] != lockfile.EvidenceVerified {
-		t.Fatalf("react = %s", got["npm:react@19.2.0"])
+
+	react := got[evidence.Key(ecosystem.Dependency{Ecosystem: "npm", Name: "react", Version: "19.2.0"})]
+	if react.Provenance != lockfile.EvidenceVerified || react.Signature != lockfile.EvidenceVerified {
+		t.Fatalf("react = %+v", react)
 	}
-	if got[evidence.Key(ecosystem.Dependency{Ecosystem: "npm", Name: "leftpad", Version: "1.0.0"})] != lockfile.EvidenceMissing {
-		t.Fatalf("leftpad = %s", got["npm:leftpad@1.0.0"])
+	left := got[evidence.Key(ecosystem.Dependency{Ecosystem: "npm", Name: "leftpad", Version: "1.0.0"})]
+	if left.Provenance != lockfile.EvidenceMissing || left.Signature != lockfile.EvidenceMissing {
+		t.Fatalf("leftpad = %+v", left)
 	}
 }

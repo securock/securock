@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/securock/securock/internal/ecosystem"
+	"github.com/securock/securock/internal/evidence"
 	"github.com/securock/securock/internal/scanner"
 	"github.com/securock/securock/pkg/lockfile"
 	"github.com/securock/securock/pkg/policy"
@@ -41,10 +42,10 @@ func TestScanOffline(t *testing.T) {
 	}
 }
 
-type fakeEvidence map[string]lockfile.EvidenceState
+type fakeEvidence map[string]evidence.Record
 
-func (f fakeEvidence) Collect(_ context.Context, deps []ecosystem.Dependency) (map[string]lockfile.EvidenceState, error) {
-	out := make(map[string]lockfile.EvidenceState, len(deps))
+func (f fakeEvidence) Collect(_ context.Context, deps []ecosystem.Dependency) (map[string]evidence.Record, error) {
+	out := make(map[string]evidence.Record, len(deps))
 	for _, dep := range deps {
 		key := dep.Ecosystem + ":" + dep.Name + "@" + dep.Version
 		out[key] = f[key]
