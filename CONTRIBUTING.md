@@ -6,11 +6,27 @@ Thanks for helping improve Securock.
 
 ```bash
 go test ./...
+go test -race ./...
 go vet ./...
+```
+
+Parser packages include Go fuzz tests. Seed corpus runs with `go test`.
+Longer campaigns:
+
+```bash
+go test -fuzz=Fuzz -fuzztime=30s ./internal/ecosystem/npm
 ```
 
 The CLI entrypoint is `cmd/securock`. Public lockfile types live in
 `pkg/lockfile`.
+
+The docs site is VitePress in `website/`:
+
+```bash
+cd website
+npm install
+npm run docs:dev
+```
 
 ## Pull requests
 

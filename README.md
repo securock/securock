@@ -38,6 +38,13 @@ gh attestation verify securock_darwin_arm64.tar.gz --repo securock/securock
 gh attestation verify ./securock --repo securock/securock
 ```
 
+Homebrew, from this repository (HEAD):
+
+```bash
+brew tap securock/securock https://github.com/securock/securock
+brew install --HEAD securock
+```
+
 Or build from source:
 
 ```bash
@@ -60,6 +67,31 @@ change, and `verify` fails when the current tree does not match the
 locked trust state.
 
 `scan` is the default command. Use `--offline` to skip OSV lookups.
+
+Walk through `lock → update → diff → verify` in
+[`examples/npm`](examples/npm).
+
+## GitHub Action
+
+```yaml
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  securock:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: securock/securock@main
+        with:
+          command: both
+```
+
+The action builds the CLI from the same git ref, runs `diff` and/or
+`verify`, and posts a `Securock Trust Report` comment on pull requests.
+
+## Lockfile
 
 ```yaml
 version: 1
@@ -95,9 +127,11 @@ Apache-2.0
 
 ## Docs
 
+- [securock.dev](https://securock.dev)
 - [Lockfile specification](docs/specification.md)
 - [Trust model](docs/trust-model.md)
 - [Threat model](docs/threat-model.md)
+- [GitHub rulesets](docs/github-rulesets.md)
 - [Contributing](CONTRIBUTING.md)
 - [Security policy](SECURITY.md)
 
