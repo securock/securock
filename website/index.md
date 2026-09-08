@@ -21,5 +21,3 @@ features:
   - title: verify
     details: Fail CI unless the current tree matches the locked trust state.
 ---
-
-<Ledger />
