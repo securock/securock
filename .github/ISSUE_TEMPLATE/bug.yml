@@ -1,0 +1,18 @@
+name: Bug report
+description: Report incorrect trust evaluation or a parser failure
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What Securock did, and what you expected.
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Reproduction
+      description: Commands, lockfiles, and policy files if you can share them. Redact private package names.
+    validations:
+      required: true
