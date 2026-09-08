@@ -15,10 +15,9 @@ func TestWriteRead(t *testing.T) {
 		Version: 1,
 		Artifacts: []lockfile.Artifact{
 			{
-				Ecosystem: "npm",
-				Name:      "react",
-				Version:   "19.2.0",
-				Digest:    "sha256:abc",
+				Subject: lockfile.Subject{Ecosystem: "npm", Name: "react"},
+				Version: "19.2.0",
+				Digest:  "sha256:abc",
 				Evidence: lockfile.Evidence{
 					Provenance: lockfile.EvidenceUnknown,
 					Signature:  lockfile.EvidenceUnknown,
@@ -34,7 +33,7 @@ func TestWriteRead(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(got.Artifacts) != 1 || got.Artifacts[0].Name != "react" {
+	if len(got.Artifacts) != 1 || got.Artifacts[0].Subject.Name != "react" {
 		t.Fatalf("unexpected document: %#v", got)
 	}
 }
@@ -45,9 +44,8 @@ func TestEncodeDeterministic(t *testing.T) {
 		Source:  lockfile.Source{Ecosystems: []string{"npm", "go"}},
 		Artifacts: []lockfile.Artifact{
 			{
-				Ecosystem: "npm",
-				Name:      "react",
-				Version:   "19.2.0",
+				Subject: lockfile.Subject{Ecosystem: "npm", Name: "react"},
+				Version: "19.2.0",
 				Evidence: lockfile.Evidence{
 					Provenance: lockfile.EvidenceUnknown,
 					Signature:  lockfile.EvidenceUnknown,
@@ -59,9 +57,8 @@ func TestEncodeDeterministic(t *testing.T) {
 				Trust: lockfile.Trust{Status: lockfile.StatusTrusted},
 			},
 			{
-				Ecosystem: "go",
-				Name:      "github.com/spf13/cobra",
-				Version:   "v1.9.1",
+				Subject: lockfile.Subject{Ecosystem: "go", Name: "github.com/spf13/cobra"},
+				Version: "v1.9.1",
 				Evidence: lockfile.Evidence{
 					Provenance: lockfile.EvidenceUnknown,
 					Signature:  lockfile.EvidenceUnknown,

@@ -64,12 +64,16 @@ func Scan(ctx context.Context, opts Options) (*Result, error) {
 
 	for _, dep := range deps {
 		art := lockfile.Artifact{
-			Ecosystem: dep.Ecosystem,
-			Name:      dep.Name,
-			Version:   dep.Version,
-			Digest:    dep.Digest,
-			Resolver:  dep.Resolver,
-			Registry:  dep.Registry,
+			Subject: lockfile.Subject{
+				Ecosystem: dep.Ecosystem,
+				Name:      dep.Name,
+			},
+			Version: dep.Version,
+			Digest:  dep.Digest,
+			Source: lockfile.ArtifactSource{
+				Resolver: dep.Resolver,
+				Registry: dep.Registry,
+			},
 			Evidence: lockfile.Evidence{
 				Provenance: provenance.State(),
 				Signature:  lockfile.EvidenceUnknown,

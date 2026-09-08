@@ -15,16 +15,16 @@ func Canonicalize(doc *Document) {
 	doc.Source.Resolvers = compactSorted(doc.Source.Resolvers)
 
 	slices.SortFunc(doc.Artifacts, func(a, b Artifact) int {
-		if n := cmp.Compare(a.Ecosystem, b.Ecosystem); n != 0 {
+		if n := cmp.Compare(a.Subject.Ecosystem, b.Subject.Ecosystem); n != 0 {
 			return n
 		}
-		if n := cmp.Compare(a.Name, b.Name); n != 0 {
+		if n := cmp.Compare(a.Subject.Name, b.Subject.Name); n != 0 {
 			return n
 		}
 		if n := cmp.Compare(a.Version, b.Version); n != 0 {
 			return n
 		}
-		return cmp.Compare(a.Resolver, b.Resolver)
+		return cmp.Compare(a.Source.Resolver, b.Source.Resolver)
 	})
 
 	for i := range doc.Artifacts {

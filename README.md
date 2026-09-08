@@ -50,12 +50,14 @@ securock version
 ```yaml
 version: 1
 artifacts:
-  - ecosystem: npm
-    name: react
+  - subject:
+      ecosystem: npm
+      name: react
     version: 19.2.0
     digest: sha256:...
-    resolver: npm
-    registry: https://registry.npmjs.org
+    source:
+      resolver: npm
+      registry: https://registry.npmjs.org
     evidence:
       provenance: unknown
       signature: unknown

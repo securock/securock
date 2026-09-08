@@ -29,15 +29,23 @@ type Source struct {
 	Resolvers  []string `json:"resolvers,omitempty" yaml:"resolvers,omitempty"`
 }
 
+type Subject struct {
+	Ecosystem string `json:"ecosystem" yaml:"ecosystem"`
+	Name      string `json:"name" yaml:"name"`
+}
+
+type ArtifactSource struct {
+	Resolver string `json:"resolver,omitempty" yaml:"resolver,omitempty"`
+	Registry string `json:"registry,omitempty" yaml:"registry,omitempty"`
+}
+
 type Artifact struct {
-	Ecosystem string   `json:"ecosystem" yaml:"ecosystem"`
-	Name      string   `json:"name" yaml:"name"`
-	Version   string   `json:"version" yaml:"version"`
-	Digest    string   `json:"digest,omitempty" yaml:"digest,omitempty"`
-	Resolver  string   `json:"resolver,omitempty" yaml:"resolver,omitempty"`
-	Registry  string   `json:"registry,omitempty" yaml:"registry,omitempty"`
-	Evidence  Evidence `json:"evidence" yaml:"evidence"`
-	Trust     Trust    `json:"trust" yaml:"trust"`
+	Subject  Subject        `json:"subject" yaml:"subject"`
+	Version  string         `json:"version" yaml:"version"`
+	Digest   string         `json:"digest,omitempty" yaml:"digest,omitempty"`
+	Source   ArtifactSource `json:"source,omitempty" yaml:"source,omitempty"`
+	Evidence Evidence       `json:"evidence" yaml:"evidence"`
+	Trust    Trust          `json:"trust" yaml:"trust"`
 }
 
 type Evidence struct {
@@ -55,6 +63,18 @@ type Trust struct {
 	Reasons []string `json:"reasons,omitempty" yaml:"reasons,omitempty"`
 }
 
+func (s Subject) ID() string {
+	return s.Ecosystem + ":" + s.Name
+}
+
+func (a Artifact) SubjectID() string {
+	return a.Subject.ID()
+}
+
+func (a Artifact) ArtifactID() string {
+	return a.SubjectID() + "@" + a.Version
+}
+
 func (a Artifact) Identity() string {
-	return a.Ecosystem + ":" + a.Name + "@" + a.Version
+	return a.SubjectID()
 }

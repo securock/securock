@@ -36,34 +36,30 @@ func (r Result) Error() string {
 func Compare(locked, current lockfile.Document) Result {
 	var findings []Finding
 
-	lockedByID := make(map[string]lockfile.Artifact, len(locked.Artifacts))
-	for _, art := range locked.Artifacts {
-		lockedByID[art.Identity()] = art
-	}
-	currentByID := make(map[string]lockfile.Artifact, len(current.Artifacts))
-	for _, art := range current.Artifacts {
-		currentByID[art.Identity()] = art
-	}
+	lockedBySubject := groupBySubject(locked.Artifacts)
+	currentBySubject := groupBySubject(current.Artifacts)
 
-	for id, art := range currentByID {
-		prev, ok := lockedByID[id]
+	for id, arts := range currentBySubject {
+		prev, ok := lockedBySubject[id]
 		if !ok {
 			findings = append(findings, Finding{Identity: id, Reason: "not present in securock.lock"})
 			continue
 		}
-		if prev.Digest != "" && art.Digest != "" && prev.Digest != art.Digest {
+		if digestChanged(prev, arts) {
 			findings = append(findings, Finding{Identity: id, Reason: "digest mismatch"})
 		}
-		if art.Trust.Status == lockfile.StatusUntrusted {
-			findings = append(findings, Finding{
-				Identity: id,
-				Reason:   "untrusted (" + strings.Join(art.Trust.Reasons, ", ") + ")",
-			})
+		for _, art := range arts {
+			if art.Trust.Status == lockfile.StatusUntrusted {
+				findings = append(findings, Finding{
+					Identity: id,
+					Reason:   "untrusted (" + strings.Join(art.Trust.Reasons, ", ") + ")",
+				})
+			}
 		}
 	}
 
-	for id := range lockedByID {
-		if _, ok := currentByID[id]; !ok {
+	for id := range lockedBySubject {
+		if _, ok := currentBySubject[id]; !ok {
 			findings = append(findings, Finding{Identity: id, Reason: "missing from current dependencies"})
 		}
 	}
@@ -76,6 +72,40 @@ func Compare(locked, current lockfile.Document) Result {
 	})
 
 	return Result{Findings: findings}
+}
+
+func groupBySubject(arts []lockfile.Artifact) map[string][]lockfile.Artifact {
+	out := make(map[string][]lockfile.Artifact)
+	for _, art := range arts {
+		id := art.SubjectID()
+		out[id] = append(out[id], art)
+	}
+	return out
+}
+
+func digestChanged(locked, current []lockfile.Artifact) bool {
+	prev := digests(locked)
+	got := digests(current)
+	if len(prev) != len(got) {
+		return true
+	}
+	for i := range prev {
+		if prev[i] != got[i] {
+			return true
+		}
+	}
+	return false
+}
+
+func digests(arts []lockfile.Artifact) []string {
+	out := make([]string, 0, len(arts))
+	for _, art := range arts {
+		if art.Digest != "" {
+			out = append(out, art.Digest)
+		}
+	}
+	slices.Sort(out)
+	return out
 }
 
 func Failed(r Result) error {

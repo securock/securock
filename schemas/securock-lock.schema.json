@@ -34,23 +34,38 @@
   "$defs": {
     "artifact": {
       "type": "object",
-      "required": ["ecosystem", "name", "version", "evidence", "trust"],
+      "required": ["subject", "version", "evidence", "trust"],
+      "additionalProperties": false,
+      "properties": {
+        "subject": { "$ref": "#/$defs/subject" },
+        "version": { "type": "string", "minLength": 1 },
+        "digest": { "type": "string" },
+        "source": { "$ref": "#/$defs/artifactSource" },
+        "evidence": { "$ref": "#/$defs/evidence" },
+        "trust": { "$ref": "#/$defs/trust" }
+      }
+    },
+    "subject": {
+      "type": "object",
+      "required": ["ecosystem", "name"],
       "additionalProperties": false,
       "properties": {
         "ecosystem": {
           "type": "string",
           "enum": ["npm", "cargo", "go", "pypi"]
         },
-        "name": { "type": "string", "minLength": 1 },
-        "version": { "type": "string", "minLength": 1 },
-        "digest": { "type": "string" },
+        "name": { "type": "string", "minLength": 1 }
+      }
+    },
+    "artifactSource": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
         "resolver": {
           "type": "string",
           "enum": ["npm", "pnpm", "cargo", "go", "uv"]
         },
-        "registry": { "type": "string" },
-        "evidence": { "$ref": "#/$defs/evidence" },
-        "trust": { "$ref": "#/$defs/trust" }
+        "registry": { "type": "string" }
       }
     },
     "evidence": {

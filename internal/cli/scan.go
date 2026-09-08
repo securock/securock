@@ -95,7 +95,7 @@ func writeScanText(w io.Writer, doc lockfile.Document) error {
 			if len(ids) > 0 {
 				extra = extra + "  " + strings.Join(ids, ", ")
 			}
-			fmt.Fprintf(w, "  %s  %s@%s  %s\n", art.Ecosystem, art.Name, art.Version, strings.TrimSpace(extra))
+			fmt.Fprintf(w, "  %s  %s@%s  %s\n", art.Subject.Ecosystem, art.Subject.Name, art.Version, strings.TrimSpace(extra))
 		}
 	}
 	return nil
