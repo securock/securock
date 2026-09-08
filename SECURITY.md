@@ -21,9 +21,10 @@ Release artifacts are published with:
 - SPDX SBOMs
 - GitHub artifact attestations
 
-Consumers can verify a binary with:
+Consumers can verify either the release archive or the extracted binary:
 
 ```bash
+gh attestation verify securock_darwin_arm64.tar.gz --repo securock/securock
 gh attestation verify ./securock --repo securock/securock
 ```
 

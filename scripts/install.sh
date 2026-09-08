@@ -93,4 +93,8 @@ fi
 tar -xzf "${tmp}/${archive}" -C "$tmp"
 install -m 0755 "${tmp}/${BINARY}" "${INSTALL_DIR}/${BINARY}"
 
+if [ -z "$SKIP_ATTESTATION" ] && command -v gh >/dev/null 2>&1; then
+  gh attestation verify "${INSTALL_DIR}/${BINARY}" --repo "$REPO"
+fi
+
 echo "installed ${BINARY} to ${INSTALL_DIR}/${BINARY}"

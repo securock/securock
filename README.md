@@ -30,9 +30,11 @@ uv.lock
 curl -fsSL https://securock.sh/install | sh
 ```
 
-Verify a downloaded binary against GitHub artifact attestations:
+Verify a downloaded archive or the extracted binary against GitHub
+artifact attestations:
 
 ```bash
+gh attestation verify securock_darwin_arm64.tar.gz --repo securock/securock
 gh attestation verify ./securock --repo securock/securock
 ```
 
