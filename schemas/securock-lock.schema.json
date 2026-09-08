@@ -10,18 +10,14 @@
       "type": "integer",
       "const": 1
     },
-    "generated_at": {
-      "type": "string",
-      "format": "date-time"
-    },
     "source": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "path": { "type": "string" },
         "ecosystems": {
           "type": "array",
-          "items": { "type": "string" }
+          "items": { "type": "string" },
+          "uniqueItems": true
         }
       }
     },
@@ -65,8 +61,7 @@
       "required": ["id"],
       "additionalProperties": false,
       "properties": {
-        "id": { "type": "string" },
-        "modified": { "type": "string" }
+        "id": { "type": "string" }
       }
     },
     "trust": {

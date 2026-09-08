@@ -3,9 +3,7 @@ package scanner
 import (
 	"cmp"
 	"context"
-	"path/filepath"
 	"slices"
-	"time"
 
 	"github.com/securock/securock/internal/ecosystem"
 	"github.com/securock/securock/internal/osv"
@@ -20,7 +18,6 @@ type Options struct {
 	Offline bool
 	Policy  policy.Document
 	Client  osv.Client
-	Now     time.Time
 }
 
 type Result struct {
@@ -31,10 +28,6 @@ func Scan(ctx context.Context, opts Options) (*Result, error) {
 	path := opts.Path
 	if path == "" {
 		path = "."
-	}
-	abs, err := filepath.Abs(path)
-	if err != nil {
-		return nil, err
 	}
 
 	deps, names, err := ecosystem.Collect(path)
@@ -64,16 +57,9 @@ func Scan(ctx context.Context, opts Options) (*Result, error) {
 		}
 	}
 
-	now := opts.Now
-	if now.IsZero() {
-		now = time.Now().UTC().Truncate(time.Second)
-	}
-
 	doc := lockfile.Document{
-		Version:     lockfile.SchemaVersion,
-		GeneratedAt: now,
+		Version: lockfile.SchemaVersion,
 		Source: lockfile.Source{
-			Path:       abs,
 			Ecosystems: names,
 		},
 		Artifacts: make([]lockfile.Artifact, 0, len(deps)),
@@ -97,6 +83,7 @@ func Scan(ctx context.Context, opts Options) (*Result, error) {
 		doc.Artifacts = append(doc.Artifacts, art)
 	}
 
+	lockfile.Canonicalize(&doc)
 	return &Result{Document: doc}, nil
 }
 

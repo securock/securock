@@ -1,6 +1,7 @@
 package lock
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -24,23 +25,34 @@ func Path(root, override string) string {
 }
 
 func Write(path string, doc lockfile.Document) error {
-	var (
-		raw []byte
-		err error
-	)
-	switch strings.ToLower(filepath.Ext(path)) {
-	case ".json":
-		raw, err = json.MarshalIndent(doc, "", "  ")
-		if err == nil {
-			raw = append(raw, '\n')
-		}
-	default:
-		raw, err = yaml.Marshal(doc)
-	}
+	raw, err := Encode(path, doc)
 	if err != nil {
 		return err
 	}
 	return os.WriteFile(path, raw, 0o644)
+}
+
+func Encode(path string, doc lockfile.Document) ([]byte, error) {
+	lockfile.Canonicalize(&doc)
+	switch strings.ToLower(filepath.Ext(path)) {
+	case ".json":
+		raw, err := json.MarshalIndent(doc, "", "  ")
+		if err != nil {
+			return nil, err
+		}
+		return append(raw, '\n'), nil
+	default:
+		var buf bytes.Buffer
+		enc := yaml.NewEncoder(&buf)
+		enc.SetIndent(2)
+		if err := enc.Encode(doc); err != nil {
+			return nil, err
+		}
+		if err := enc.Close(); err != nil {
+			return nil, err
+		}
+		return buf.Bytes(), nil
+	}
 }
 
 func Read(path string) (lockfile.Document, error) {
@@ -59,5 +71,6 @@ func Read(path string) (lockfile.Document, error) {
 	if err != nil {
 		return lockfile.Document{}, fmt.Errorf("parse %s: %w", path, err)
 	}
+	lockfile.Canonicalize(&doc)
 	return doc, nil
 }

@@ -3,7 +3,6 @@ package scanner_test
 import (
 	"context"
 	"testing"
-	"time"
 
 	"github.com/securock/securock/internal/ecosystem"
 	"github.com/securock/securock/internal/scanner"
@@ -29,7 +28,6 @@ func TestScanOffline(t *testing.T) {
 		Path:    "../ecosystem/npm/testdata",
 		Offline: true,
 		Policy:  policy.Default(),
-		Now:     time.Date(2026, 9, 8, 0, 0, 0, 0, time.UTC),
 	})
 	if err != nil {
 		t.Fatal(err)

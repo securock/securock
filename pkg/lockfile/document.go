@@ -1,7 +1,5 @@
 package lockfile
 
-import "time"
-
 const SchemaVersion = 1
 
 type Status string
@@ -21,14 +19,12 @@ const (
 )
 
 type Document struct {
-	Version     int        `json:"version" yaml:"version"`
-	GeneratedAt time.Time  `json:"generated_at" yaml:"generated_at"`
-	Source      Source     `json:"source,omitempty" yaml:"source,omitempty"`
-	Artifacts   []Artifact `json:"artifacts" yaml:"artifacts"`
+	Version   int        `json:"version" yaml:"version"`
+	Source    Source     `json:"source,omitempty" yaml:"source,omitempty"`
+	Artifacts []Artifact `json:"artifacts" yaml:"artifacts"`
 }
 
 type Source struct {
-	Path       string   `json:"path,omitempty" yaml:"path,omitempty"`
 	Ecosystems []string `json:"ecosystems,omitempty" yaml:"ecosystems,omitempty"`
 }
 
@@ -48,8 +44,7 @@ type Evidence struct {
 }
 
 type Vulnerability struct {
-	ID       string `json:"id" yaml:"id"`
-	Modified string `json:"modified,omitempty" yaml:"modified,omitempty"`
+	ID string `json:"id" yaml:"id"`
 }
 
 type Trust struct {

@@ -137,8 +137,7 @@ func (c *HTTPClient) queryBatch(ctx context.Context, deps []ecosystem.Dependency
 				continue
 			}
 			vulns = append(vulns, lockfile.Vulnerability{
-				ID:       v.ID,
-				Modified: v.Modified,
+				ID: v.ID,
 			})
 		}
 		out[key] = vulns
