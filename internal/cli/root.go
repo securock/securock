@@ -36,6 +36,7 @@ func NewRoot(version, commit, date string) *cobra.Command {
 
 	root.AddCommand(newScanCommand(opts))
 	root.AddCommand(newLockCommand(opts))
+	root.AddCommand(newDiffCommand(opts))
 	root.AddCommand(newVerifyCommand(opts))
 	root.AddCommand(&cobra.Command{
 		Use:   "version",

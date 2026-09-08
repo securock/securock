@@ -41,9 +41,15 @@ go install github.com/securock/securock/cmd/securock@latest
 ```bash
 securock scan
 securock lock
+securock diff
 securock verify
 securock version
 ```
+
+`diff` and `verify` are the core loop. `scan` inspects a tree, `lock`
+writes `securock.lock`, `diff` shows trust drift after a dependency
+change, and `verify` fails when the current tree does not match the
+locked trust state.
 
 `scan` is the default command. Use `--offline` to skip OSV lookups.
 
