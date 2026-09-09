@@ -21,6 +21,7 @@ and only for artifacts whose lockfile registry is a known public registry:
 | packagist | `https://repo.packagist.org` |
 | rubygems | `https://rubygems.org` |
 | nuget | `https://api.nuget.org` |
+| pub | `https://pub.dev` |
 | jsr | `https://jsr.io` (names are not sent to OSV yet) |
 
 Private registries, missing `resolved` URLs, and `GOPRIVATE` modules are

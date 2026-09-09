@@ -202,6 +202,8 @@ func Ecosystem(name string) string {
 		return "NuGet"
 	case "swift":
 		return "SwiftURL"
+	case "pub":
+		return "Pub"
 	default:
 		return name
 	}

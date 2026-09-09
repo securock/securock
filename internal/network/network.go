@@ -36,6 +36,9 @@ func DefaultRegistries() map[string][]string {
 		"nuget": {
 			"https://api.nuget.org",
 		},
+		"pub": {
+			"https://pub.dev",
+		},
 		"jsr": {
 			"https://jsr.io",
 		},

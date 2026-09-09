@@ -21,6 +21,7 @@ func TestEcosystem(t *testing.T) {
 		"rubygems":  "RubyGems",
 		"nuget":     "NuGet",
 		"swift":     "SwiftURL",
+		"pub":       "Pub",
 	}
 	for in, want := range cases {
 		if got := osv.Ecosystem(in); got != want {
