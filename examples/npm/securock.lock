@@ -5,7 +5,7 @@ source:
   resolvers:
     - npm
 policy:
-  digest: sha256:de0a30aebfb6c56c7568b4ce1cf17e9d4f99844f6ed150e620142f89124b63f9
+  digest: sha256:10bba8f8a88487c52d211613a3ff89ee600a779e89ca20d8a009e055374f6c4d
 artifacts:
   - subject:
       ecosystem: npm

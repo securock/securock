@@ -67,8 +67,10 @@ pnpm to npm must not rewrite every subject identity.
 `source.ecosystems` and `source.resolvers` are optional sorted lists.
 They must not include a path.
 
-`policy.digest` is a SHA-256 of the canonical policy document used to
-compute `trust`. It must not include a file path.
+`policy.digest` is a SHA-256 of a canonical JSON encoding of the active
+policy (version, resolved network mode, registry allowlists, and
+non-default rules). It must not include a file path. Adding unused
+optional fields to the Go struct must not change the digest.
 
 Vulnerability evidence is not a bare list. `state: checked` means
 OSV was queried. `unknown` means it was not. An empty `items` list
