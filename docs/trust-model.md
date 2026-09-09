@@ -60,12 +60,16 @@ network mode. See [Privacy](privacy.md).
 
 ## Evidence Securock records
 
-| Evidence | npm / pnpm / yarn / bun / deno | cargo / go / pypi |
+| Evidence | npm / pnpm / yarn / bun / deno npm | cargo / go / pypi |
 | --- | --- | --- |
 | digest | from the language lockfile | from the language lockfile |
 | vulnerabilities | OSV ids | OSV ids |
 | provenance | npm provenance attestation present | `unknown` |
 | signature | npm `dist.signatures` present | `unknown` |
+
+Deno JSR and HTTPS URL artifacts record integrity from `deno.lock`.
+OSV does not cover those ecosystems yet, so vulnerability state stays
+`unknown`.
 
 v0.1 records presence only. It does not perform full Sigstore or
 registry-key cryptographic verification, so it will not emit

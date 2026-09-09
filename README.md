@@ -42,7 +42,7 @@ not trusted.
 
 ## Status
 
-Pre-1.0. npm, pnpm, Yarn, and Bun are the stable evidence path. Other
+Pre-1.0. npm, pnpm, Yarn, Bun, and Deno are the stable resolvers. Other
 lockfile parsers exist; provenance and signature evidence there is still
 experimental.
 
@@ -160,9 +160,9 @@ it cannot comment on a fork PR.
 | npm       | pnpm     | `pnpm-lock.yaml`    | stable target |
 | npm       | yarn     | `yarn.lock`         | stable target |
 | npm       | bun      | `bun.lock`          | stable target |
-| npm       | deno     | `deno.lock`         | experimental  |
-| jsr       | deno     | `deno.lock`         | experimental  |
-| url       | deno     | `deno.lock`         | experimental  |
+| npm       | deno     | `deno.lock`         | stable target |
+| jsr       | deno     | `deno.lock`         | stable target |
+| url       | deno     | `deno.lock`         | stable target |
 | cargo     | cargo    | `Cargo.lock`        | experimental  |
 | go        | go       | `go.sum`            | experimental  |
 | pypi      | uv       | `uv.lock`           | experimental  |
@@ -175,6 +175,10 @@ it cannot comment on a fork PR.
 | pub       | pub      | `pubspec.lock`      | experimental  |
 | hex       | mix      | `mix.lock`          | experimental  |
 | maven     | gradle   | `gradle.lockfile`   | experimental  |
+
+Deno npm packages use OSV and npm evidence. JSR and HTTPS URL artifacts
+are stable to parse; OSV does not cover them yet, so vulnerability state
+stays `unknown`.
 
 ## Documentation
 
