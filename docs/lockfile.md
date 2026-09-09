@@ -22,7 +22,7 @@ Exit codes:
 - `2` configuration or operational error
 
 `--format json` prints a `schema_version: 1` report from `diff` and
-`verify`.
+`verify`. JSON Schemas live in `schemas/`.
 
 ## Identity
 

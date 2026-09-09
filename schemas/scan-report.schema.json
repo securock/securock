@@ -1,0 +1,6 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://securock.dev/schema/scan-report.schema.json",
+  "title": "securock scan report",
+  "$ref": "securock-lock.schema.json"
+}

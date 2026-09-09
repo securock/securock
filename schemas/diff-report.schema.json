@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://securock.dev/schema/diff-report.schema.json",
+  "title": "securock diff/verify report",
+  "type": "object",
+  "required": ["schema_version", "trust_drift"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": { "type": "integer", "const": 1 },
+    "trust_drift": { "type": "boolean" },
+    "policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "before": { "type": "string" },
+        "after": { "type": "string" }
+      }
+    },
+    "added": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "removed": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "changes": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/change" }
+    }
+  },
+  "$defs": {
+    "change": {
+      "type": "object",
+      "required": ["artifact", "subject", "before", "after"],
+      "additionalProperties": false,
+      "properties": {
+        "artifact": { "type": "string" },
+        "subject": { "type": "string" },
+        "before": { "$ref": "#/$defs/side" },
+        "after": { "$ref": "#/$defs/side" }
+      }
+    },
+    "side": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "versions": { "type": "array", "items": { "type": "string" } },
+        "digests": { "type": "array", "items": { "type": "string" } },
+        "provenance": { "type": "string" },
+        "signature": { "type": "string" },
+        "vuln_state": { "type": "string" },
+        "vulnerabilities": { "type": "array", "items": { "type": "string" } },
+        "trust": { "type": "string" },
+        "reasons": { "type": "array", "items": { "type": "string" } }
+      }
+    }
+  }
+}
