@@ -93,3 +93,44 @@ func TestPrivateFeedUnknown(t *testing.T) {
 		t.Fatalf("mixed nuget feeds must be unknown: %#v", deps)
 	}
 }
+
+func TestParentConfigMustNotLookPublic(t *testing.T) {
+	isolate(t)
+	home, err := os.UserHomeDir()
+	if err != nil {
+		t.Fatal(err)
+	}
+	userDir := filepath.Join(home, ".nuget", "NuGet")
+	if err := os.MkdirAll(userDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	user := `<?xml version="1.0"?><configuration><packageSources><add key="nuget.org" value="https://api.nuget.org/v3/index.json" /></packageSources></configuration>`
+	if err := os.WriteFile(filepath.Join(userDir, "NuGet.Config"), []byte(user), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	root := t.TempDir()
+	project := filepath.Join(root, "apps", "api")
+	if err := os.MkdirAll(project, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	raw, err := os.ReadFile(filepath.Join("testdata", "packages.lock.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(project, "packages.lock.json"), raw, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cfg := `<?xml version="1.0"?><configuration><packageSources><add key="company" value="https://nuget.company.example/v3/index.json" /></packageSources></configuration>`
+	if err := os.WriteFile(filepath.Join(root, "NuGet.Config"), []byte(cfg), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	deps, err := nuget.New().Dependencies(project)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(deps) != 1 || deps[0].Registry != "" {
+		t.Fatalf("parent private feed with user nuget.org must be unknown: %#v", deps)
+	}
+}

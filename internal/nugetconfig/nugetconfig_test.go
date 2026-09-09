@@ -67,3 +67,68 @@ func TestSourcesClearDropsUserConfig(t *testing.T) {
 		t.Fatalf("got %#v", got)
 	}
 }
+
+func TestSourcesFromParentDirectory(t *testing.T) {
+	isolate(t)
+	home, err := os.UserHomeDir()
+	if err != nil {
+		t.Fatal(err)
+	}
+	userDir := filepath.Join(home, ".nuget", "NuGet")
+	if err := os.MkdirAll(userDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	user := `<?xml version="1.0"?><configuration><packageSources><add key="nuget.org" value="https://api.nuget.org/v3/index.json" /></packageSources></configuration>`
+	if err := os.WriteFile(filepath.Join(userDir, "NuGet.Config"), []byte(user), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	root := t.TempDir()
+	project := filepath.Join(root, "apps", "api")
+	if err := os.MkdirAll(project, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	parent := `<?xml version="1.0"?><configuration><packageSources><add key="company" value="https://nuget.company.example/v3/index.json" /></packageSources></configuration>`
+	if err := os.WriteFile(filepath.Join(root, "NuGet.Config"), []byte(parent), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	got := nugetconfig.Sources(project)
+	if len(got) != 2 {
+		t.Fatalf("parent private feed must merge with user nuget.org: %#v", got)
+	}
+	if got[0] != "https://api.nuget.org/v3/index.json" || got[1] != "https://nuget.company.example/v3/index.json" {
+		t.Fatalf("merge order = %#v", got)
+	}
+}
+
+func TestSourcesParentClearDropsUserConfig(t *testing.T) {
+	isolate(t)
+	home, err := os.UserHomeDir()
+	if err != nil {
+		t.Fatal(err)
+	}
+	userDir := filepath.Join(home, ".nuget", "NuGet")
+	if err := os.MkdirAll(userDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	user := `<?xml version="1.0"?><configuration><packageSources><add key="nuget.org" value="https://api.nuget.org/v3/index.json" /></packageSources></configuration>`
+	if err := os.WriteFile(filepath.Join(userDir, "NuGet.Config"), []byte(user), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	root := t.TempDir()
+	project := filepath.Join(root, "apps", "api")
+	if err := os.MkdirAll(project, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	parent := `<?xml version="1.0"?><configuration><packageSources><clear /><add key="company" value="https://nuget.company.example/v3/index.json" /></packageSources></configuration>`
+	if err := os.WriteFile(filepath.Join(root, "NuGet.Config"), []byte(parent), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	got := nugetconfig.Sources(project)
+	if len(got) != 1 || got[0] != "https://nuget.company.example/v3/index.json" {
+		t.Fatalf("parent clear must drop user nuget.org: %#v", got)
+	}
+}

@@ -13,10 +13,12 @@ import (
 
 func TestPrivacyMatrix(t *testing.T) {
 	cases := []struct {
-		name    string
-		files   map[string]string
-		wantN   int
-		wantAll lockfile.VulnState
+		name      string
+		files     map[string]string
+		homeFiles map[string]string
+		scan      string
+		wantN     int
+		wantAll   lockfile.VulnState
 	}{
 		{
 			name: "npm public registry",
@@ -140,6 +142,26 @@ files = [
 			wantAll: lockfile.VulnUnknown,
 		},
 		{
+			name: "nuget parent private feed",
+			scan: "apps/api",
+			homeFiles: map[string]string{
+				".nuget/NuGet/NuGet.Config": `<?xml version="1.0"?><configuration><packageSources><add key="nuget.org" value="https://api.nuget.org/v3/index.json" /></packageSources></configuration>`,
+			},
+			files: map[string]string{
+				"NuGet.Config": `<?xml version="1.0"?><configuration><packageSources><add key="company" value="https://nuget.company.example/v3/index.json" /></packageSources></configuration>`,
+				"apps/api/packages.lock.json": `{
+  "version": 1,
+  "dependencies": {
+    "net8.0": {
+      "Secret.Sdk": { "type": "Direct", "resolved": "1.0.0", "contentHash": "n4bQgYhMfWWaL+qgxVrQFaO/TxsrC4Is0V1sFbDwCgg=" }
+    }
+  }
+}`,
+			},
+			wantN:   0,
+			wantAll: lockfile.VulnUnknown,
+		},
+		{
 			name: "hex organization",
 			files: map[string]string{
 				"mix.lock": `%{
@@ -195,17 +217,18 @@ url = "https://pypi.company.example/simple"
 			t.Setenv("APPDATA", home)
 			t.Setenv("npm_config_registry", "")
 			t.Setenv("NPM_CONFIG_REGISTRY", "")
+			writeFiles(t, home, tc.homeFiles)
 
 			dir := t.TempDir()
-			for name, raw := range tc.files {
-				if err := os.WriteFile(filepath.Join(dir, name), []byte(raw), 0o644); err != nil {
-					t.Fatal(err)
-				}
+			writeFiles(t, dir, tc.files)
+			scan := dir
+			if tc.scan != "" {
+				scan = filepath.Join(dir, tc.scan)
 			}
 
 			client := &countingOSV{}
 			result, err := scanner.Scan(context.Background(), scanner.Options{
-				Path:     dir,
+				Path:     scan,
 				Policy:   policy.Default(),
 				Client:   client,
 				Evidence: fakeEvidence{},
@@ -225,5 +248,18 @@ url = "https://pypi.company.example/simple"
 				}
 			}
 		})
+	}
+}
+
+func writeFiles(t *testing.T, root string, files map[string]string) {
+	t.Helper()
+	for name, raw := range files {
+		path := filepath.Join(root, name)
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte(raw), 0o644); err != nil {
+			t.Fatal(err)
+		}
 	}
 }
