@@ -20,6 +20,7 @@ and only for artifacts whose lockfile registry is a known public registry:
 | pypi | `https://pypi.org` |
 | packagist | `https://repo.packagist.org` |
 | rubygems | `https://rubygems.org` |
+| nuget | `https://api.nuget.org` |
 | jsr | `https://jsr.io` (names are not sent to OSV yet) |
 
 Private registries, missing `resolved` URLs, and `GOPRIVATE` modules are

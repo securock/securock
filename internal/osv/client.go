@@ -191,6 +191,8 @@ func Ecosystem(name string) string {
 		return "Packagist"
 	case "rubygems":
 		return "RubyGems"
+	case "nuget":
+		return "NuGet"
 	default:
 		return name
 	}

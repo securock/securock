@@ -3,7 +3,7 @@
 A lockfile for trust, not just versions.
 
 Securock reads the lockfiles you already commit (`package-lock.json`,
-`pnpm-lock.yaml`, `yarn.lock`, `bun.lock`, `deno.lock`, `Cargo.lock`, `go.sum`, `uv.lock`, `poetry.lock`, `pdm.lock`, `composer.lock`, `Gemfile.lock`), records digest,
+`pnpm-lock.yaml`, `yarn.lock`, `bun.lock`, `deno.lock`, `Cargo.lock`, `go.sum`, `uv.lock`, `poetry.lock`, `pdm.lock`, `composer.lock`, `Gemfile.lock`, `packages.lock.json`), records digest,
 provenance, signature, and vulnerability evidence for each artifact,
 and fails CI when that trust state drifts.
 
@@ -170,6 +170,7 @@ it cannot comment on a fork PR.
 | pypi      | pdm      | `pdm.lock`          | experimental  |
 | packagist | composer | `composer.lock`     | experimental  |
 | rubygems  | bundler  | `Gemfile.lock`      | experimental  |
+| nuget     | nuget    | `packages.lock.json` | experimental  |
 
 ## Documentation
 

@@ -3,7 +3,7 @@ layout: home
 hero:
   name: Securock
   text: A lockfile for trust, not just versions.
-  tagline: Reads npm, pnpm, Yarn, Bun, Deno, Cargo, Go, uv, Poetry, PDM, Composer, and Bundler lockfiles, records digest / provenance / signature / vulnerability evidence, and fails when that trust state drifts.
+  tagline: Reads npm, pnpm, Yarn, Bun, Deno, Cargo, Go, uv, Poetry, PDM, Composer, Bundler, and NuGet lockfiles, records digest / provenance / signature / vulnerability evidence, and fails when that trust state drifts.
   actions:
     - theme: brand
       text: Read the docs

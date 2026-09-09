@@ -8,6 +8,7 @@ import (
 	"github.com/securock/securock/internal/ecosystem/deno"
 	"github.com/securock/securock/internal/ecosystem/golang"
 	"github.com/securock/securock/internal/ecosystem/npm"
+	"github.com/securock/securock/internal/ecosystem/nuget"
 	"github.com/securock/securock/internal/ecosystem/pdm"
 	"github.com/securock/securock/internal/ecosystem/pnpm"
 	"github.com/securock/securock/internal/ecosystem/poetry"
@@ -29,6 +30,7 @@ func All() []Ecosystem {
 		pdm.New(),
 		composer.New(),
 		bundler.New(),
+		nuget.New(),
 	}
 }
 

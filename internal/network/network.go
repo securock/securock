@@ -33,6 +33,9 @@ func DefaultRegistries() map[string][]string {
 		"rubygems": {
 			"https://rubygems.org",
 		},
+		"nuget": {
+			"https://api.nuget.org",
+		},
 		"jsr": {
 			"https://jsr.io",
 		},
