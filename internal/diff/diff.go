@@ -22,9 +22,10 @@ type Side struct {
 }
 
 type Change struct {
-	Subject string `json:"subject"`
-	Before  Side   `json:"before"`
-	After   Side   `json:"after"`
+	Artifact string `json:"artifact"`
+	Subject  string `json:"subject"`
+	Before   Side   `json:"before"`
+	After    Side   `json:"after"`
 }
 
 type Result struct {
@@ -66,7 +67,12 @@ func Compare(locked, current lockfile.Document) Result {
 		case !hadNext:
 			result.Removed = append(result.Removed, id)
 		case changed(prev, next):
-			result.Changes = append(result.Changes, Change{Subject: id, Before: prev, After: next})
+			result.Changes = append(result.Changes, Change{
+				Artifact: id,
+				Subject:  subjectOf(id),
+				Before:   prev,
+				After:    next,
+			})
 		}
 	}
 	return result
@@ -120,7 +126,7 @@ func Write(w io.Writer, r Result) {
 		fmt.Fprintf(w, "\n%s\n  added\n", id)
 	}
 	for _, c := range r.Changes {
-		fmt.Fprintf(w, "\n%s\n", displayName(c.Subject))
+		fmt.Fprintf(w, "\n%s\n", displayName(c.Artifact))
 		writeField(w, "version", join(c.Before.Versions), join(c.After.Versions), false)
 		writeDigest(w, c.Before.Digests, c.After.Digests)
 		writeState(w, "provenance", c.Before.Provenance, c.After.Provenance)
@@ -141,7 +147,7 @@ func Write(w io.Writer, r Result) {
 func summarize(arts []lockfile.Artifact) map[string]Side {
 	grouped := make(map[string][]lockfile.Artifact)
 	for _, art := range arts {
-		id := art.SubjectID()
+		id := art.ArtifactID()
 		grouped[id] = append(grouped[id], art)
 	}
 	out := make(map[string]Side, len(grouped))
@@ -273,12 +279,23 @@ func writeState(w io.Writer, name string, before, after lockfile.EvidenceState) 
 	fmt.Fprintf(w, "  %-14s%s → %s\n", name, before, after)
 }
 
-func displayName(subjectID string) string {
-	_, name, ok := strings.Cut(subjectID, ":")
+func displayName(artifactID string) string {
+	_, name, ok := strings.Cut(artifactID, ":")
 	if !ok || name == "" {
-		return subjectID
+		return artifactID
 	}
 	return name
+}
+
+func subjectOf(artifactID string) string {
+	id := artifactID
+	if i := strings.Index(id, "#"); i >= 0 {
+		id = id[:i]
+	}
+	if i := strings.LastIndex(id, "@"); i > 0 {
+		return id[:i]
+	}
+	return artifactID
 }
 
 func join(in []string) string {
