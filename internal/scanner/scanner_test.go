@@ -111,6 +111,12 @@ func TestScanPrivateNotQueried(t *testing.T) {
 }
 
 func TestScanPnpmChecksVulns(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	t.Setenv("npm_config_registry", "")
+	t.Setenv("NPM_CONFIG_REGISTRY", "")
+
 	client := &countingOSV{}
 	result, err := scanner.Scan(context.Background(), scanner.Options{
 		Path:     "../ecosystem/pnpm/testdata",
@@ -129,6 +135,45 @@ func TestScanPnpmChecksVulns(t *testing.T) {
 			t.Fatalf("%s state = %s", art.Subject.Name, art.Evidence.Vulnerabilities.State)
 		}
 		if art.Trust.Status != lockfile.StatusTrusted {
+			t.Fatalf("%s trust = %s", art.Subject.Name, art.Trust.Status)
+		}
+	}
+}
+
+func TestScanPnpmUnprovenRegistry(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	t.Setenv("npm_config_registry", "")
+	t.Setenv("NPM_CONFIG_REGISTRY", "")
+
+	dir := t.TempDir()
+	raw, err := os.ReadFile(filepath.Join("..", "ecosystem", "pnpm", "testdata", "pnpm-lock.yaml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "pnpm-lock.yaml"), raw, 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	client := &countingOSV{}
+	result, err := scanner.Scan(context.Background(), scanner.Options{
+		Path:     dir,
+		Policy:   policy.Default(),
+		Client:   client,
+		Evidence: fakeEvidence{},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if client.n != 0 {
+		t.Fatalf("queried %d packages, want 0", client.n)
+	}
+	for _, art := range result.Document.Artifacts {
+		if art.Evidence.Vulnerabilities.State != lockfile.VulnUnknown {
+			t.Fatalf("%s state = %s", art.Subject.Name, art.Evidence.Vulnerabilities.State)
+		}
+		if art.Trust.Status != lockfile.StatusUnknown {
 			t.Fatalf("%s trust = %s", art.Subject.Name, art.Trust.Status)
 		}
 	}

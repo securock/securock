@@ -23,6 +23,11 @@ Private registries, missing `resolved` URLs, and `GOPRIVATE` modules are
 recorded in `securock.lock` but are **not** sent off-machine. Their
 vulnerability state is `unknown`, not `trusted`.
 
+pnpm often omits tarball URLs. Securock does **not** assume
+`registry.npmjs.org` in that case. It only treats a package as public when
+a tarball origin or an explicit registry setting (environment, project
+`.npmrc`, or user `~/.npmrc`) proves a public origin.
+
 ## Modes
 
 ```sh
