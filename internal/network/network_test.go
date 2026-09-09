@@ -86,6 +86,39 @@ func TestGoPrivate(t *testing.T) {
 	if network.Allow(policy.ModePublicOnly, nil, dep) {
 		t.Fatal("GOPRIVATE modules must not be queried")
 	}
+
+	public := core.Dependency{
+		Ecosystem: "go",
+		Name:      "golang.org/x/mod",
+		Version:   "v0.41.0",
+		Registry:  "https://proxy.golang.org",
+	}
+	if !network.Allow(policy.ModePublicOnly, nil, public) {
+		t.Fatal("modules outside GOPRIVATE must still be queried")
+	}
+}
+
+func TestGoPrivateWildcardHost(t *testing.T) {
+	t.Setenv("GOPRIVATE", "*.corp.example.com")
+	private := core.Dependency{
+		Ecosystem: "go",
+		Name:      "git.corp.example.com/xyzzy",
+		Version:   "v1.0.0",
+		Registry:  "https://proxy.golang.org",
+	}
+	if network.Allow(policy.ModePublicOnly, nil, private) {
+		t.Fatal("GOPRIVATE host wildcards must match module path prefixes")
+	}
+
+	public := core.Dependency{
+		Ecosystem: "go",
+		Name:      "github.com/public/mod",
+		Version:   "v1.0.0",
+		Registry:  "https://proxy.golang.org",
+	}
+	if !network.Allow(policy.ModePublicOnly, nil, public) {
+		t.Fatal("unrelated modules must not match GOPRIVATE host wildcards")
+	}
 }
 
 func TestSparseCargoRegistry(t *testing.T) {

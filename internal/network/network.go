@@ -130,19 +130,41 @@ func parse(raw string) *url.URL {
 }
 
 func goPrivate(name string) bool {
-	patterns := os.Getenv("GOPRIVATE")
-	if patterns == "" {
-		return false
-	}
-	for _, pattern := range strings.Split(patterns, ",") {
-		pattern = strings.TrimSpace(pattern)
-		if pattern == "" {
+	return matchPrefixPatterns(os.Getenv("GOPRIVATE"), name)
+}
+
+// matchPrefixPatterns is the GOPRIVATE algorithm from
+// golang.org/x/mod/module.MatchPrefixPatterns: each comma-separated
+// glob is matched against the corresponding prefix of the module path.
+func matchPrefixPatterns(globs, target string) bool {
+	for globs != "" {
+		var glob string
+		if before, after, ok := strings.Cut(globs, ","); ok {
+			glob, globs = before, after
+		} else {
+			glob, globs = globs, ""
+		}
+		glob = strings.TrimSpace(strings.TrimSuffix(glob, "/"))
+		if glob == "" {
 			continue
 		}
-		if matched, _ := path.Match(pattern, name); matched {
-			return true
+
+		n := strings.Count(glob, "/")
+		prefix := target
+		for i := 0; i < len(target); i++ {
+			if target[i] == '/' {
+				if n == 0 {
+					prefix = target[:i]
+					break
+				}
+				n--
+			}
 		}
-		if strings.HasPrefix(name, strings.TrimSuffix(pattern, "*")) {
+		if n > 0 {
+			continue
+		}
+		matched, _ := path.Match(glob, prefix)
+		if matched {
 			return true
 		}
 	}

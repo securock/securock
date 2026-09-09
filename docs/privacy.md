@@ -16,7 +16,7 @@ and only for artifacts whose lockfile registry is a known public registry:
 | --- | --- |
 | npm | `https://registry.npmjs.org` |
 | cargo | crates.io index URLs |
-| go | `https://proxy.golang.org` (skips `GOPRIVATE`) |
+| go | `https://proxy.golang.org` (skips `GOPRIVATE`, same prefix globs as `go`) |
 | pypi | `https://pypi.org` |
 
 Private registries, missing `resolved` URLs, and `GOPRIVATE` modules are
