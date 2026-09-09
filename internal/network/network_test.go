@@ -91,3 +91,45 @@ func TestSparseCargoRegistry(t *testing.T) {
 		t.Fatal("crates.io sparse index must be public")
 	}
 }
+
+func TestAllowlistDoesNotMatchParentPath(t *testing.T) {
+	allow := map[string][]string{
+		"npm": {"https://repo.example/npm-public"},
+	}
+	parent := core.Dependency{
+		Ecosystem: "npm",
+		Name:      "foo",
+		Version:   "1.0.0",
+		Registry:  "https://repo.example",
+	}
+	if network.Allow(policy.ModePublicOnly, allow, parent) {
+		t.Fatal("parent registry URL must not match a path-scoped allowlist")
+	}
+	child := core.Dependency{
+		Ecosystem: "npm",
+		Name:      "foo",
+		Version:   "1.0.0",
+		Registry:  "https://repo.example/npm-public",
+	}
+	if !network.Allow(policy.ModePublicOnly, allow, child) {
+		t.Fatal("exact allowlisted path must be allowed")
+	}
+	nested := core.Dependency{
+		Ecosystem: "npm",
+		Name:      "foo",
+		Version:   "1.0.0",
+		Registry:  "https://repo.example/npm-public/extra",
+	}
+	if !network.Allow(policy.ModePublicOnly, allow, nested) {
+		t.Fatal("nested path under allowlist must be allowed")
+	}
+	sibling := core.Dependency{
+		Ecosystem: "npm",
+		Name:      "foo",
+		Version:   "1.0.0",
+		Registry:  "https://repo.example/npm-private",
+	}
+	if network.Allow(policy.ModePublicOnly, allow, sibling) {
+		t.Fatal("sibling path must not match")
+	}
+}

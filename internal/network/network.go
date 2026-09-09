@@ -51,19 +51,45 @@ func public(allowlist map[string][]string, dep core.Dependency) bool {
 	if dep.Registry == "" {
 		return false
 	}
-	got := strings.TrimRight(dep.Registry, "/")
+	got := parse(dep.Registry)
+	if got == nil {
+		return false
+	}
 	for _, prefix := range allowed {
-		if registryMatch(got, prefix) {
+		want := parse(prefix)
+		if want != nil && registryMatch(got, want) {
 			return true
 		}
 	}
 	return false
 }
 
-func registryMatch(got, prefix string) bool {
-	got = strings.TrimRight(got, "/")
-	prefix = strings.TrimRight(prefix, "/")
-	return got == prefix || strings.HasPrefix(got, prefix+"/") || strings.HasPrefix(prefix, got+"/")
+func registryMatch(got, prefix *url.URL) bool {
+	if !strings.EqualFold(got.Scheme, prefix.Scheme) {
+		return false
+	}
+	if !strings.EqualFold(got.Host, prefix.Host) {
+		return false
+	}
+	gotPath := pathSegments(got.Path)
+	prefixPath := pathSegments(prefix.Path)
+	if len(gotPath) < len(prefixPath) {
+		return false
+	}
+	for i := range prefixPath {
+		if gotPath[i] != prefixPath[i] {
+			return false
+		}
+	}
+	return true
+}
+
+func pathSegments(p string) []string {
+	p = strings.Trim(p, "/")
+	if p == "" {
+		return nil
+	}
+	return strings.Split(p, "/")
 }
 
 func Origin(raw string) string {
