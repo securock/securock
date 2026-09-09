@@ -81,7 +81,7 @@ func writeScanText(w io.Writer, doc lockfile.Document) error {
 		fmt.Fprintf(w, "resolvers   %s\n", strings.Join(doc.Source.Resolvers, ", "))
 	}
 	fmt.Fprintf(w, "artifacts   %d\n", len(doc.Artifacts))
-	fmt.Fprintf(w, "trusted     %d\n", trusted)
+	fmt.Fprintf(w, "trusted     %d  (under active policy)\n", trusted)
 	fmt.Fprintf(w, "untrusted   %d\n", untrusted)
 	fmt.Fprintf(w, "unknown     %d\n", unknown)
 

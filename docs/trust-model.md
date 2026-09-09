@@ -2,15 +2,14 @@
 
 ## What "trusted" means
 
-`trusted` means Securock's active policy did not fail the artifact.
+`trusted` means the artifact passed the active policy. It is not a
+guarantee that a package is safe, authentic, or free of malicious
+behavior. The CLI prints this as `trusted (under active policy)`.
 
 The default policy requires that OSV was queried and returned no
 known vulnerabilities. Unchecked vulnerabilities (`state: unknown`)
 are `unknown`, not `trusted`. Digest, provenance, and signature checks
 are optional policy rules and are off by default.
-
-`trusted` is not a guarantee that a package is safe, authentic, or
-free of malicious behavior.
 
 Policy files are fail-closed: unknown fields, versions, and network
 modes are errors. Typos such as `require_provenace` do not silently
