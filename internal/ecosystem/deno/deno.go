@@ -66,7 +66,7 @@ func (Ecosystem) Dependencies(path string) ([]core.Dependency, error) {
 		deps = append(deps, core.Dependency{
 			Ecosystem:  "npm",
 			Resolver:   "deno",
-			Registry:   npmrc.Registry(path, name, ""),
+			Registry:   npmRegistry(path, name),
 			SourceKind: core.SourceRegistry,
 			Name:       name,
 			Version:    version,
@@ -192,6 +192,14 @@ func stripPeerContext(version string) string {
 		return base
 	}
 	return version
+}
+
+func npmRegistry(project, name string) string {
+	registry := npmrc.Registry(project, name, "")
+	if registry == "" {
+		return npmrc.DefaultRegistry
+	}
+	return registry
 }
 
 func remoteVersion(hash string) (version, digest string) {

@@ -9,6 +9,7 @@ import (
 
 	"github.com/securock/securock/internal/ecosystem/core"
 	"github.com/securock/securock/internal/ecosystem/deno"
+	"github.com/securock/securock/internal/npmrc"
 )
 
 func isolate(t *testing.T) {
@@ -170,7 +171,7 @@ func TestNPMPeerContext(t *testing.T) {
 	}
 }
 
-func TestDependenciesUnprovenRegistry(t *testing.T) {
+func TestDefaultRegistryWithoutNpmrc(t *testing.T) {
 	isolate(t)
 	dir := t.TempDir()
 	raw, err := os.ReadFile(filepath.Join("testdata", "deno.lock"))
@@ -188,9 +189,65 @@ func TestDependenciesUnprovenRegistry(t *testing.T) {
 		if dep.Ecosystem != "npm" {
 			continue
 		}
-		if dep.Registry != "" {
-			t.Fatalf("%s registry = %q, want empty", dep.Name, dep.Registry)
+		if dep.Registry != npmrc.DefaultRegistry {
+			t.Fatalf("%s registry = %q, want default npm", dep.Name, dep.Registry)
 		}
+	}
+}
+
+func TestPrivateProjectNpmrc(t *testing.T) {
+	isolate(t)
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "deno.lock"), []byte(`{"version":"5","npm":{"react@19.2.0":{"integrity":"sha256-n4bQgYhMfWWaL+qgxVrQFaO/TxsrC4Is0V1sFbDwCgg="}}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, ".npmrc"), []byte("registry=https://npm.company.example/\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	deps, err := deno.New().Dependencies(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(deps) != 1 || deps[0].Registry != "https://npm.company.example" {
+		t.Fatalf("project private npmrc = %#v", deps)
+	}
+}
+
+func TestPrivateHomeNpmrc(t *testing.T) {
+	isolate(t)
+	home, err := os.UserHomeDir()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(home, ".npmrc"), []byte("registry=https://npm.company.example/\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "deno.lock"), []byte(`{"version":"5","npm":{"react@19.2.0":{"integrity":"sha256-n4bQgYhMfWWaL+qgxVrQFaO/TxsrC4Is0V1sFbDwCgg="}}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	deps, err := deno.New().Dependencies(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(deps) != 1 || deps[0].Registry != "https://npm.company.example" {
+		t.Fatalf("home private npmrc = %#v", deps)
+	}
+}
+
+func TestPrivateEnvRegistry(t *testing.T) {
+	isolate(t)
+	t.Setenv("NPM_CONFIG_REGISTRY", "https://npm.company.example/")
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "deno.lock"), []byte(`{"version":"5","npm":{"react@19.2.0":{"integrity":"sha256-n4bQgYhMfWWaL+qgxVrQFaO/TxsrC4Is0V1sFbDwCgg="}}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	deps, err := deno.New().Dependencies(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(deps) != 1 || deps[0].Registry != "https://npm.company.example" {
+		t.Fatalf("env private registry = %#v", deps)
 	}
 }
 

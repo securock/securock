@@ -125,6 +125,49 @@ func TestPrivacyMatrix(t *testing.T) {
 			wantAll: lockfile.VulnChecked,
 		},
 		{
+			name: "deno default npm registry",
+			files: map[string]string{
+				"deno.lock": `{
+  "version": "5",
+  "npm": {
+    "react@19.2.0": { "integrity": "sha256-n4bQgYhMfWWaL+qgxVrQFaO/TxsrC4Is0V1sFbDwCgg=" }
+  }
+}`,
+			},
+			wantN:   1,
+			wantAll: lockfile.VulnChecked,
+		},
+		{
+			name: "deno private npmrc",
+			files: map[string]string{
+				"deno.lock": `{
+  "version": "5",
+  "npm": {
+    "react@19.2.0": { "integrity": "sha256-n4bQgYhMfWWaL+qgxVrQFaO/TxsrC4Is0V1sFbDwCgg=" }
+  }
+}`,
+				".npmrc": "registry=https://npm.company.example/\n",
+			},
+			wantN:   0,
+			wantAll: lockfile.VulnUnknown,
+		},
+		{
+			name: "deno home private npmrc",
+			homeFiles: map[string]string{
+				".npmrc": "registry=https://npm.company.example/\n",
+			},
+			files: map[string]string{
+				"deno.lock": `{
+  "version": "5",
+  "npm": {
+    "react@19.2.0": { "integrity": "sha256-n4bQgYhMfWWaL+qgxVrQFaO/TxsrC4Is0V1sFbDwCgg=" }
+  }
+}`,
+			},
+			wantN:   0,
+			wantAll: lockfile.VulnUnknown,
+		},
+		{
 			name: "yarn parent private scope",
 			scan: "apps/web",
 			files: map[string]string{
