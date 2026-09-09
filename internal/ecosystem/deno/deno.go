@@ -188,20 +188,10 @@ func splitAtVersion(key string) (name, rest string) {
 }
 
 func stripPeerContext(version string) string {
-	for i := 0; i < len(version); i++ {
-		if version[i] != '_' {
-			continue
-		}
-		if looksLikePackageID(version[i+1:]) {
-			return version[:i]
-		}
+	if base, _, ok := strings.Cut(version, "_"); ok {
+		return base
 	}
 	return version
-}
-
-func looksLikePackageID(s string) bool {
-	name, rest := splitAtVersion(s)
-	return name != "" && rest != ""
 }
 
 func remoteVersion(hash string) (version, digest string) {

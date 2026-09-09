@@ -151,6 +151,8 @@ func TestNPMPeerContext(t *testing.T) {
 		{"foo@1.0.0_@scope/bar@2.0.0", "foo", "1.0.0"},
 		{"pkg@1.0.0_a@2.0.0_b@3.0.0", "pkg", "1.0.0"},
 		{"react@19.2.0", "react", "19.2.0"},
+		{"@octokit/plugin-rest-endpoint-methods@13.2.6_@octokit+core@6.1.2", "@octokit/plugin-rest-endpoint-methods", "13.2.6"},
+		{"probot@13.4.0_@octokit+core@5.2.0_dotenv@16.4.5", "probot", "13.4.0"},
 	}
 	for _, tc := range cases {
 		dir := t.TempDir()

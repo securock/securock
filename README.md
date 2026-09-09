@@ -176,9 +176,10 @@ it cannot comment on a fork PR.
 | hex       | mix      | `mix.lock`          | experimental  |
 | maven     | gradle   | `gradle.lockfile`   | experimental  |
 
-Deno npm packages use OSV and npm evidence. JSR and HTTPS URL artifacts
-are stable to parse; OSV does not cover them yet, so vulnerability state
-stays `unknown`.
+Deno `deno.lock` v5 is the stable target. v3/v4 are supported for
+compatibility. Deno npm packages use OSV and npm evidence. JSR and
+HTTPS URL artifacts are stable to parse; OSV does not cover them yet,
+so vulnerability state stays `unknown`.
 
 ## Documentation
 
