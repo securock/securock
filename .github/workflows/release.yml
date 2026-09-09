@@ -44,26 +44,12 @@ jobs:
       - name: Pair archives with SBOMs
         id: sboms
         run: |
-          python3 - <<'PY'
-          import json
-          import glob
-          import os
-
-          pairs = []
-          archives = sorted(glob.glob("dist/*.tar.gz") + glob.glob("dist/*.zip"))
-          for archive in archives:
-              sbom = archive + ".sbom.json"
-              if not os.path.isfile(sbom):
-                  raise SystemExit(f"missing SBOM for {archive}: expected {sbom}")
-              pairs.append({"archive": archive, "sbom": sbom})
-          if not pairs:
-              raise SystemExit("no release archives found")
-          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as f:
-              f.write("pairs<<EOF\n")
-              f.write(json.dumps(pairs))
-              f.write("\nEOF\n")
-          print(f"paired {len(pairs)} archives with SBOMs")
-          PY
+          {
+            echo "pairs<<EOF"
+            sh scripts/check-sbom-pairs.sh --json dist
+            echo
+            echo EOF
+          } >> "$GITHUB_OUTPUT"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: release-dist
