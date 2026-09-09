@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 )
 
@@ -31,6 +32,20 @@ func CacheDir() string {
 func Do(ctx context.Context, client *http.Client, req *http.Request) (*http.Response, error) {
 	if client == nil {
 		client = &http.Client{Timeout: 30 * time.Second}
+	}
+	c := *client
+	parent := client.CheckRedirect
+	c.CheckRedirect = func(req *http.Request, via []*http.Request) error {
+		if err := sameOriginRedirect(req, via); err != nil {
+			return err
+		}
+		if parent != nil {
+			return parent(req, via)
+		}
+		if len(via) >= 10 {
+			return fmt.Errorf("stopped after 10 redirects")
+		}
+		return nil
 	}
 
 	key := cacheKey(req)
@@ -57,7 +72,7 @@ func Do(ctx context.Context, client *http.Client, req *http.Request) (*http.Resp
 				req.Body = body
 			}
 		}
-		res, err := client.Do(req.Clone(ctx))
+		res, err := c.Do(req.Clone(ctx))
 		if err != nil {
 			last = err
 			continue
@@ -88,6 +103,20 @@ func Do(ctx context.Context, client *http.Client, req *http.Request) (*http.Resp
 		last = fmt.Errorf("request failed")
 	}
 	return nil, last
+}
+
+func sameOriginRedirect(req *http.Request, via []*http.Request) error {
+	if len(via) == 0 || req.URL == nil {
+		return nil
+	}
+	orig := via[0].URL
+	if orig == nil {
+		return nil
+	}
+	if req.URL.Scheme != orig.Scheme || !strings.EqualFold(req.URL.Host, orig.Host) {
+		return fmt.Errorf("refusing cross-origin redirect from %s to %s", orig, req.URL)
+	}
+	return nil
 }
 
 func cacheKey(req *http.Request) string {
