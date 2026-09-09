@@ -39,3 +39,10 @@ jobs:
             dist/*.zip
             dist/**/securock
             dist/**/securock.exe
+      - name: Attest SBOMs
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-path: |
+            dist/*.tar.gz
+            dist/*.zip
+          sbom-path: dist/*.sbom.json
