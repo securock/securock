@@ -68,7 +68,7 @@ func Scan(ctx context.Context, opts Options) (*Result, error) {
 	allowed := make(map[string]bool, len(deps))
 	for _, dep := range deps {
 		key := dep.Ecosystem + ":" + dep.Name + "@" + dep.Version
-		if network.Allow(mode, allowlist, dep) {
+		if network.Allow(mode, allowlist, dep) && osv.Queryable(dep) {
 			query = append(query, dep)
 			allowed[key] = true
 		}

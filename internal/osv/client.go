@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/securock/securock/internal/ecosystem"
@@ -83,7 +84,7 @@ func (c *HTTPClient) queryBatch(ctx context.Context, deps []ecosystem.Dependency
 		reqBody.Queries = append(reqBody.Queries, queryItem{
 			Package: queryPackage{
 				Name:      dep.Name,
-				Ecosystem: Ecosystem(dep.Ecosystem),
+				Ecosystem: QueryEcosystem(dep),
 			},
 			Version: dep.Version,
 		})
@@ -152,6 +153,25 @@ func (c *HTTPClient) queryBatch(ctx context.Context, deps []ecosystem.Dependency
 
 func identity(dep ecosystem.Dependency) string {
 	return dep.Ecosystem + ":" + dep.Name + "@" + dep.Version
+}
+
+func Queryable(dep ecosystem.Dependency) bool {
+	return QueryEcosystem(dep) != ""
+}
+
+func QueryEcosystem(dep ecosystem.Dependency) string {
+	if dep.Ecosystem == "cargo" && !cratesIO(dep.Registry) {
+		return ""
+	}
+	return Ecosystem(dep.Ecosystem)
+}
+
+func cratesIO(registry string) bool {
+	switch registry {
+	case "https://index.crates.io", "https://github.com/rust-lang/crates.io-index":
+		return true
+	}
+	return strings.Contains(registry, "crates.io")
 }
 
 func Ecosystem(name string) string {
