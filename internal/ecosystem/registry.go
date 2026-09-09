@@ -7,6 +7,7 @@ import (
 	"github.com/securock/securock/internal/ecosystem/golang"
 	"github.com/securock/securock/internal/ecosystem/npm"
 	"github.com/securock/securock/internal/ecosystem/pnpm"
+	"github.com/securock/securock/internal/ecosystem/poetry"
 	"github.com/securock/securock/internal/ecosystem/pypi"
 	"github.com/securock/securock/internal/ecosystem/yarn"
 )
@@ -21,42 +22,41 @@ func All() []Ecosystem {
 		cargo.New(),
 		golang.New(),
 		pypi.New(),
+		poetry.New(),
 	}
 }
 
 func Prefer(found []Ecosystem) []Ecosystem {
-	chosen := npmFamilyChoice(found)
+	found = preferFamily(found, []string{"pnpm", "yarn", "bun", "npm"})
+	found = preferFamily(found, []string{"pypi", "poetry", "pdm"})
+	return found
+}
+
+func preferFamily(found []Ecosystem, order []string) []Ecosystem {
+	present := map[string]bool{}
+	member := map[string]bool{}
+	for _, name := range order {
+		member[name] = true
+	}
+	for _, e := range found {
+		present[e.Name()] = true
+	}
+	chosen := ""
+	for _, name := range order {
+		if present[name] {
+			chosen = name
+			break
+		}
+	}
 	if chosen == "" {
 		return found
 	}
 	out := make([]Ecosystem, 0, len(found))
 	for _, e := range found {
-		if npmFamily(e.Name()) && e.Name() != chosen {
+		if member[e.Name()] && e.Name() != chosen {
 			continue
 		}
 		out = append(out, e)
 	}
 	return out
-}
-
-func npmFamilyChoice(found []Ecosystem) string {
-	present := map[string]bool{}
-	for _, e := range found {
-		present[e.Name()] = true
-	}
-	for _, name := range []string{"pnpm", "yarn", "bun", "npm"} {
-		if present[name] {
-			return name
-		}
-	}
-	return ""
-}
-
-func npmFamily(name string) bool {
-	switch name {
-	case "npm", "pnpm", "yarn", "bun":
-		return true
-	default:
-		return false
-	}
 }

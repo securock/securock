@@ -67,6 +67,26 @@ func TestPreferKeepsDenoWithNpm(t *testing.T) {
 	}
 }
 
+func TestPreferUvOverPoetry(t *testing.T) {
+	found := []ecosystem.Ecosystem{
+		fakeEco("poetry"),
+		fakeEco("pypi"),
+		fakeEco("go"),
+	}
+	got := ecosystem.Prefer(found)
+	if len(got) != 2 {
+		t.Fatalf("got %d ecosystems, want 2: %v", len(got), names(got))
+	}
+	if got[0].Name() != "pypi" && got[1].Name() != "pypi" {
+		t.Fatalf("uv parser should win: %v", names(got))
+	}
+	for _, name := range names(got) {
+		if name == "poetry" {
+			t.Fatal("poetry should be dropped when uv.lock is present")
+		}
+	}
+}
+
 func TestCollectArtifactConflict(t *testing.T) {
 	dir := t.TempDir()
 	raw := `{

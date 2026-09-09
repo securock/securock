@@ -3,7 +3,7 @@
 A lockfile for trust, not just versions.
 
 Securock reads the lockfiles you already commit (`package-lock.json`,
-`pnpm-lock.yaml`, `yarn.lock`, `bun.lock`, `deno.lock`, `Cargo.lock`, `go.sum`, `uv.lock`), records digest,
+`pnpm-lock.yaml`, `yarn.lock`, `bun.lock`, `deno.lock`, `Cargo.lock`, `go.sum`, `uv.lock`, `poetry.lock`), records digest,
 provenance, signature, and vulnerability evidence for each artifact,
 and fails CI when that trust state drifts.
 
@@ -166,6 +166,7 @@ it cannot comment on a fork PR.
 | cargo     | cargo    | `Cargo.lock`        | experimental  |
 | go        | go       | `go.sum`            | experimental  |
 | pypi      | uv       | `uv.lock`           | experimental  |
+| pypi      | poetry   | `poetry.lock`       | experimental  |
 
 ## Documentation
 
