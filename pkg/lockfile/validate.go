@@ -42,7 +42,7 @@ func validateArtifact(art Artifact) error {
 	if art.Subject.Name == "" {
 		return fmt.Errorf("missing subject name")
 	}
-	if art.Version == "" {
+	if art.Version == "" && art.Subject.Ecosystem != "url" {
 		return fmt.Errorf("missing version")
 	}
 	if art.Source.Resolver != "" && !slices.Contains(resolvers, art.Source.Resolver) {

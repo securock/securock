@@ -213,3 +213,39 @@ func TestCompareRedirectResolved(t *testing.T) {
 		t.Fatal("deno redirect target change must be trust drift")
 	}
 }
+
+func TestCompareURLRedirectSubject(t *testing.T) {
+	locked := lockfile.Document{Artifacts: []lockfile.Artifact{
+		{
+			Subject: lockfile.Subject{Ecosystem: "url", Name: "https://esm.sh/preact"},
+			Source: lockfile.ArtifactSource{
+				Resolver:  "deno",
+				Requested: "https://esm.sh/preact",
+				Resolved:  "https://esm.sh/preact@10.26.8",
+			},
+		},
+	}}
+	current := lockfile.Document{Artifacts: []lockfile.Artifact{
+		{
+			Subject: lockfile.Subject{Ecosystem: "url", Name: "https://esm.sh/preact"},
+			Source: lockfile.ArtifactSource{
+				Resolver:  "deno",
+				Requested: "https://esm.sh/preact",
+				Resolved:  "https://esm.sh/preact@10.26.9",
+			},
+		},
+	}}
+	got := diff.Compare(locked, current)
+	if !got.TrustDrift() {
+		t.Fatal("redirect target change must be trust drift")
+	}
+	if len(got.Changes) != 1 {
+		t.Fatalf("changes = %#v", got.Changes)
+	}
+	if got.Changes[0].Subject != "url:https://esm.sh/preact" {
+		t.Fatalf("subject = %s", got.Changes[0].Subject)
+	}
+	if got.Changes[0].Artifact != "url:https://esm.sh/preact" {
+		t.Fatalf("artifact = %s", got.Changes[0].Artifact)
+	}
+}

@@ -99,7 +99,6 @@ func (Ecosystem) Dependencies(path string) ([]core.Dependency, error) {
 			Resolver:   "deno",
 			SourceKind: core.SourceURL,
 			Name:       from,
-			Version:    to,
 			Requested:  from,
 			Resolved:   to,
 		}

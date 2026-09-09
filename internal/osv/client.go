@@ -152,7 +152,7 @@ func (c *HTTPClient) queryBatch(ctx context.Context, deps []ecosystem.Dependency
 }
 
 func identity(dep ecosystem.Dependency) string {
-	return dep.Ecosystem + ":" + dep.Name + "@" + dep.Version
+	return ecosystem.Identity(dep)
 }
 
 func Queryable(dep ecosystem.Dependency) bool {

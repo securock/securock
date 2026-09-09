@@ -61,7 +61,7 @@ type ArtifactSource struct {
 
 type Artifact struct {
 	Subject  Subject        `json:"subject" yaml:"subject"`
-	Version  string         `json:"version" yaml:"version"`
+	Version  string         `json:"version,omitempty" yaml:"version,omitempty"`
 	Filename string         `json:"filename,omitempty" yaml:"filename,omitempty"`
 	Digest   string         `json:"digest,omitempty" yaml:"digest,omitempty"`
 	Source   ArtifactSource `json:"source,omitempty" yaml:"source,omitempty"`
@@ -98,7 +98,10 @@ func (a Artifact) SubjectID() string {
 }
 
 func (a Artifact) ArtifactID() string {
-	id := a.SubjectID() + "@" + a.Version
+	id := a.SubjectID()
+	if a.Version != "" {
+		id += "@" + a.Version
+	}
 	if a.Filename != "" {
 		return id + "#" + a.Filename
 	}

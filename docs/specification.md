@@ -70,6 +70,24 @@ metadata origin. `source.artifact` is the download URL when it differs.
 `source.requested` and `source.resolved` record a specifier that
 redirected, such as a Deno `deno.lock` HTTPS import.
 
+URL artifacts may omit `version`. Their identity is `subject.name`
+(the requested URL). Do not encode a URL into `version`; that makes
+`ecosystem:name@version` keys ambiguous because URLs contain `@`.
+
+```yaml
+  - subject:
+      ecosystem: url
+      name: https://esm.sh/preact
+    source:
+      resolver: deno
+      requested: https://esm.sh/preact
+      resolved: https://esm.sh/preact@10.26.8
+```
+
+When a remote hash is present, `version` is that hash (not a URL).
+Internal comparison uses structured keys (`ecosystem`, `name`,
+`version`, `filename`) and does not parse `ecosystem:name@version`.
+
 `policy.digest` is a SHA-256 of a canonical JSON encoding of the active
 policy (version, resolved network mode, registry allowlists, and
 non-default rules). It must not include a file path. Adding unused

@@ -53,3 +53,60 @@ func TestSubjectIdentity(t *testing.T) {
 		t.Fatalf("artifact id with filename = %s", art.ArtifactID())
 	}
 }
+
+func TestURLArtifactIDOmitsEmptyVersion(t *testing.T) {
+	art := lockfile.Artifact{
+		Subject: lockfile.Subject{Ecosystem: "url", Name: "https://esm.sh/preact"},
+	}
+	if art.SubjectID() != "url:https://esm.sh/preact" {
+		t.Fatalf("subject = %s", art.SubjectID())
+	}
+	if art.ArtifactID() != "url:https://esm.sh/preact" {
+		t.Fatalf("url artifact id = %s", art.ArtifactID())
+	}
+}
+
+func TestValidateAllowsEmptyURLVersion(t *testing.T) {
+	doc := lockfile.Document{
+		Version: 1,
+		Artifacts: []lockfile.Artifact{
+			{
+				Subject: lockfile.Subject{Ecosystem: "url", Name: "https://esm.sh/preact"},
+				Source: lockfile.ArtifactSource{
+					Resolver:  "deno",
+					Requested: "https://esm.sh/preact",
+					Resolved:  "https://esm.sh/preact@10.26.8",
+				},
+				Evidence: lockfile.Evidence{
+					Provenance:      lockfile.EvidenceUnknown,
+					Signature:       lockfile.EvidenceUnknown,
+					Vulnerabilities: lockfile.VulnEvidence{State: lockfile.VulnUnknown},
+				},
+				Trust: lockfile.Trust{Status: lockfile.StatusUnknown},
+			},
+		},
+	}
+	if err := lockfile.Validate(doc); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestValidateRejectsEmptyNPMVersion(t *testing.T) {
+	doc := lockfile.Document{
+		Version: 1,
+		Artifacts: []lockfile.Artifact{
+			{
+				Subject: lockfile.Subject{Ecosystem: "npm", Name: "react"},
+				Evidence: lockfile.Evidence{
+					Provenance:      lockfile.EvidenceUnknown,
+					Signature:       lockfile.EvidenceUnknown,
+					Vulnerabilities: lockfile.VulnEvidence{State: lockfile.VulnUnknown},
+				},
+				Trust: lockfile.Trust{Status: lockfile.StatusUnknown},
+			},
+		},
+	}
+	if err := lockfile.Validate(doc); err == nil {
+		t.Fatal("npm artifacts must require a version")
+	}
+}

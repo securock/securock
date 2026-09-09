@@ -274,7 +274,7 @@ func TestRedirectWithoutRemoteHash(t *testing.T) {
 	if dep.Name != "https://esm.sh/preact" || dep.Resolved != "https://esm.sh/preact@10.26.8" {
 		t.Fatalf("redirect = %+v", dep)
 	}
-	if dep.Version != "https://esm.sh/preact@10.26.8" {
-		t.Fatalf("redirect version = %q", dep.Version)
+	if dep.Version != "" {
+		t.Fatalf("redirect without hash must omit version, got %q", dep.Version)
 	}
 }

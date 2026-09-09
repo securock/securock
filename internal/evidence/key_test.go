@@ -18,3 +18,13 @@ func TestKeyIncludesFilename(t *testing.T) {
 		t.Fatalf("got %q", got)
 	}
 }
+
+func TestKeyOmitsEmptyURLVersion(t *testing.T) {
+	got := evidence.Key(ecosystem.Dependency{
+		Ecosystem: "url",
+		Name:      "https://esm.sh/preact",
+	})
+	if got != "url:https://esm.sh/preact" {
+		t.Fatalf("got %q", got)
+	}
+}

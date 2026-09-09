@@ -20,7 +20,7 @@ type fakeOSV struct {
 func (f fakeOSV) Query(_ context.Context, deps []ecosystem.Dependency) (map[string][]lockfile.Vulnerability, error) {
 	out := make(map[string][]lockfile.Vulnerability, len(deps))
 	for _, dep := range deps {
-		key := dep.Ecosystem + ":" + dep.Name + "@" + dep.Version
+		key := ecosystem.Identity(dep)
 		out[key] = f.vulns[key]
 	}
 	return out, nil
@@ -49,7 +49,7 @@ type fakeEvidence map[string]evidence.Record
 func (f fakeEvidence) Collect(_ context.Context, deps []ecosystem.Dependency) (map[string]evidence.Record, error) {
 	out := make(map[string]evidence.Record, len(deps))
 	for _, dep := range deps {
-		key := dep.Ecosystem + ":" + dep.Name + "@" + dep.Version
+		key := evidence.Key(dep)
 		out[key] = f[key]
 	}
 	return out, nil

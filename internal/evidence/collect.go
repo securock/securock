@@ -17,9 +17,5 @@ type Collector interface {
 }
 
 func Key(dep ecosystem.Dependency) string {
-	id := dep.Ecosystem + ":" + dep.Name + "@" + dep.Version
-	if dep.Filename != "" {
-		return id + "#" + dep.Filename
-	}
-	return id
+	return ecosystem.Identity(dep)
 }

@@ -42,3 +42,14 @@ func FileExists(path string) bool {
 func Join(root, name string) string {
 	return filepath.Join(root, name)
 }
+
+func Identity(dep Dependency) string {
+	id := dep.Ecosystem + ":" + dep.Name
+	if dep.Version != "" {
+		id += "@" + dep.Version
+	}
+	if dep.Filename != "" {
+		id += "#" + dep.Filename
+	}
+	return id
+}

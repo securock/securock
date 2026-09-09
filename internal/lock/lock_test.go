@@ -115,3 +115,42 @@ func TestReadRejectsUnknownEcosystem(t *testing.T) {
 		t.Fatal("expected unknown ecosystem to fail")
 	}
 }
+
+func TestEncodeOmitsEmptyURLVersion(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "securock.lock")
+	doc := lockfile.Document{
+		Version: 1,
+		Artifacts: []lockfile.Artifact{
+			{
+				Subject: lockfile.Subject{Ecosystem: "url", Name: "https://esm.sh/preact"},
+				Source: lockfile.ArtifactSource{
+					Resolver:  "deno",
+					Requested: "https://esm.sh/preact",
+					Resolved:  "https://esm.sh/preact@10.26.8",
+				},
+				Evidence: validEvidence(),
+				Trust:    lockfile.Trust{Status: lockfile.StatusUnknown},
+			},
+		},
+	}
+	if err := lock.Write(path, doc); err != nil {
+		t.Fatal(err)
+	}
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if bytes.Contains(raw, []byte("version: \"\"")) || bytes.Contains(raw, []byte("version: ''")) {
+		t.Fatalf("empty version must be omitted:\n%s", raw)
+	}
+	got, err := lock.Read(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Artifacts[0].Version != "" {
+		t.Fatalf("version = %q", got.Artifacts[0].Version)
+	}
+	if got.Artifacts[0].Source.Resolved != "https://esm.sh/preact@10.26.8" {
+		t.Fatalf("resolved = %q", got.Artifacts[0].Source.Resolved)
+	}
+}

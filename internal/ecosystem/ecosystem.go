@@ -9,6 +9,10 @@ import (
 type Dependency = core.Dependency
 type Ecosystem = core.Ecosystem
 
+func Identity(dep Dependency) string {
+	return core.Identity(dep)
+}
+
 func Detect(path string) []Ecosystem {
 	var found []Ecosystem
 	for _, e := range All() {
@@ -34,7 +38,10 @@ func Collect(path string) ([]Dependency, error) {
 			return nil, fmt.Errorf("%s: %w", e.Name(), err)
 		}
 		for _, dep := range got {
-			if dep.Name == "" || dep.Version == "" {
+			if dep.Name == "" {
+				continue
+			}
+			if dep.Version == "" && dep.Ecosystem != "url" {
 				continue
 			}
 			if dep.Ecosystem == "" {
@@ -59,9 +66,5 @@ func Collect(path string) ([]Dependency, error) {
 }
 
 func depKey(dep Dependency) string {
-	key := dep.Ecosystem + ":" + dep.Name + "@" + dep.Version
-	if dep.Filename != "" {
-		return key + "#" + dep.Filename
-	}
-	return key
+	return core.Identity(dep)
 }

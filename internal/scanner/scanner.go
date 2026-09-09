@@ -67,7 +67,7 @@ func Scan(ctx context.Context, opts Options) (*Result, error) {
 	var query []ecosystem.Dependency
 	allowed := make(map[string]bool, len(deps))
 	for _, dep := range deps {
-		key := dep.Ecosystem + ":" + dep.Name + "@" + dep.Version
+		key := ecosystem.Identity(dep)
 		if network.Allow(mode, allowlist, dep) && osv.Queryable(dep) {
 			query = append(query, dep)
 			allowed[key] = true
@@ -132,7 +132,7 @@ func Scan(ctx context.Context, opts Options) (*Result, error) {
 				},
 			},
 		}
-		key := dep.Ecosystem + ":" + dep.Name + "@" + dep.Version
+		key := ecosystem.Identity(dep)
 		if rec, ok := ev[evidence.Key(dep)]; ok {
 			art.Evidence.Provenance = rec.Provenance
 			art.Evidence.Signature = rec.Signature

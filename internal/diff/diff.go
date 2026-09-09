@@ -1,6 +1,7 @@
 package diff
 
 import (
+	"cmp"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -46,32 +47,34 @@ func Compare(locked, current lockfile.Document) Result {
 	before := summarize(locked.Artifacts)
 	after := summarize(current.Artifacts)
 
-	subjects := make(map[string]struct{})
-	for id := range before {
-		subjects[id] = struct{}{}
+	keys := make([]artifactKey, 0, len(before)+len(after))
+	seen := map[artifactKey]struct{}{}
+	for k := range before {
+		seen[k] = struct{}{}
+		keys = append(keys, k)
 	}
-	for id := range after {
-		subjects[id] = struct{}{}
+	for k := range after {
+		if _, ok := seen[k]; ok {
+			continue
+		}
+		keys = append(keys, k)
 	}
+	slices.SortFunc(keys, func(a, b artifactKey) int {
+		return cmp.Compare(a.id(), b.id())
+	})
 
-	ids := make([]string, 0, len(subjects))
-	for id := range subjects {
-		ids = append(ids, id)
-	}
-	slices.Sort(ids)
-
-	for _, id := range ids {
-		prev, hadPrev := before[id]
-		next, hadNext := after[id]
+	for _, k := range keys {
+		prev, hadPrev := before[k]
+		next, hadNext := after[k]
 		switch {
 		case !hadPrev:
-			result.Added = append(result.Added, id)
+			result.Added = append(result.Added, k.id())
 		case !hadNext:
-			result.Removed = append(result.Removed, id)
+			result.Removed = append(result.Removed, k.id())
 		case changed(prev, next):
 			result.Changes = append(result.Changes, Change{
-				Artifact: id,
-				Subject:  subjectOf(id),
+				Artifact: k.id(),
+				Subject:  k.subject(),
 				Before:   prev,
 				After:    next,
 			})
@@ -148,15 +151,15 @@ func Write(w io.Writer, r Result) {
 	fmt.Fprintln(w, "\nNo trust drift.")
 }
 
-func summarize(arts []lockfile.Artifact) map[string]Side {
-	grouped := make(map[string][]lockfile.Artifact)
+func summarize(arts []lockfile.Artifact) map[artifactKey]Side {
+	grouped := make(map[artifactKey][]lockfile.Artifact)
 	for _, art := range arts {
-		id := art.ArtifactID()
-		grouped[id] = append(grouped[id], art)
+		k := keyOf(art)
+		grouped[k] = append(grouped[k], art)
 	}
-	out := make(map[string]Side, len(grouped))
-	for id, group := range grouped {
-		out[id] = sideOf(group)
+	out := make(map[artifactKey]Side, len(grouped))
+	for k, group := range grouped {
+		out[k] = sideOf(group)
 	}
 	return out
 }
@@ -174,7 +177,9 @@ func sideOf(arts []lockfile.Artifact) Side {
 	s.Signature = arts[0].Evidence.Signature
 	s.Trust = arts[0].Trust.Status
 	for _, art := range arts {
-		s.Versions = append(s.Versions, art.Version)
+		if art.Version != "" {
+			s.Versions = append(s.Versions, art.Version)
+		}
 		if art.Digest != "" {
 			s.Digests = append(s.Digests, art.Digest)
 		}
@@ -305,15 +310,35 @@ func displayName(artifactID string) string {
 	return name
 }
 
-func subjectOf(artifactID string) string {
-	id := artifactID
-	if i := strings.Index(id, "#"); i >= 0 {
-		id = id[:i]
+type artifactKey struct {
+	Ecosystem string
+	Name      string
+	Version   string
+	Filename  string
+}
+
+func keyOf(art lockfile.Artifact) artifactKey {
+	return artifactKey{
+		Ecosystem: art.Subject.Ecosystem,
+		Name:      art.Subject.Name,
+		Version:   art.Version,
+		Filename:  art.Filename,
 	}
-	if i := strings.LastIndex(id, "@"); i > 0 {
-		return id[:i]
+}
+
+func (k artifactKey) id() string {
+	id := k.subject()
+	if k.Version != "" {
+		id += "@" + k.Version
 	}
-	return artifactID
+	if k.Filename != "" {
+		id += "#" + k.Filename
+	}
+	return id
+}
+
+func (k artifactKey) subject() string {
+	return k.Ecosystem + ":" + k.Name
 }
 
 func join(in []string) string {
