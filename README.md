@@ -28,6 +28,7 @@ uv.lock
 
 ```bash
 curl -fsSL https://securock.sh/install | sh
+curl -fsSL https://securock.sh/install | sh -s -- --version v0.1.0-alpha.1
 ```
 
 Verify a downloaded archive or the extracted binary against GitHub

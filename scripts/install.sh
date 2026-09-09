@@ -5,6 +5,24 @@ REPO="${REPO:-securock/securock}"
 BINARY="${BINARY:-securock}"
 INSTALL_DIR="${INSTALL_DIR:-}"
 SKIP_ATTESTATION="${SKIP_ATTESTATION:-}"
+VERSION="${VERSION:-}"
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --version)
+      VERSION=$2
+      shift 2
+      ;;
+    --skip-attestation)
+      SKIP_ATTESTATION=1
+      shift
+      ;;
+    *)
+      echo "unknown argument: $1" >&2
+      exit 1
+      ;;
+  esac
+done
 
 os=$(uname -s)
 arch=$(uname -m)
@@ -27,8 +45,29 @@ case "$arch" in
     ;;
 esac
 
+resolve_latest() {
+  url="https://github.com/${REPO}/releases/latest"
+  if command -v curl >/dev/null 2>&1; then
+    curl -fsSLI -o /dev/null -w '%{url_effective}' "$url"
+  elif command -v wget >/dev/null 2>&1; then
+    wget --max-redirect=0 --server-response "$url" 2>&1 | awk 'tolower($1) == "location:" { print $2; exit }'
+  else
+    echo "curl or wget is required" >&2
+    exit 1
+  fi
+}
+
+if [ -z "$VERSION" ]; then
+  latest=$(resolve_latest)
+  VERSION=${latest##*/}
+fi
+if [ -z "$VERSION" ]; then
+  echo "could not resolve latest release" >&2
+  exit 1
+fi
+
 archive="${BINARY}_${os}_${arch}.tar.gz"
-base="https://github.com/${REPO}/releases/latest/download"
+base="https://github.com/${REPO}/releases/download/${VERSION}"
 archive_url="${base}/${archive}"
 checksums_url="${base}/checksums.txt"
 
@@ -86,15 +125,22 @@ if [ "$got" != "$expected" ]; then
   exit 1
 fi
 
-if [ -z "$SKIP_ATTESTATION" ] && command -v gh >/dev/null 2>&1; then
+if [ -n "$SKIP_ATTESTATION" ]; then
+  echo "warning: attestation verification skipped" >&2
+else
+  if ! command -v gh >/dev/null 2>&1; then
+    echo "error: GitHub CLI is required for provenance verification" >&2
+    echo "install gh or set SKIP_ATTESTATION=1" >&2
+    exit 1
+  fi
   gh attestation verify "${tmp}/${archive}" --repo "$REPO"
 fi
 
 tar -xzf "${tmp}/${archive}" -C "$tmp"
 install -m 0755 "${tmp}/${BINARY}" "${INSTALL_DIR}/${BINARY}"
 
-if [ -z "$SKIP_ATTESTATION" ] && command -v gh >/dev/null 2>&1; then
+if [ -z "$SKIP_ATTESTATION" ]; then
   gh attestation verify "${INSTALL_DIR}/${BINARY}" --repo "$REPO"
 fi
 
-echo "installed ${BINARY} to ${INSTALL_DIR}/${BINARY}"
+echo "installed ${BINARY} ${VERSION} to ${INSTALL_DIR}/${BINARY}"
