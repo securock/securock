@@ -39,6 +39,9 @@ func DefaultRegistries() map[string][]string {
 		"pub": {
 			"https://pub.dev",
 		},
+		"hex": {
+			"https://repo.hex.pm",
+		},
 		"jsr": {
 			"https://jsr.io",
 		},

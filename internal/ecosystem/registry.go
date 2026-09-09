@@ -7,6 +7,7 @@ import (
 	"github.com/securock/securock/internal/ecosystem/composer"
 	"github.com/securock/securock/internal/ecosystem/deno"
 	"github.com/securock/securock/internal/ecosystem/golang"
+	"github.com/securock/securock/internal/ecosystem/mix"
 	"github.com/securock/securock/internal/ecosystem/npm"
 	"github.com/securock/securock/internal/ecosystem/nuget"
 	"github.com/securock/securock/internal/ecosystem/pdm"
@@ -35,6 +36,7 @@ func All() []Ecosystem {
 		nuget.New(),
 		swiftpm.New(),
 		pub.New(),
+		mix.New(),
 	}
 }
 

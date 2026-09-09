@@ -22,6 +22,7 @@ and only for artifacts whose lockfile registry is a known public registry:
 | rubygems | `https://rubygems.org` |
 | nuget | `https://api.nuget.org` |
 | pub | `https://pub.dev` |
+| hex | `https://repo.hex.pm` |
 | jsr | `https://jsr.io` (names are not sent to OSV yet) |
 
 Private registries, missing `resolved` URLs, and `GOPRIVATE` modules are

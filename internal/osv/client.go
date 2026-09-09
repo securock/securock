@@ -204,6 +204,8 @@ func Ecosystem(name string) string {
 		return "SwiftURL"
 	case "pub":
 		return "Pub"
+	case "hex":
+		return "Hex"
 	default:
 		return name
 	}
