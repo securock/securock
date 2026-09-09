@@ -10,6 +10,9 @@
     }
   },
   "npm": {
+    "@preact/signals@1.3.2_preact@10.26.8": {
+      "integrity": "sha512-naxcJgUJ6BTOROJ7C3QML7KvwKwCXQJYTc5L/b0eEsdYgPB6SxwoQ1vDGcS0Q7GVjAenVq/tXrybVdFShHYZWg=="
+    },
     "react@19.2.0": {
       "integrity": "sha256-n4bQgYhMfWWaL+qgxVrQFaO/TxsrC4Is0V1sFbDwCgg="
     }

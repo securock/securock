@@ -1,6 +1,7 @@
 package deno_test
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -53,6 +54,10 @@ func TestDependencies(t *testing.T) {
 	if remote.Digest != "sha256:9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08" {
 		t.Fatalf("url digest = %q", remote.Digest)
 	}
+	signals := got["npm:@preact/signals"]
+	if signals.Version != "1.3.2" {
+		t.Fatalf("npm peer context version = %+v", signals)
+	}
 }
 
 func TestV3Packages(t *testing.T) {
@@ -75,6 +80,33 @@ func TestV3Packages(t *testing.T) {
 	}
 	if len(deps) != 1 || deps[0].Name != "chalk" || deps[0].Version != "5.3.0" {
 		t.Fatalf("v3 npm = %#v", deps)
+	}
+}
+
+func TestNPMPeerContext(t *testing.T) {
+	isolate(t)
+	cases := []struct {
+		key, name, version string
+	}{
+		{"@preact/signals@1.3.2_preact@10.26.8", "@preact/signals", "1.3.2"},
+		{"preact@10.26.8", "preact", "10.26.8"},
+		{"foo@1.0.0_@scope/bar@2.0.0", "foo", "1.0.0"},
+		{"pkg@1.0.0_a@2.0.0_b@3.0.0", "pkg", "1.0.0"},
+		{"react@19.2.0", "react", "19.2.0"},
+	}
+	for _, tc := range cases {
+		dir := t.TempDir()
+		raw := fmt.Sprintf(`{"version":"5","npm":{%q:{"integrity":"sha256-n4bQgYhMfWWaL+qgxVrQFaO/TxsrC4Is0V1sFbDwCgg="}}}`, tc.key)
+		if err := os.WriteFile(filepath.Join(dir, "deno.lock"), []byte(raw), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		deps, err := deno.New().Dependencies(dir)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(deps) != 1 || deps[0].Name != tc.name || deps[0].Version != tc.version {
+			t.Fatalf("%s = %#v, want %s@%s", tc.key, deps, tc.name, tc.version)
+		}
 	}
 }
 

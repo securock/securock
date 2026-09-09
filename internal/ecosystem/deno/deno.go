@@ -47,12 +47,18 @@ func (Ecosystem) Dependencies(path string) ([]core.Dependency, error) {
 		}
 	}
 
+	seen := map[string]struct{}{}
 	var deps []core.Dependency
 	for key, pkg := range npmPkgs {
 		name, version := splitNameVersion(key)
 		if name == "" || version == "" {
 			continue
 		}
+		id := "npm:" + name + "@" + version
+		if _, ok := seen[id]; ok {
+			continue
+		}
+		seen[id] = struct{}{}
 		deps = append(deps, core.Dependency{
 			Ecosystem:  "npm",
 			Resolver:   "deno",
@@ -116,9 +122,46 @@ type denoPkg struct {
 func splitNameVersion(key string) (name, version string) {
 	key = strings.TrimPrefix(key, "npm:")
 	key = strings.TrimPrefix(key, "jsr:")
-	at := strings.LastIndex(key, "@")
+	name, rest := splitAtVersion(key)
+	if name == "" || rest == "" {
+		return "", ""
+	}
+	return name, stripPeerContext(rest)
+}
+
+func splitAtVersion(key string) (name, rest string) {
+	if strings.HasPrefix(key, "@") {
+		slash := strings.IndexByte(key, '/')
+		if slash < 1 {
+			return "", ""
+		}
+		at := strings.IndexByte(key[slash+1:], '@')
+		if at < 1 {
+			return "", ""
+		}
+		at += slash + 1
+		return key[:at], key[at+1:]
+	}
+	at := strings.IndexByte(key, '@')
 	if at <= 0 {
 		return "", ""
 	}
 	return key[:at], key[at+1:]
+}
+
+func stripPeerContext(version string) string {
+	for i := 0; i < len(version); i++ {
+		if version[i] != '_' {
+			continue
+		}
+		if looksLikePackageID(version[i+1:]) {
+			return version[:i]
+		}
+	}
+	return version
+}
+
+func looksLikePackageID(s string) bool {
+	name, rest := splitAtVersion(s)
+	return name != "" && rest != ""
 }
