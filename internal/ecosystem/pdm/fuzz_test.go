@@ -17,6 +17,9 @@ func FuzzDependencies(f *testing.F) {
 	f.Add([]byte("[[package]]\nname = \"x\"\nversion = \"1\"\n"))
 	f.Fuzz(func(t *testing.T, data []byte) {
 		dir := t.TempDir()
+		t.Setenv("HOME", t.TempDir())
+		t.Setenv("USERPROFILE", os.Getenv("HOME"))
+		t.Setenv("PDM_PYPI_URL", "")
 		if err := os.WriteFile(filepath.Join(dir, "pdm.lock"), data, 0o644); err != nil {
 			t.Fatal(err)
 		}

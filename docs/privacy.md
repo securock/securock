@@ -41,9 +41,10 @@ registry setting use Yarn's documented default,
 `https://registry.yarnpkg.com`, which is treated as public npm. The same
 fail-closed rule applies to NuGet (`NuGet.Config` package sources, merged
 like NuGet from machine and user configs through every parent directory
-down to the project), PDM (lockfile file URLs), Mix (`mix.lock`
-repository identity), and Gradle (`gradle.lockfile` has no repository
-URL). Mixed public and private sources are treated as unknown.
+down to the project), PDM (lockfile file URLs, plus `[[tool.pdm.source]]`
+and PDM config indexes; the default PyPI index is treated as public), Mix
+(`mix.lock` repository identity), and Gradle (`gradle.lockfile` has no
+repository URL). Mixed public and private sources are treated as unknown.
 
 ## Modes
 

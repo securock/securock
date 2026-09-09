@@ -154,6 +154,38 @@ files = [
 			wantAll: lockfile.VulnUnknown,
 		},
 		{
+			name: "pdm default index",
+			files: map[string]string{
+				"pdm.lock": `[[package]]
+name = "requests"
+version = "2.32.3"
+files = [
+    {file = "requests-2.32.3.tar.gz", hash = "sha256:9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"},
+]
+`,
+			},
+			wantN:   1,
+			wantAll: lockfile.VulnChecked,
+		},
+		{
+			name: "pdm pyproject private source",
+			files: map[string]string{
+				"pdm.lock": `[[package]]
+name = "secret-sdk"
+version = "1.0.0"
+files = [
+    {file = "secret-sdk-1.0.0.tar.gz", hash = "sha256:9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"},
+]
+`,
+				"pyproject.toml": `[[tool.pdm.source]]
+name = "internal"
+url = "https://pypi.company.example/simple"
+`,
+			},
+			wantN:   0,
+			wantAll: lockfile.VulnUnknown,
+		},
+		{
 			name: "nuget private feed",
 			files: map[string]string{
 				"packages.lock.json": `{
@@ -243,8 +275,13 @@ url = "https://pypi.company.example/simple"
 			t.Setenv("HOME", home)
 			t.Setenv("USERPROFILE", home)
 			t.Setenv("APPDATA", home)
+			t.Setenv("LOCALAPPDATA", home)
+			t.Setenv("XDG_CONFIG_HOME", filepath.Join(home, ".config"))
+			t.Setenv("XDG_CONFIG_DIRS", filepath.Join(home, "xdg"))
+			t.Setenv("ProgramData", filepath.Join(home, "ProgramData"))
 			t.Setenv("npm_config_registry", "")
 			t.Setenv("NPM_CONFIG_REGISTRY", "")
+			t.Setenv("PDM_PYPI_URL", "")
 			writeFiles(t, home, tc.homeFiles)
 
 			dir := t.TempDir()
