@@ -2,10 +2,6 @@ version: 2
 
 project_name: securock
 
-before:
-  hooks:
-    - go mod tidy
-
 builds:
   - id: securock
     main: ./cmd/securock
