@@ -52,7 +52,9 @@
         "vuln_state": { "type": "string" },
         "vulnerabilities": { "type": "array", "items": { "type": "string" } },
         "trust": { "type": "string" },
-        "reasons": { "type": "array", "items": { "type": "string" } }
+        "reasons": { "type": "array", "items": { "type": "string" } },
+        "requested": { "type": "array", "items": { "type": "string" } },
+        "resolved": { "type": "array", "items": { "type": "string" } }
       }
     }
   }

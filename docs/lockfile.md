@@ -21,8 +21,8 @@ Exit codes:
 - `1` trust violation
 - `2` configuration or operational error
 
-`--format json` prints a `schema_version: 1` report from `diff` and
-`verify`. JSON Schemas live in `schemas/`.
+`scan --format json` emits the lock document. `diff` and `verify`
+print a `schema_version: 1` report. JSON Schemas live in `schemas/`.
 
 ## Identity
 
