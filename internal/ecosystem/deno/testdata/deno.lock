@@ -18,6 +18,10 @@
     }
   },
   "remote": {
-    "https://example.com/mod.ts": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"
+    "https://example.com/mod.ts": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
+    "https://esm.sh/preact@10.26.8": "f6c6195e67293b6df707b53dd3075ca149604e1ba989c7832179b3c1b7e8a302"
+  },
+  "redirects": {
+    "https://esm.sh/preact": "https://esm.sh/preact@10.26.8"
   }
 }

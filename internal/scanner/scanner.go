@@ -118,9 +118,11 @@ func Scan(ctx context.Context, opts Options) (*Result, error) {
 			Filename: dep.Filename,
 			Digest:   dep.Digest,
 			Source: lockfile.ArtifactSource{
-				Resolver: dep.Resolver,
-				Registry: dep.Registry,
-				Artifact: dep.Artifact,
+				Resolver:  dep.Resolver,
+				Registry:  dep.Registry,
+				Artifact:  dep.Artifact,
+				Requested: dep.Requested,
+				Resolved:  dep.Resolved,
 			},
 			Evidence: lockfile.Evidence{
 				Provenance: provenance.State(),

@@ -88,13 +88,34 @@ func (Ecosystem) Dependencies(path string) ([]core.Dependency, error) {
 			Digest:     core.NormalizeDigest(pkg.Integrity),
 		})
 	}
+	targets := map[string]struct{}{}
+	for from, to := range lock.Redirects {
+		if from == "" || to == "" {
+			continue
+		}
+		targets[to] = struct{}{}
+		dep := core.Dependency{
+			Ecosystem:  "url",
+			Resolver:   "deno",
+			SourceKind: core.SourceURL,
+			Name:       from,
+			Version:    to,
+			Requested:  from,
+			Resolved:   to,
+		}
+		if hash := lock.Remote[to]; hash != "" {
+			dep.Version, dep.Digest = remoteVersion(hash)
+		}
+		deps = append(deps, dep)
+	}
 	for url, hash := range lock.Remote {
 		if url == "" || hash == "" {
 			continue
 		}
-		digest := core.NormalizeDigest(hash)
-		version := strings.TrimPrefix(digest, "sha256:")
-		version = strings.TrimPrefix(version, "sha512:")
+		if _, ok := targets[url]; ok {
+			continue
+		}
+		version, digest := remoteVersion(hash)
 		deps = append(deps, core.Dependency{
 			Ecosystem:  "url",
 			Resolver:   "deno",
@@ -119,11 +140,12 @@ func supportedVersion(v string) error {
 }
 
 type denoLock struct {
-	Version  string             `json:"version"`
-	NPM      map[string]denoPkg `json:"npm"`
-	JSR      map[string]denoPkg `json:"jsr"`
-	Remote   map[string]string  `json:"remote"`
-	Packages *denoV3Packages    `json:"packages"`
+	Version   string             `json:"version"`
+	NPM       map[string]denoPkg `json:"npm"`
+	JSR       map[string]denoPkg `json:"jsr"`
+	Remote    map[string]string  `json:"remote"`
+	Redirects map[string]string  `json:"redirects"`
+	Packages  *denoV3Packages    `json:"packages"`
 }
 
 type denoV3Packages struct {
@@ -180,4 +202,11 @@ func stripPeerContext(version string) string {
 func looksLikePackageID(s string) bool {
 	name, rest := splitAtVersion(s)
 	return name != "" && rest != ""
+}
+
+func remoteVersion(hash string) (version, digest string) {
+	digest = core.NormalizeDigest(hash)
+	version = strings.TrimPrefix(digest, "sha256:")
+	version = strings.TrimPrefix(version, "sha512:")
+	return version, digest
 }

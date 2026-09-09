@@ -52,9 +52,11 @@ type Subject struct {
 }
 
 type ArtifactSource struct {
-	Resolver string `json:"resolver,omitempty" yaml:"resolver,omitempty"`
-	Registry string `json:"registry,omitempty" yaml:"registry,omitempty"`
-	Artifact string `json:"artifact,omitempty" yaml:"artifact,omitempty"`
+	Resolver  string `json:"resolver,omitempty" yaml:"resolver,omitempty"`
+	Registry  string `json:"registry,omitempty" yaml:"registry,omitempty"`
+	Artifact  string `json:"artifact,omitempty" yaml:"artifact,omitempty"`
+	Requested string `json:"requested,omitempty" yaml:"requested,omitempty"`
+	Resolved  string `json:"resolved,omitempty" yaml:"resolved,omitempty"`
 }
 
 type Artifact struct {

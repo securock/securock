@@ -59,6 +59,16 @@ func TestDependencies(t *testing.T) {
 	if signals.Version != "1.3.2" {
 		t.Fatalf("npm peer context version = %+v", signals)
 	}
+	redir := got["url:https://esm.sh/preact"]
+	if redir.Requested != "https://esm.sh/preact" || redir.Resolved != "https://esm.sh/preact@10.26.8" {
+		t.Fatalf("redirect = %+v", redir)
+	}
+	if redir.Digest != "sha256:f6c6195e67293b6df707b53dd3075ca149604e1ba989c7832179b3c1b7e8a302" {
+		t.Fatalf("redirect digest = %q", redir.Digest)
+	}
+	if _, ok := got["url:https://esm.sh/preact@10.26.8"]; ok {
+		t.Fatal("redirect target must not be a second url artifact")
+	}
 }
 
 func TestV3Packages(t *testing.T) {
@@ -179,5 +189,33 @@ func TestDependenciesUnprovenRegistry(t *testing.T) {
 		if dep.Registry != "" {
 			t.Fatalf("%s registry = %q, want empty", dep.Name, dep.Registry)
 		}
+	}
+}
+
+func TestRedirectWithoutRemoteHash(t *testing.T) {
+	isolate(t)
+	dir := t.TempDir()
+	raw := `{
+  "version": "5",
+  "redirects": {
+    "https://esm.sh/preact": "https://esm.sh/preact@10.26.8"
+  }
+}`
+	if err := os.WriteFile(filepath.Join(dir, "deno.lock"), []byte(raw), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	deps, err := deno.New().Dependencies(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(deps) != 1 {
+		t.Fatalf("deps = %#v", deps)
+	}
+	dep := deps[0]
+	if dep.Name != "https://esm.sh/preact" || dep.Resolved != "https://esm.sh/preact@10.26.8" {
+		t.Fatalf("redirect = %+v", dep)
+	}
+	if dep.Version != "https://esm.sh/preact@10.26.8" {
+		t.Fatalf("redirect version = %q", dep.Version)
 	}
 }

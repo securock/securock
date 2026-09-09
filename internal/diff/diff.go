@@ -19,6 +19,8 @@ type Side struct {
 	Vulns       []string               `json:"vulnerabilities,omitempty"`
 	Trust       lockfile.Status        `json:"trust,omitempty"`
 	TrustReason []string               `json:"reasons,omitempty"`
+	Requested   []string               `json:"requested,omitempty"`
+	Resolved    []string               `json:"resolved,omitempty"`
 }
 
 type Change struct {
@@ -135,6 +137,8 @@ func Write(w io.Writer, r Result) {
 		writeField(w, "vulnerabilities", ids(c.Before.Vulns), ids(c.After.Vulns), false)
 		writeField(w, "trust", string(c.Before.Trust), string(c.After.Trust), false)
 		writeField(w, "reason", join(c.Before.TrustReason), join(c.After.TrustReason), false)
+		writeField(w, "requested", join(c.Before.Requested), join(c.After.Requested), false)
+		writeField(w, "resolved", join(c.Before.Resolved), join(c.After.Resolved), false)
 	}
 
 	if r.TrustDrift() {
@@ -182,6 +186,12 @@ func sideOf(arts []lockfile.Artifact) Side {
 		s.Signature = worstEvidence(s.Signature, art.Evidence.Signature)
 		s.Trust = worstTrust(s.Trust, art.Trust.Status)
 		s.TrustReason = append(s.TrustReason, art.Trust.Reasons...)
+		if art.Source.Requested != "" {
+			s.Requested = append(s.Requested, art.Source.Requested)
+		}
+		if art.Source.Resolved != "" {
+			s.Resolved = append(s.Resolved, art.Source.Resolved)
+		}
 	}
 	slices.Sort(s.Versions)
 	s.Versions = slices.Compact(s.Versions)
@@ -191,6 +201,10 @@ func sideOf(arts []lockfile.Artifact) Side {
 	s.Vulns = slices.Compact(s.Vulns)
 	slices.Sort(s.TrustReason)
 	s.TrustReason = slices.Compact(s.TrustReason)
+	slices.Sort(s.Requested)
+	s.Requested = slices.Compact(s.Requested)
+	slices.Sort(s.Resolved)
+	s.Resolved = slices.Compact(s.Resolved)
 	return s
 }
 
@@ -202,7 +216,9 @@ func changed(a, b Side) bool {
 		a.VulnState != b.VulnState ||
 		join(a.Vulns) != join(b.Vulns) ||
 		a.Trust != b.Trust ||
-		join(a.TrustReason) != join(b.TrustReason)
+		join(a.TrustReason) != join(b.TrustReason) ||
+		join(a.Requested) != join(b.Requested) ||
+		join(a.Resolved) != join(b.Resolved)
 }
 
 func trustRelevant(a, b Side) bool {
@@ -213,7 +229,9 @@ func trustRelevant(a, b Side) bool {
 		a.VulnState != b.VulnState ||
 		join(a.Vulns) != join(b.Vulns) ||
 		a.Trust != b.Trust ||
-		join(a.TrustReason) != join(b.TrustReason)
+		join(a.TrustReason) != join(b.TrustReason) ||
+		join(a.Requested) != join(b.Requested) ||
+		join(a.Resolved) != join(b.Resolved)
 }
 
 func worstVuln(a, b lockfile.VulnState) lockfile.VulnState {

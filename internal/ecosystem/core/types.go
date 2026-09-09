@@ -10,6 +10,8 @@ type Dependency struct {
 	Resolver   string
 	Registry   string
 	Artifact   string
+	Requested  string
+	Resolved   string
 	SourceKind string
 	Name       string
 	Version    string

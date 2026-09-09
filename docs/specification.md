@@ -67,6 +67,8 @@ pnpm to npm must not rewrite every subject identity.
 `source.ecosystems` and `source.resolvers` are optional sorted lists.
 They must not include a path. Artifact `source.registry` is the package
 metadata origin. `source.artifact` is the download URL when it differs.
+`source.requested` and `source.resolved` record a specifier that
+redirected, such as a Deno `deno.lock` HTTPS import.
 
 `policy.digest` is a SHA-256 of a canonical JSON encoding of the active
 policy (version, resolved network mode, registry allowlists, and

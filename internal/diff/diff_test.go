@@ -182,3 +182,34 @@ func TestCompareArtifactDigestSwap(t *testing.T) {
 		t.Fatalf("changes = %d, want 2", len(got.Changes))
 	}
 }
+
+func TestCompareRedirectResolved(t *testing.T) {
+	locked := lockfile.Document{Artifacts: []lockfile.Artifact{
+		{
+			Subject: lockfile.Subject{Ecosystem: "url", Name: "https://esm.sh/preact"},
+			Version: "aaa",
+			Digest:  "sha256:aaa",
+			Source: lockfile.ArtifactSource{
+				Resolver:  "deno",
+				Requested: "https://esm.sh/preact",
+				Resolved:  "https://esm.sh/preact@10.26.8",
+			},
+		},
+	}}
+	current := lockfile.Document{Artifacts: []lockfile.Artifact{
+		{
+			Subject: lockfile.Subject{Ecosystem: "url", Name: "https://esm.sh/preact"},
+			Version: "aaa",
+			Digest:  "sha256:aaa",
+			Source: lockfile.ArtifactSource{
+				Resolver:  "deno",
+				Requested: "https://esm.sh/preact",
+				Resolved:  "https://esm.sh/preact@10.26.9",
+			},
+		},
+	}}
+	got := diff.Compare(locked, current)
+	if !got.TrustDrift() {
+		t.Fatal("deno redirect target change must be trust drift")
+	}
+}
