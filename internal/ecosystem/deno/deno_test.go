@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/securock/securock/internal/ecosystem/core"
@@ -80,6 +81,53 @@ func TestV3Packages(t *testing.T) {
 	}
 	if len(deps) != 1 || deps[0].Name != "chalk" || deps[0].Version != "5.3.0" {
 		t.Fatalf("v3 npm = %#v", deps)
+	}
+}
+
+func TestV4Lockfile(t *testing.T) {
+	isolate(t)
+	dir := t.TempDir()
+	raw := `{
+  "version": "4",
+  "npm": {
+    "chalk@5.3.0": { "integrity": "sha256-n4bQgYhMfWWaL+qgxVrQFaO/TxsrC4Is0V1sFbDwCgg=" }
+  }
+}`
+	if err := os.WriteFile(filepath.Join(dir, "deno.lock"), []byte(raw), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	deps, err := deno.New().Dependencies(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(deps) != 1 || deps[0].Name != "chalk" || deps[0].Version != "5.3.0" {
+		t.Fatalf("v4 npm = %#v", deps)
+	}
+}
+
+func TestUnsupportedVersion(t *testing.T) {
+	isolate(t)
+	dir := t.TempDir()
+	raw := `{"version":"6","npm":{"react@19.2.0":{"integrity":"sha256-n4bQgYhMfWWaL+qgxVrQFaO/TxsrC4Is0V1sFbDwCgg="}}}`
+	if err := os.WriteFile(filepath.Join(dir, "deno.lock"), []byte(raw), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	_, err := deno.New().Dependencies(dir)
+	if err == nil || !strings.Contains(err.Error(), `unsupported deno.lock version "6"`) {
+		t.Fatalf("want unsupported version error, got %v", err)
+	}
+}
+
+func TestMissingVersion(t *testing.T) {
+	isolate(t)
+	dir := t.TempDir()
+	raw := `{"npm":{"react@19.2.0":{"integrity":"sha256-n4bQgYhMfWWaL+qgxVrQFaO/TxsrC4Is0V1sFbDwCgg="}}}`
+	if err := os.WriteFile(filepath.Join(dir, "deno.lock"), []byte(raw), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	_, err := deno.New().Dependencies(dir)
+	if err == nil || !strings.Contains(err.Error(), "missing deno.lock version") {
+		t.Fatalf("want missing version error, got %v", err)
 	}
 }
 

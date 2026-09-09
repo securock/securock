@@ -2,6 +2,7 @@ package deno
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"strings"
 
@@ -33,6 +34,9 @@ func (Ecosystem) Dependencies(path string) ([]core.Dependency, error) {
 
 	var lock denoLock
 	if err := json.Unmarshal(raw, &lock); err != nil {
+		return nil, err
+	}
+	if err := supportedVersion(lock.Version); err != nil {
 		return nil, err
 	}
 
@@ -103,7 +107,19 @@ func (Ecosystem) Dependencies(path string) ([]core.Dependency, error) {
 	return deps, nil
 }
 
+func supportedVersion(v string) error {
+	switch v {
+	case "3", "4", "5":
+		return nil
+	case "":
+		return fmt.Errorf("missing deno.lock version")
+	default:
+		return fmt.Errorf("unsupported deno.lock version %q", v)
+	}
+}
+
 type denoLock struct {
+	Version  string             `json:"version"`
 	NPM      map[string]denoPkg `json:"npm"`
 	JSR      map[string]denoPkg `json:"jsr"`
 	Remote   map[string]string  `json:"remote"`
