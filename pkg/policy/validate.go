@@ -14,7 +14,22 @@ func Validate(doc Document) error {
 	default:
 		return fmt.Errorf("unknown network mode %q", doc.Network.Mode)
 	}
+	if err := validateEvidenceRule("provenance", doc.Rules.Provenance.Minimum); err != nil {
+		return err
+	}
+	if err := validateEvidenceRule("signature", doc.Rules.Signature.Minimum); err != nil {
+		return err
+	}
 	return nil
+}
+
+func validateEvidenceRule(name, minimum string) error {
+	switch minimum {
+	case "", "present", "verified":
+		return nil
+	default:
+		return fmt.Errorf("unknown %s minimum %q", name, minimum)
+	}
 }
 
 func ValidMode(mode Mode) bool {

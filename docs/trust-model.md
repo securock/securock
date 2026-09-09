@@ -38,6 +38,17 @@ not yet expose that evidence. Unknown is not the same as verified.
 | `present` | registry returned provenance or signatures; not cryptographically verified |
 | `verified` | cryptographic verification succeeded |
 
+`require_provenance: true` accepts `present` or `verified`. To require
+cryptographic verification:
+
+```yaml
+rules:
+  provenance:
+    minimum: verified
+  signature:
+    minimum: verified
+```
+
 v0.1 npm collection can emit `present`, never `verified`. `verified`
 is reserved for Sigstore and registry-key verification.
 

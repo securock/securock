@@ -28,10 +28,16 @@ type Network struct {
 }
 
 type Rules struct {
-	RequireNoVulnerabilities bool `json:"require_no_vulnerabilities" yaml:"require_no_vulnerabilities"`
-	RequireDigest            bool `json:"require_digest" yaml:"require_digest"`
-	RequireProvenance        bool `json:"require_provenance" yaml:"require_provenance"`
-	RequireSignature         bool `json:"require_signature" yaml:"require_signature"`
+	RequireNoVulnerabilities bool         `json:"require_no_vulnerabilities" yaml:"require_no_vulnerabilities"`
+	RequireDigest            bool         `json:"require_digest" yaml:"require_digest"`
+	RequireProvenance        bool         `json:"require_provenance" yaml:"require_provenance"`
+	RequireSignature         bool         `json:"require_signature" yaml:"require_signature"`
+	Provenance               EvidenceRule `json:"provenance,omitempty" yaml:"provenance,omitempty"`
+	Signature                EvidenceRule `json:"signature,omitempty" yaml:"signature,omitempty"`
+}
+
+type EvidenceRule struct {
+	Minimum string `json:"minimum,omitempty" yaml:"minimum,omitempty"`
 }
 
 func Default() Document {

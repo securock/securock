@@ -77,6 +77,37 @@ func TestEvaluateOfflineUnknown(t *testing.T) {
 	}
 }
 
+func TestEvaluateRequireVerifiedProvenance(t *testing.T) {
+	pol := policy.Default()
+	pol.Rules.Provenance.Minimum = "verified"
+
+	present := lockfile.Artifact{
+		Evidence: lockfile.Evidence{
+			Provenance: lockfile.EvidencePresent,
+			Vulnerabilities: lockfile.VulnEvidence{
+				State: lockfile.VulnChecked,
+			},
+		},
+	}
+	trust.Evaluate(&present, pol)
+	if present.Trust.Status != lockfile.StatusUntrusted {
+		t.Fatal("present provenance must fail minimum verified")
+	}
+
+	verified := lockfile.Artifact{
+		Evidence: lockfile.Evidence{
+			Provenance: lockfile.EvidenceVerified,
+			Vulnerabilities: lockfile.VulnEvidence{
+				State: lockfile.VulnChecked,
+			},
+		},
+	}
+	trust.Evaluate(&verified, pol)
+	if verified.Trust.Status != lockfile.StatusTrusted {
+		t.Fatalf("verified provenance should pass: %s", verified.Trust.Status)
+	}
+}
+
 func TestEvaluateRequireDigest(t *testing.T) {
 	art := lockfile.Artifact{
 		Evidence: lockfile.Evidence{
