@@ -83,7 +83,7 @@ func (c *HTTPClient) queryBatch(ctx context.Context, deps []ecosystem.Dependency
 	for _, dep := range deps {
 		reqBody.Queries = append(reqBody.Queries, queryItem{
 			Package: queryPackage{
-				Name:      dep.Name,
+				Name:      QueryName(dep),
 				Ecosystem: QueryEcosystem(dep),
 			},
 			Version: dep.Version,
@@ -159,6 +159,13 @@ func Queryable(dep ecosystem.Dependency) bool {
 	return QueryEcosystem(dep) != ""
 }
 
+func QueryName(dep ecosystem.Dependency) string {
+	if dep.Ecosystem == "swift" && dep.Registry != "" {
+		return dep.Registry
+	}
+	return dep.Name
+}
+
 func QueryEcosystem(dep ecosystem.Dependency) string {
 	if dep.Ecosystem == "cargo" && !cratesIO(dep.Registry) {
 		return ""
@@ -193,6 +200,8 @@ func Ecosystem(name string) string {
 		return "RubyGems"
 	case "nuget":
 		return "NuGet"
+	case "swift":
+		return "SwiftURL"
 	default:
 		return name
 	}

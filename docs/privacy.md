@@ -25,7 +25,9 @@ and only for artifacts whose lockfile registry is a known public registry:
 
 Private registries, missing `resolved` URLs, and `GOPRIVATE` modules are
 recorded in `securock.lock` but are **not** sent off-machine. Their
-vulnerability state is `unknown`, not `trusted`.
+vulnerability state is `unknown`, not `trusted`. Swift package URLs
+are recorded the same way: `public-only` does not treat Git hosts as a
+public registry.
 
 pnpm often omits tarball URLs. Securock does **not** assume
 `registry.npmjs.org` in that case. It only treats a package as public when

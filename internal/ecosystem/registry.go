@@ -13,6 +13,7 @@ import (
 	"github.com/securock/securock/internal/ecosystem/pnpm"
 	"github.com/securock/securock/internal/ecosystem/poetry"
 	"github.com/securock/securock/internal/ecosystem/pypi"
+	"github.com/securock/securock/internal/ecosystem/swiftpm"
 	"github.com/securock/securock/internal/ecosystem/yarn"
 )
 
@@ -31,6 +32,7 @@ func All() []Ecosystem {
 		composer.New(),
 		bundler.New(),
 		nuget.New(),
+		swiftpm.New(),
 	}
 }
 

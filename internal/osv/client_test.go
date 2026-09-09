@@ -20,6 +20,7 @@ func TestEcosystem(t *testing.T) {
 		"packagist": "Packagist",
 		"rubygems":  "RubyGems",
 		"nuget":     "NuGet",
+		"swift":     "SwiftURL",
 	}
 	for in, want := range cases {
 		if got := osv.Ecosystem(in); got != want {
@@ -57,5 +58,20 @@ func TestQueryEcosystemSkipsJSRAndURL(t *testing.T) {
 	remote := ecosystem.Dependency{Ecosystem: "url", Name: "https://example.com/mod.ts", Version: "abc"}
 	if osv.Queryable(remote) {
 		t.Fatal("url artifacts must not be sent to OSV")
+	}
+}
+
+func TestQueryNameUsesSwiftLocation(t *testing.T) {
+	dep := ecosystem.Dependency{
+		Ecosystem: "swift",
+		Name:      "swift-argument-parser",
+		Version:   "1.2.3",
+		Registry:  "https://github.com/apple/swift-argument-parser",
+	}
+	if osv.QueryName(dep) != dep.Registry {
+		t.Fatal("swift OSV queries must use the repository URL")
+	}
+	if osv.QueryEcosystem(dep) != "SwiftURL" {
+		t.Fatal("swift must map to SwiftURL")
 	}
 }
