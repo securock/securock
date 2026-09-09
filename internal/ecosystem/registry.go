@@ -6,6 +6,7 @@ import (
 	"github.com/securock/securock/internal/ecosystem/deno"
 	"github.com/securock/securock/internal/ecosystem/golang"
 	"github.com/securock/securock/internal/ecosystem/npm"
+	"github.com/securock/securock/internal/ecosystem/pdm"
 	"github.com/securock/securock/internal/ecosystem/pnpm"
 	"github.com/securock/securock/internal/ecosystem/poetry"
 	"github.com/securock/securock/internal/ecosystem/pypi"
@@ -23,6 +24,7 @@ func All() []Ecosystem {
 		golang.New(),
 		pypi.New(),
 		poetry.New(),
+		pdm.New(),
 	}
 }
 

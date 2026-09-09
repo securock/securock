@@ -87,6 +87,23 @@ func TestPreferUvOverPoetry(t *testing.T) {
 	}
 }
 
+func TestPreferPoetryOverPdm(t *testing.T) {
+	found := []ecosystem.Ecosystem{
+		fakeEco("pdm"),
+		fakeEco("poetry"),
+		fakeEco("go"),
+	}
+	got := ecosystem.Prefer(found)
+	if len(got) != 2 {
+		t.Fatalf("got %d ecosystems, want 2: %v", len(got), names(got))
+	}
+	for _, name := range names(got) {
+		if name == "pdm" {
+			t.Fatal("pdm should be dropped when poetry.lock is present")
+		}
+	}
+}
+
 func TestCollectArtifactConflict(t *testing.T) {
 	dir := t.TempDir()
 	raw := `{

@@ -21,7 +21,7 @@
         },
         "resolvers": {
           "type": "array",
-          "items": { "type": "string", "enum": ["npm", "pnpm", "yarn", "bun", "deno", "cargo", "go", "uv", "poetry"] },
+          "items": { "type": "string", "enum": ["npm", "pnpm", "yarn", "bun", "deno", "cargo", "go", "uv", "poetry", "pdm"] },
           "uniqueItems": true
         }
       }
@@ -71,7 +71,7 @@
       "properties": {
         "resolver": {
           "type": "string",
-          "enum": ["npm", "pnpm", "yarn", "bun", "deno", "cargo", "go", "uv", "poetry"]
+          "enum": ["npm", "pnpm", "yarn", "bun", "deno", "cargo", "go", "uv", "poetry", "pdm"]
         },
         "registry": { "type": "string" }
       }
