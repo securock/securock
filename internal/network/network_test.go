@@ -63,6 +63,18 @@ func TestAllowAll(t *testing.T) {
 	}
 }
 
+func TestAllowSkipsWorkspace(t *testing.T) {
+	dep := core.Dependency{
+		Ecosystem:  "npm",
+		Name:       "local-pkg",
+		Version:    "0.0.1",
+		SourceKind: core.SourceWorkspace,
+	}
+	if network.Allow(policy.ModeAllowAll, nil, dep) {
+		t.Fatal("workspace packages must not be queried")
+	}
+}
+
 func TestGoPrivate(t *testing.T) {
 	t.Setenv("GOPRIVATE", "github.com/company/*")
 	dep := core.Dependency{

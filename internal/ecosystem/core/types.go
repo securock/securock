@@ -6,14 +6,23 @@ import (
 )
 
 type Dependency struct {
-	Ecosystem string
-	Resolver  string
-	Registry  string
-	Name      string
-	Version   string
-	Filename  string
-	Digest    string
+	Ecosystem  string
+	Resolver   string
+	Registry   string
+	SourceKind string
+	Name       string
+	Version    string
+	Filename   string
+	Digest     string
 }
+
+const (
+	SourceRegistry  = "registry"
+	SourceWorkspace = "workspace"
+	SourceGit       = "git"
+	SourceFile      = "file"
+	SourceURL       = "url"
+)
 
 type Ecosystem interface {
 	Name() string

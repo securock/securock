@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/securock/securock/internal/ecosystem/core"
-	"github.com/securock/securock/internal/network"
+	"github.com/securock/securock/internal/npmrc"
 )
 
 const lockfileName = "package-lock.json"
@@ -74,13 +74,15 @@ func fromPackages(packages map[string]lockPackage) []core.Dependency {
 		if name == "" || pkg.Version == "" {
 			continue
 		}
+		kind, registry := classifyResolved(pkg.Resolved)
 		deps = append(deps, core.Dependency{
-			Ecosystem: "npm",
-			Resolver:  "npm",
-			Registry:  npmRegistry(pkg.Resolved),
-			Name:      name,
-			Version:   pkg.Version,
-			Digest:    core.NormalizeDigest(pkg.Integrity),
+			Ecosystem:  "npm",
+			Resolver:   "npm",
+			Registry:   registry,
+			SourceKind: kind,
+			Name:       name,
+			Version:    pkg.Version,
+			Digest:     core.NormalizeDigest(pkg.Integrity),
 		})
 	}
 	return deps
@@ -92,13 +94,15 @@ func fromDependencies(deps map[string]v1Dep) []core.Dependency {
 	walk = func(tree map[string]v1Dep) {
 		for name, dep := range tree {
 			if name != "" && dep.Version != "" {
+				kind, registry := classifyResolved(dep.Resolved)
 				out = append(out, core.Dependency{
-					Ecosystem: "npm",
-					Resolver:  "npm",
-					Registry:  npmRegistry(dep.Resolved),
-					Name:      name,
-					Version:   dep.Version,
-					Digest:    core.NormalizeDigest(dep.Integrity),
+					Ecosystem:  "npm",
+					Resolver:   "npm",
+					Registry:   registry,
+					SourceKind: kind,
+					Name:       name,
+					Version:    dep.Version,
+					Digest:     core.NormalizeDigest(dep.Integrity),
 				})
 			}
 			if len(dep.Dependencies) > 0 {
@@ -110,8 +114,20 @@ func fromDependencies(deps map[string]v1Dep) []core.Dependency {
 	return out
 }
 
-func npmRegistry(resolved string) string {
-	return network.Origin(resolved)
+func classifyResolved(resolved string) (kind, registry string) {
+	resolved = strings.TrimSpace(resolved)
+	switch {
+	case resolved == "":
+		return core.SourceWorkspace, ""
+	case strings.HasPrefix(resolved, "file:") || strings.HasPrefix(resolved, "link:"):
+		return core.SourceFile, ""
+	case strings.HasPrefix(resolved, "git+") || strings.HasPrefix(resolved, "git://"):
+		return core.SourceGit, ""
+	case strings.HasPrefix(resolved, "https://") || strings.HasPrefix(resolved, "http://"):
+		return core.SourceRegistry, npmrc.Registry(".", "", resolved)
+	default:
+		return core.SourceURL, ""
+	}
 }
 
 func packageName(key string) string {

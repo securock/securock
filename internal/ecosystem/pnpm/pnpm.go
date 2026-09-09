@@ -46,13 +46,19 @@ func (Ecosystem) Dependencies(path string) ([]core.Dependency, error) {
 		if local(pkg) && tarball == "" {
 			tarball = "file:local"
 		}
+		registry := npmrc.Registry(path, name, tarball)
+		kind := core.SourceRegistry
+		if registry == "" {
+			kind = core.SourceFile
+		}
 		deps = append(deps, core.Dependency{
-			Ecosystem: "npm",
-			Resolver:  "pnpm",
-			Registry:  npmrc.Registry(path, name, tarball),
-			Name:      name,
-			Version:   version,
-			Digest:    core.NormalizeDigest(pkg.Resolution.Integrity),
+			Ecosystem:  "npm",
+			Resolver:   "pnpm",
+			Registry:   registry,
+			SourceKind: kind,
+			Name:       name,
+			Version:    version,
+			Digest:     core.NormalizeDigest(pkg.Resolution.Integrity),
 		})
 	}
 	return deps, nil

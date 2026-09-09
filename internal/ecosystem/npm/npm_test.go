@@ -39,6 +39,30 @@ func TestDependencies(t *testing.T) {
 	}
 }
 
+func TestSourceKinds(t *testing.T) {
+	eco := npm.New()
+	deps, err := eco.Dependencies("testdata/sources")
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := map[string]string{}
+	for _, dep := range deps {
+		got[dep.Name] = dep.SourceKind
+		if dep.SourceKind != "registry" && dep.Registry != "" {
+			t.Errorf("%s: non-registry %s has registry %q", dep.Name, dep.SourceKind, dep.Registry)
+		}
+	}
+	if got["react"] != "registry" {
+		t.Fatalf("react kind = %q", got["react"])
+	}
+	if got["local-pkg"] != "file" && got["local-pkg"] != "workspace" {
+		t.Fatalf("local-pkg kind = %q", got["local-pkg"])
+	}
+	if got["from-git"] != "git" {
+		t.Fatalf("from-git kind = %q", got["from-git"])
+	}
+}
+
 func testdata(t *testing.T) string {
 	t.Helper()
 	return filepath.Join("testdata")

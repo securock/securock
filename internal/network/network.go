@@ -30,6 +30,9 @@ func DefaultRegistries() map[string][]string {
 }
 
 func Allow(mode policy.Mode, allowlist map[string][]string, dep core.Dependency) bool {
+	if !remote(dep) {
+		return false
+	}
 	switch mode {
 	case policy.ModeOffline:
 		return false
@@ -144,4 +147,12 @@ func goPrivate(name string) bool {
 		}
 	}
 	return false
+}
+
+func remote(dep core.Dependency) bool {
+	switch dep.SourceKind {
+	case core.SourceWorkspace, core.SourceFile, core.SourceGit:
+		return false
+	}
+	return true
 }
