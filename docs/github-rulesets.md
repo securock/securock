@@ -22,3 +22,11 @@ Enable **Require actions to be pinned to a full-length commit SHA**.
 - Do not allow bypass except for repository admins during an incident
 
 Example payload: `.github/rulesets/main.json`.
+
+## `v*` tag ruleset
+
+- Target: tags matching `v*`
+- Block tag deletions
+- Block force-pushes that rewrite a release tag
+
+Example payload: `.github/rulesets/tags.json`.
