@@ -178,3 +178,21 @@ func TestAllowlistDoesNotMatchParentPath(t *testing.T) {
 		t.Fatal("sibling path must not match")
 	}
 }
+
+func TestProvenance(t *testing.T) {
+	if got := network.Provenance("nuget", nil); got != "" {
+		t.Fatalf("unknown = %q", got)
+	}
+	if got := network.Provenance("nuget", []string{"https://api.nuget.org/v3/index.json"}); got != "https://api.nuget.org" {
+		t.Fatalf("public nuget = %q", got)
+	}
+	if got := network.Provenance("nuget", []string{
+		"https://api.nuget.org/v3/index.json",
+		"https://nuget.company.example/v3/index.json",
+	}); got != "" {
+		t.Fatalf("mixed = %q", got)
+	}
+	if got := network.Provenance("pypi", []string{"https://pypi.company.example/simple"}); got != "https://pypi.company.example" {
+		t.Fatalf("single private = %q", got)
+	}
+}

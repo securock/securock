@@ -5,6 +5,7 @@ import (
 
 	"github.com/pelletier/go-toml/v2"
 	"github.com/securock/securock/internal/ecosystem/core"
+	"github.com/securock/securock/internal/network"
 )
 
 const lockfileName = "pdm.lock"
@@ -72,6 +73,7 @@ type pdmPackage struct {
 
 type pdmFile struct {
 	File string `toml:"file"`
+	URL  string `toml:"url"`
 	Hash string `toml:"hash"`
 }
 
@@ -103,6 +105,16 @@ func classify(pkg pdmPackage) (kind, registry string) {
 	case pkg.URL != "":
 		return core.SourceURL, ""
 	default:
-		return core.SourceRegistry, "https://pypi.org"
+		return core.SourceRegistry, fileRegistry(pkg)
 	}
+}
+
+func fileRegistry(pkg pdmPackage) string {
+	var urls []string
+	for _, file := range pkg.Files {
+		if file.URL != "" {
+			urls = append(urls, file.URL)
+		}
+	}
+	return network.Provenance("pypi", urls)
 }

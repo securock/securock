@@ -42,14 +42,18 @@ func (Ecosystem) Dependencies(path string) ([]core.Dependency, error) {
 		}
 		switch kind {
 		case "hex":
-			version, digest := hexFields(payload)
+			version, digest, repo := hexFields(payload)
 			if version == "" {
 				continue
+			}
+			registry := ""
+			if repo == "hexpm" {
+				registry = "https://repo.hex.pm"
 			}
 			deps = append(deps, core.Dependency{
 				Ecosystem:  "hex",
 				Resolver:   "mix",
-				Registry:   "https://repo.hex.pm",
+				Registry:   registry,
 				SourceKind: core.SourceRegistry,
 				Name:       name,
 				Version:    version,
@@ -101,24 +105,62 @@ func nextEntry(raw string) (name, kind, payload, rest string, ok bool) {
 		return name, "", "", "", true
 	}
 	kind = strings.TrimSpace(strings.TrimPrefix(after[:kindEnd], ":"))
-	return name, kind, after[kindEnd:], after[kindEnd:], true
+	end := closeTuple(after)
+	if end < 0 {
+		return name, kind, after[kindEnd:], "", true
+	}
+	return name, kind, after[kindEnd:end], after[end+1:], true
 }
 
-func hexFields(payload string) (version, digest string) {
+func closeTuple(s string) int {
+	depth := 1
+	inString := false
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		if inString {
+			if c == '\\' && i+1 < len(s) {
+				i++
+				continue
+			}
+			if c == '"' {
+				inString = false
+			}
+			continue
+		}
+		switch c {
+		case '"':
+			inString = true
+		case '{', '[':
+			depth++
+		case '}', ']':
+			depth--
+			if depth == 0 {
+				return i
+			}
+		}
+	}
+	return -1
+}
+
+func hexFields(payload string) (version, digest, repo string) {
 	quoted := quotedStrings(payload)
 	if len(quoted) == 0 {
-		return "", ""
+		return "", "", ""
 	}
 	version = quoted[0]
 	for i := len(quoted) - 1; i >= 1; i-- {
 		if len(quoted[i]) == 64 && isHex(quoted[i]) {
-			return version, quoted[i]
+			if digest == "" {
+				digest = quoted[i]
+			}
+			continue
+		}
+		if quoted[i] != "" {
+			repo = quoted[i]
+			break
 		}
 	}
-	if len(quoted) >= 2 {
-		return version, quoted[len(quoted)-1]
-	}
-	return version, ""
+	return version, digest, repo
 }
 
 func firstQuoted(payload string) string {

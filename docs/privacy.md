@@ -34,9 +34,11 @@ public registry.
 pnpm often omits tarball URLs. Securock does **not** assume
 `registry.npmjs.org` in that case. It only treats a package as public when
 a tarball origin or an explicit registry setting (environment, project
-`.npmrc`, or user `~/.npmrc`) proves a public origin. `gradle.lockfile`
-likewise has no repository URL, so Gradle artifacts stay on-machine in
-`public-only`.
+`.npmrc`, or user `~/.npmrc`) proves a public origin. The same fail-closed
+rule applies to NuGet (`NuGet.Config` package sources), PDM (lockfile file
+URLs), Mix (`mix.lock` repository identity), and Gradle (`gradle.lockfile`
+has no repository URL). Mixed public and private sources are treated as
+unknown.
 
 ## Modes
 

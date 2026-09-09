@@ -6,6 +6,8 @@ import (
 	"strings"
 
 	"github.com/securock/securock/internal/ecosystem/core"
+	"github.com/securock/securock/internal/network"
+	"github.com/securock/securock/internal/nugetconfig"
 )
 
 const lockfileName = "packages.lock.json"
@@ -35,6 +37,7 @@ func (Ecosystem) Dependencies(path string) ([]core.Dependency, error) {
 		return nil, err
 	}
 
+	registry := network.Provenance("nuget", nugetconfig.Sources(path))
 	seen := map[string]struct{}{}
 	var deps []core.Dependency
 	for _, framework := range lock.Dependencies {
@@ -53,7 +56,7 @@ func (Ecosystem) Dependencies(path string) ([]core.Dependency, error) {
 			deps = append(deps, core.Dependency{
 				Ecosystem:  "nuget",
 				Resolver:   "nuget",
-				Registry:   "https://api.nuget.org",
+				Registry:   registry,
 				SourceKind: core.SourceRegistry,
 				Name:       name,
 				Version:    pkg.Resolved,
