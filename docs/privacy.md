@@ -19,6 +19,7 @@ and only for artifacts whose lockfile registry is a known public registry:
 | go | `https://proxy.golang.org` (skips `GOPRIVATE`, same prefix globs as `go`) |
 | pypi | `https://pypi.org` |
 | packagist | `https://repo.packagist.org` |
+| rubygems | `https://rubygems.org` |
 | jsr | `https://jsr.io` (names are not sent to OSV yet) |
 
 Private registries, missing `resolved` URLs, and `GOPRIVATE` modules are

@@ -16,12 +16,12 @@
       "properties": {
         "ecosystems": {
           "type": "array",
-          "items": { "type": "string", "enum": ["npm", "jsr", "url", "cargo", "go", "pypi", "packagist"] },
+          "items": { "type": "string", "enum": ["npm", "jsr", "url", "cargo", "go", "pypi", "packagist", "rubygems"] },
           "uniqueItems": true
         },
         "resolvers": {
           "type": "array",
-          "items": { "type": "string", "enum": ["npm", "pnpm", "yarn", "bun", "deno", "cargo", "go", "uv", "poetry", "pdm", "composer"] },
+          "items": { "type": "string", "enum": ["npm", "pnpm", "yarn", "bun", "deno", "cargo", "go", "uv", "poetry", "pdm", "composer", "bundler"] },
           "uniqueItems": true
         }
       }
@@ -60,7 +60,7 @@
       "properties": {
         "ecosystem": {
           "type": "string",
-          "enum": ["npm", "jsr", "url", "cargo", "go", "pypi", "packagist"]
+          "enum": ["npm", "jsr", "url", "cargo", "go", "pypi", "packagist", "rubygems"]
         },
         "name": { "type": "string", "minLength": 1 }
       }
@@ -71,7 +71,7 @@
       "properties": {
         "resolver": {
           "type": "string",
-          "enum": ["npm", "pnpm", "yarn", "bun", "deno", "cargo", "go", "uv", "poetry", "pdm", "composer"]
+          "enum": ["npm", "pnpm", "yarn", "bun", "deno", "cargo", "go", "uv", "poetry", "pdm", "composer", "bundler"]
         },
         "registry": { "type": "string" }
       }

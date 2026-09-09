@@ -18,6 +18,7 @@ func TestEcosystem(t *testing.T) {
 		"go":        "Go",
 		"pypi":      "PyPI",
 		"packagist": "Packagist",
+		"rubygems":  "RubyGems",
 	}
 	for in, want := range cases {
 		if got := osv.Ecosystem(in); got != want {

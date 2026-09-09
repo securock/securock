@@ -2,6 +2,7 @@ package ecosystem
 
 import (
 	"github.com/securock/securock/internal/ecosystem/bun"
+	"github.com/securock/securock/internal/ecosystem/bundler"
 	"github.com/securock/securock/internal/ecosystem/cargo"
 	"github.com/securock/securock/internal/ecosystem/composer"
 	"github.com/securock/securock/internal/ecosystem/deno"
@@ -27,6 +28,7 @@ func All() []Ecosystem {
 		poetry.New(),
 		pdm.New(),
 		composer.New(),
+		bundler.New(),
 	}
 }
 

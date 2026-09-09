@@ -30,6 +30,9 @@ func DefaultRegistries() map[string][]string {
 			"https://repo.packagist.org",
 			"https://packagist.org",
 		},
+		"rubygems": {
+			"https://rubygems.org",
+		},
 		"jsr": {
 			"https://jsr.io",
 		},
