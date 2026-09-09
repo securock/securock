@@ -18,12 +18,40 @@ inputs:
     description: Comment a trust report on pull requests
     default: "true"
   token:
-    description: GitHub token for PR comments
+    description: GitHub token for PR comments and attested release downloads
     default: ${{ github.token }}
+  version:
+    description: Securock release tag to install. Empty uses a v* action ref, otherwise builds from source.
+    default: ""
 runs:
   using: composite
   steps:
+    - name: Resolve install mode
+      id: mode
+      shell: bash
+      env:
+        INPUT_VERSION: ${{ inputs.version }}
+      run: |
+        set -euo pipefail
+        version="${INPUT_VERSION:-}"
+        if [ -z "$version" ]; then
+          case "${GITHUB_ACTION_REF:-}" in
+            v[0-9]*.[0-9]*) version="${GITHUB_ACTION_REF}" ;;
+          esac
+        fi
+        os=$(uname -s)
+        case "$os" in
+          Linux|Darwin) unix=1 ;;
+          *) unix=0 ;;
+        esac
+        if [ -n "$version" ] && [ "$unix" = 1 ]; then
+          echo "mode=release" >> "$GITHUB_OUTPUT"
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+        else
+          echo "mode=source" >> "$GITHUB_OUTPUT"
+        fi
     - name: Resolve Go module files
+      if: ${{ steps.mode.outputs.mode == 'source' }}
       id: gomod
       shell: bash
       run: |
@@ -33,13 +61,28 @@ runs:
         echo "mod=${action_root}/go.mod" >> "$GITHUB_OUTPUT"
         echo "sum=${action_root}/go.sum" >> "$GITHUB_OUTPUT"
     - uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
+      if: ${{ steps.mode.outputs.mode == 'source' }}
       with:
         go-version-file: ${{ steps.gomod.outputs.mod }}
         cache-dependency-path: ${{ steps.gomod.outputs.sum }}
-    - name: Install securock
+    - name: Install securock from source
+      if: ${{ steps.mode.outputs.mode == 'source' }}
       shell: bash
       run: go install ./cmd/securock
       working-directory: ${{ steps.gomod.outputs.root }}
+    - name: Install attested securock
+      if: ${{ steps.mode.outputs.mode == 'release' }}
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.token }}
+        VERSION: ${{ steps.mode.outputs.version }}
+        INSTALL_DIR: ${{ runner.temp }}/securock-bin
+        REPO: ${{ github.action_repository }}
+      run: |
+        set -euo pipefail
+        mkdir -p "$INSTALL_DIR"
+        "${GITHUB_ACTION_PATH}/scripts/install.sh"
+        echo "$INSTALL_DIR" >> "$GITHUB_PATH"
     - name: Run securock
       id: run
       shell: bash

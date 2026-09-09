@@ -6,6 +6,7 @@ consume a GitHub Action.
 ```yaml
 permissions:
   contents: read
+  attestations: read
   pull-requests: write
 
 jobs:
@@ -16,7 +17,13 @@ jobs:
       - uses: securock/securock@<commit-sha>
         with:
           command: both
+          version: v0.1.0-alpha.1
 ```
+
+After a tagged release exists, set `version` to that tag so the action
+downloads the attested binary instead of building from source. A `v*`
+action ref does the same. Local checkouts such as `uses: ./` still
+build from the action source.
 
 `@main` tracks a moving branch and is not the security-first default.
 

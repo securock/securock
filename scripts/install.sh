@@ -46,13 +46,17 @@ case "$arch" in
 esac
 
 resolve_latest() {
+  if command -v gh >/dev/null 2>&1; then
+    gh release view --repo "$REPO" --json tagName --jq .tagName
+    return 0
+  fi
   url="https://github.com/${REPO}/releases/latest"
   if command -v curl >/dev/null 2>&1; then
     curl -fsSLI -o /dev/null -w '%{url_effective}' "$url"
   elif command -v wget >/dev/null 2>&1; then
     wget --max-redirect=0 --server-response "$url" 2>&1 | awk 'tolower($1) == "location:" { print $2; exit }'
   else
-    echo "curl or wget is required" >&2
+    echo "curl, wget, or gh is required" >&2
     exit 1
   fi
 }
@@ -87,14 +91,28 @@ trap 'rm -rf "$tmp"' EXIT
 download() {
   url=$1
   dest=$2
+  token="${GH_TOKEN:-${GITHUB_TOKEN:-}}"
   if command -v curl >/dev/null 2>&1; then
-    curl -fsSL "$url" -o "$dest"
+    if [ -n "$token" ]; then
+      curl -fsSL -H "Authorization: Bearer ${token}" -H "Accept: application/octet-stream" "$url" -o "$dest"
+    else
+      curl -fsSL "$url" -o "$dest"
+    fi
   elif command -v wget >/dev/null 2>&1; then
     wget -qO "$dest" "$url"
   else
     echo "curl or wget is required" >&2
     exit 1
   fi
+}
+
+fetch_assets() {
+  if command -v gh >/dev/null 2>&1; then
+    gh release download "$VERSION" --repo "$REPO" --pattern "$archive" --pattern checksums.txt --dir "$tmp"
+    return 0
+  fi
+  download "$checksums_url" "${tmp}/checksums.txt"
+  download "$archive_url" "${tmp}/${archive}"
 }
 
 sha256() {
@@ -108,8 +126,7 @@ sha256() {
   fi
 }
 
-download "$checksums_url" "${tmp}/checksums.txt"
-download "$archive_url" "${tmp}/${archive}"
+fetch_assets
 
 expected=$(awk -v name="$archive" '$2 == name { print $1; exit }' "${tmp}/checksums.txt")
 if [ -z "$expected" ]; then

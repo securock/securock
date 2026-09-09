@@ -85,6 +85,7 @@ Walk through `lock → update → diff → verify` in
 ```yaml
 permissions:
   contents: read
+  attestations: read
   pull-requests: write
 
 jobs:
@@ -95,10 +96,13 @@ jobs:
       - uses: securock/securock@<commit-sha>
         with:
           command: both
+          version: v0.1.0-alpha.1
 ```
 
-Pin the action to a full commit SHA. The action writes a trust report
-to `$GITHUB_STEP_SUMMARY` even when it cannot comment on a fork PR.
+Pin the action to a full commit SHA. After a tagged release exists, set
+`version` so the action runs that attested binary. The action writes a
+trust report to `$GITHUB_STEP_SUMMARY` even when it cannot comment on a
+fork PR.
 
 ## Lockfile
 
