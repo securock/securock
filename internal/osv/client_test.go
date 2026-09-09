@@ -9,14 +9,15 @@ import (
 
 func TestEcosystem(t *testing.T) {
 	cases := map[string]string{
-		"npm":   "npm",
-		"pnpm":  "npm",
-		"yarn":  "npm",
-		"bun":   "npm",
-		"deno":  "npm",
-		"cargo": "crates.io",
-		"go":    "Go",
-		"pypi":  "PyPI",
+		"npm":       "npm",
+		"pnpm":      "npm",
+		"yarn":      "npm",
+		"bun":       "npm",
+		"deno":      "npm",
+		"cargo":     "crates.io",
+		"go":        "Go",
+		"pypi":      "PyPI",
+		"packagist": "Packagist",
 	}
 	for in, want := range cases {
 		if got := osv.Ecosystem(in); got != want {

@@ -6,8 +6,8 @@ import (
 )
 
 var (
-	ecosystems = []string{"npm", "jsr", "url", "cargo", "go", "pypi"}
-	resolvers  = []string{"npm", "pnpm", "yarn", "bun", "deno", "cargo", "go", "uv", "poetry", "pdm"}
+	ecosystems = []string{"npm", "jsr", "url", "cargo", "go", "pypi", "packagist"}
+	resolvers  = []string{"npm", "pnpm", "yarn", "bun", "deno", "cargo", "go", "uv", "poetry", "pdm", "composer"}
 	statuses   = []Status{StatusTrusted, StatusUntrusted, StatusUnknown}
 	evidence   = []EvidenceState{EvidenceUnknown, EvidenceMissing, EvidencePresent, EvidenceVerified}
 	vulnStates = []VulnState{VulnUnknown, VulnChecked}

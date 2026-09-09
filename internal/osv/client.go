@@ -187,6 +187,8 @@ func Ecosystem(name string) string {
 		return "Go"
 	case "pypi":
 		return "PyPI"
+	case "packagist":
+		return "Packagist"
 	default:
 		return name
 	}

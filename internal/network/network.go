@@ -26,6 +26,10 @@ func DefaultRegistries() map[string][]string {
 			"https://pypi.org",
 			"https://pypi.org/simple",
 		},
+		"packagist": {
+			"https://repo.packagist.org",
+			"https://packagist.org",
+		},
 		"jsr": {
 			"https://jsr.io",
 		},

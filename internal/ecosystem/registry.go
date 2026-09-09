@@ -3,6 +3,7 @@ package ecosystem
 import (
 	"github.com/securock/securock/internal/ecosystem/bun"
 	"github.com/securock/securock/internal/ecosystem/cargo"
+	"github.com/securock/securock/internal/ecosystem/composer"
 	"github.com/securock/securock/internal/ecosystem/deno"
 	"github.com/securock/securock/internal/ecosystem/golang"
 	"github.com/securock/securock/internal/ecosystem/npm"
@@ -25,6 +26,7 @@ func All() []Ecosystem {
 		pypi.New(),
 		poetry.New(),
 		pdm.New(),
+		composer.New(),
 	}
 }
 
