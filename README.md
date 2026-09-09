@@ -2,15 +2,18 @@
 
 A lockfile for trust, not just versions.
 
-Securock reads the lockfiles you already commit (`package-lock.json`,
-`pnpm-lock.yaml`, `yarn.lock`, `bun.lock`, `deno.lock`, `Cargo.lock`, `go.sum`, `uv.lock`, `poetry.lock`, `pdm.lock`, `composer.lock`, `Gemfile.lock`, `packages.lock.json`, `Package.resolved`, `pubspec.lock`, `mix.lock`, `gradle.lockfile`), records digest,
-provenance, signature, and vulnerability evidence for each artifact,
-and fails CI when that trust state drifts.
-
 Language lockfiles pin versions. `securock.lock` pins the _trust
 decision_ you accepted for those versions.
 
+Securock records digest, provenance, signature, and vulnerability
+evidence for each artifact, then fails CI when that trust state
+drifts.
+
 **Docs:** [securock.dev](https://securock.dev)
+
+**Status:** pre-1.0. npm, pnpm, Yarn, Bun, and Deno are stable. Other
+resolvers parse today; their provenance and signature evidence is still
+experimental.
 
 ## Why
 
@@ -18,13 +21,11 @@ A dependency bump can change more than a version string: the artifact
 digest, known vulnerabilities, or whether provenance is even present.
 Those changes are easy to miss in a language lockfile diff.
 
-Securock makes them visible, then gates them:
-
 ```text
 securock lock     # snapshot the current tree
 # …bump a dependency the way you already do…
 securock diff     # see version, digest, evidence, and trust reasons
-securock verify    # fail CI on the same drift
+securock verify   # fail CI on the same drift
 ```
 
 `trusted` means the artifact passed the **active policy**. It is not a
@@ -40,13 +41,9 @@ not trusted.
 - GitHub Action that can run an attested release binary
 - JSON reports (`--format json`) with exit `0` / `1` / `2`
 
-## Status
-
-Pre-1.0. npm, pnpm, Yarn, Bun, and Deno are the stable resolvers. Other
-lockfile parsers exist; provenance and signature evidence there is still
-experimental.
-
 ## Install
+
+### Script
 
 ```bash
 curl -fsSL https://securock.sh/install | sh
@@ -60,14 +57,16 @@ gh attestation verify securock_darwin_arm64.tar.gz --repo securock/securock
 gh attestation verify ./securock --repo securock/securock
 ```
 
-Homebrew (HEAD, builds from this repo):
+### Homebrew
+
+HEAD, builds from this repo:
 
 ```bash
 brew tap securock/securock https://github.com/securock/securock
 brew install --HEAD securock
 ```
 
-From source:
+### From source
 
 ```bash
 go install github.com/securock/securock/cmd/securock@latest
@@ -101,12 +100,14 @@ The committed `securock.lock` in that directory is that snapshot.
 | `securock verify`  | Fail on trust-relevant drift                      |
 | `securock version` | Print the build version                           |
 
-`--network public-only` is the default. `--offline` records
-vulnerability state as `unknown`. `--format json` is a stable API on
-`scan`, `diff`, and `verify`.
-
-Exit codes: `0` success, `1` trust violation, `2` configuration or
-operational error.
+| Flag / exit | Meaning |
+| ----------- | ------- |
+| `--network public-only` | Default. Public registries only |
+| `--offline` | Skip remote lookups; vulnerabilities stay `unknown` |
+| `--format json` | Stable API on `scan`, `diff`, and `verify` |
+| Exit `0` | Success / no trust drift |
+| `1` | Trust violation |
+| `2` | Configuration or operational error |
 
 ```yaml
 # securock.lock (abridged)
@@ -154,32 +155,39 @@ it cannot comment on a fork PR.
 
 ## Supported ecosystems
 
-| Ecosystem | Resolver | Lockfile            | Status        |
-| --------- | -------- | ------------------- | ------------- |
-| npm       | npm      | `package-lock.json` | stable target |
-| npm       | pnpm     | `pnpm-lock.yaml`    | stable target |
-| npm       | yarn     | `yarn.lock`         | stable target |
-| npm       | bun      | `bun.lock`          | stable target |
-| npm       | deno     | `deno.lock`         | stable target |
-| jsr       | deno     | `deno.lock`         | stable target |
-| url       | deno     | `deno.lock`         | stable target |
-| cargo     | cargo    | `Cargo.lock`        | experimental  |
-| go        | go       | `go.sum`            | experimental  |
-| pypi      | uv       | `uv.lock`           | experimental  |
-| pypi      | poetry   | `poetry.lock`       | experimental  |
-| pypi      | pdm      | `pdm.lock`          | experimental  |
-| packagist | composer | `composer.lock`     | experimental  |
-| rubygems  | bundler  | `Gemfile.lock`      | experimental  |
-| nuget     | nuget    | `packages.lock.json` | experimental  |
-| swift     | swiftpm  | `Package.resolved`  | experimental  |
-| pub       | pub      | `pubspec.lock`      | experimental  |
-| hex       | mix      | `mix.lock`          | experimental  |
-| maven     | gradle   | `gradle.lockfile`   | experimental  |
+### Stable
+
+| Ecosystem | Resolver | Lockfile            |
+| --------- | -------- | ------------------- |
+| npm       | npm      | `package-lock.json` |
+| npm       | pnpm     | `pnpm-lock.yaml`    |
+| npm       | yarn     | `yarn.lock`         |
+| npm       | bun      | `bun.lock`          |
+| npm       | deno     | `deno.lock`         |
+| jsr       | deno     | `deno.lock`         |
+| url       | deno     | `deno.lock`         |
 
 Deno `deno.lock` v5 is the stable target. v3/v4 are supported for
 compatibility. Deno npm packages use OSV and npm evidence. JSR and
 HTTPS URL artifacts are stable to parse; OSV does not cover them yet,
 so vulnerability state stays `unknown`.
+
+### Experimental
+
+| Ecosystem | Resolver | Lockfile             |
+| --------- | -------- | -------------------- |
+| cargo     | cargo    | `Cargo.lock`         |
+| go        | go       | `go.sum`             |
+| pypi      | uv       | `uv.lock`            |
+| pypi      | poetry   | `poetry.lock`        |
+| pypi      | pdm      | `pdm.lock`           |
+| packagist | composer | `composer.lock`      |
+| rubygems  | bundler  | `Gemfile.lock`       |
+| nuget     | nuget    | `packages.lock.json` |
+| swift     | swiftpm  | `Package.resolved`   |
+| pub       | pub      | `pubspec.lock`       |
+| hex       | mix      | `mix.lock`           |
+| maven     | gradle   | `gradle.lockfile`    |
 
 ## Documentation
 
@@ -200,7 +208,7 @@ go test -race ./...
 go vet ./...
 ```
 
-Please keep commits to [Conventional Commits](https://www.conventionalcommits.org/),
+Commits follow [Conventional Commits](https://www.conventionalcommits.org/),
 lowercase subject only.
 
 ## Security
