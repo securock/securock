@@ -163,6 +163,9 @@ func QueryEcosystem(dep ecosystem.Dependency) string {
 	if dep.Ecosystem == "cargo" && !cratesIO(dep.Registry) {
 		return ""
 	}
+	if dep.Ecosystem == "jsr" || dep.Ecosystem == "url" {
+		return ""
+	}
 	return Ecosystem(dep.Ecosystem)
 }
 
@@ -176,7 +179,7 @@ func cratesIO(registry string) bool {
 
 func Ecosystem(name string) string {
 	switch name {
-	case "npm", "pnpm", "yarn", "bun":
+	case "npm", "pnpm", "yarn", "bun", "deno":
 		return "npm"
 	case "cargo":
 		return "crates.io"

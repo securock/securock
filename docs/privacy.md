@@ -18,6 +18,7 @@ and only for artifacts whose lockfile registry is a known public registry:
 | cargo | crates.io index URLs |
 | go | `https://proxy.golang.org` (skips `GOPRIVATE`, same prefix globs as `go`) |
 | pypi | `https://pypi.org` |
+| jsr | `https://jsr.io` (names are not sent to OSV yet) |
 
 Private registries, missing `resolved` URLs, and `GOPRIVATE` modules are
 recorded in `securock.lock` but are **not** sent off-machine. Their

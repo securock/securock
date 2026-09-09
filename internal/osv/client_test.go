@@ -13,6 +13,7 @@ func TestEcosystem(t *testing.T) {
 		"pnpm":  "npm",
 		"yarn":  "npm",
 		"bun":   "npm",
+		"deno":  "npm",
 		"cargo": "crates.io",
 		"go":    "Go",
 		"pypi":  "PyPI",
@@ -42,5 +43,16 @@ func TestQueryEcosystemSkipsPrivateCargo(t *testing.T) {
 	}
 	if osv.QueryEcosystem(public) != "crates.io" {
 		t.Fatal("crates.io cargo must map to crates.io")
+	}
+}
+
+func TestQueryEcosystemSkipsJSRAndURL(t *testing.T) {
+	jsr := ecosystem.Dependency{Ecosystem: "jsr", Name: "@std/assert", Version: "1.0.6", Registry: "https://jsr.io"}
+	if osv.Queryable(jsr) {
+		t.Fatal("jsr must not be sent to OSV yet")
+	}
+	remote := ecosystem.Dependency{Ecosystem: "url", Name: "https://example.com/mod.ts", Version: "abc"}
+	if osv.Queryable(remote) {
+		t.Fatal("url artifacts must not be sent to OSV")
 	}
 }

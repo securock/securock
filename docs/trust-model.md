@@ -60,7 +60,7 @@ network mode. See [Privacy](privacy.md).
 
 ## Evidence Securock records
 
-| Evidence | npm / pnpm | cargo / go / pypi |
+| Evidence | npm / pnpm / yarn / bun / deno | cargo / go / pypi |
 | --- | --- | --- |
 | digest | from the language lockfile | from the language lockfile |
 | vulnerabilities | OSV ids | OSV ids |

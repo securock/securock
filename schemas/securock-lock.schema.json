@@ -16,12 +16,12 @@
       "properties": {
         "ecosystems": {
           "type": "array",
-          "items": { "type": "string", "enum": ["npm", "cargo", "go", "pypi"] },
+          "items": { "type": "string", "enum": ["npm", "jsr", "url", "cargo", "go", "pypi"] },
           "uniqueItems": true
         },
         "resolvers": {
           "type": "array",
-          "items": { "type": "string", "enum": ["npm", "pnpm", "yarn", "bun", "cargo", "go", "uv"] },
+          "items": { "type": "string", "enum": ["npm", "pnpm", "yarn", "bun", "deno", "cargo", "go", "uv"] },
           "uniqueItems": true
         }
       }
@@ -60,7 +60,7 @@
       "properties": {
         "ecosystem": {
           "type": "string",
-          "enum": ["npm", "cargo", "go", "pypi"]
+          "enum": ["npm", "jsr", "url", "cargo", "go", "pypi"]
         },
         "name": { "type": "string", "minLength": 1 }
       }
@@ -71,7 +71,7 @@
       "properties": {
         "resolver": {
           "type": "string",
-          "enum": ["npm", "pnpm", "yarn", "bun", "cargo", "go", "uv"]
+          "enum": ["npm", "pnpm", "yarn", "bun", "deno", "cargo", "go", "uv"]
         },
         "registry": { "type": "string" }
       }

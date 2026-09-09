@@ -55,6 +55,18 @@ func TestPreferBunOverNpm(t *testing.T) {
 	}
 }
 
+func TestPreferKeepsDenoWithNpm(t *testing.T) {
+	found := []ecosystem.Ecosystem{
+		fakeEco("npm"),
+		fakeEco("deno"),
+		fakeEco("go"),
+	}
+	got := ecosystem.Prefer(found)
+	if len(got) != 3 {
+		t.Fatalf("got %d ecosystems, want 3: %v", len(got), names(got))
+	}
+}
+
 func TestCollectArtifactConflict(t *testing.T) {
 	dir := t.TempDir()
 	raw := `{
