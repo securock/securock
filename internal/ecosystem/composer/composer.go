@@ -45,6 +45,7 @@ func (Ecosystem) Dependencies(path string) ([]core.Dependency, error) {
 			Ecosystem:  "packagist",
 			Resolver:   "composer",
 			Registry:   registry,
+			Artifact:   pkg.Dist.URL,
 			SourceKind: kind,
 			Name:       pkg.Name,
 			Version:    pkg.Version,
@@ -60,9 +61,10 @@ type composerLock struct {
 }
 
 type composerPackage struct {
-	Name    string `json:"name"`
-	Version string `json:"version"`
-	Dist    struct {
+	Name            string `json:"name"`
+	Version         string `json:"version"`
+	NotificationURL string `json:"notification-url"`
+	Dist            struct {
 		Type   string `json:"type"`
 		URL    string `json:"url"`
 		Shasum string `json:"shasum"`
@@ -74,10 +76,9 @@ type composerPackage struct {
 }
 
 func classify(pkg composerPackage) (kind, registry string) {
-	if pkg.Dist.URL != "" {
-		registry = network.Origin(pkg.Dist.URL)
-		if registry == "" {
-			registry = network.RegistryURL(pkg.Dist.URL)
+	if pkg.Dist.URL != "" || pkg.NotificationURL != "" {
+		if pkg.NotificationURL != "" {
+			registry = network.Provenance("packagist", []string{pkg.NotificationURL})
 		}
 		return core.SourceRegistry, registry
 	}

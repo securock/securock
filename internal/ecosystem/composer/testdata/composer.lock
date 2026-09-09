@@ -4,9 +4,10 @@
         {
             "name": "psr/log",
             "version": "3.0.2",
+            "notification-url": "https://packagist.org/downloads/",
             "dist": {
                 "type": "zip",
-                "url": "https://repo.packagist.org/p2/psr/log/psr-log-3.0.2-de3.zip",
+                "url": "https://api.github.com/repos/php-fig/log/zipball/f16e1d5863e37f8d8c2a01719f5b34baa2b714d3",
                 "reference": "f16e1d5863e37f8d8c2a01719f5b34baa2b714d3",
                 "shasum": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"
             }

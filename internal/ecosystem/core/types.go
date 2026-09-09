@@ -9,6 +9,7 @@ type Dependency struct {
 	Ecosystem  string
 	Resolver   string
 	Registry   string
+	Artifact   string
 	SourceKind string
 	Name       string
 	Version    string

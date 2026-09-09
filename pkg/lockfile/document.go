@@ -54,6 +54,7 @@ type Subject struct {
 type ArtifactSource struct {
 	Resolver string `json:"resolver,omitempty" yaml:"resolver,omitempty"`
 	Registry string `json:"registry,omitempty" yaml:"registry,omitempty"`
+	Artifact string `json:"artifact,omitempty" yaml:"artifact,omitempty"`
 }
 
 type Artifact struct {
