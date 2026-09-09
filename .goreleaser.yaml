@@ -40,20 +40,17 @@ sboms:
       - "--output"
       - "spdx-json=$document"
 
-brews:
+homebrew_casks:
   - name: securock
-    ids:
+    binaries:
       - securock
     homepage: https://securock.dev
     description: Supply-chain trust layer for software dependencies
     license: Apache-2.0
-    directory: .
     skip_upload: true
     repository:
       owner: securock
       name: securock
-    test: |
-      system "#{bin}/securock", "version"
 
 changelog:
   sort: asc
