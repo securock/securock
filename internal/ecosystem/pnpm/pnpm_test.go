@@ -32,5 +32,8 @@ func TestDependencies(t *testing.T) {
 		if dep.Ecosystem != "npm" || dep.Resolver != "pnpm" {
 			t.Fatalf("ecosystem/resolver = %s/%s, want npm/pnpm", dep.Ecosystem, dep.Resolver)
 		}
+		if dep.Registry != "https://registry.npmjs.org" {
+			t.Fatalf("%s registry = %q", dep.Name, dep.Registry)
+		}
 	}
 }

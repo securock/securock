@@ -5,7 +5,7 @@ import (
 	"strings"
 
 	"github.com/securock/securock/internal/ecosystem/core"
-	"github.com/securock/securock/internal/network"
+	"github.com/securock/securock/internal/npmrc"
 	"gopkg.in/yaml.v3"
 )
 
@@ -42,10 +42,14 @@ func (Ecosystem) Dependencies(path string) ([]core.Dependency, error) {
 		if name == "" || version == "" {
 			continue
 		}
+		tarball := pkg.Resolution.Tarball
+		if local(pkg) && tarball == "" {
+			tarball = "file:local"
+		}
 		deps = append(deps, core.Dependency{
 			Ecosystem: "npm",
 			Resolver:  "pnpm",
-			Registry:  network.Origin(pkg.Resolution.Tarball),
+			Registry:  npmrc.Registry(path, name, tarball),
 			Name:      name,
 			Version:   version,
 			Digest:    core.NormalizeDigest(pkg.Resolution.Integrity),
@@ -62,7 +66,16 @@ type pnpmPackage struct {
 	Resolution struct {
 		Integrity string `yaml:"integrity"`
 		Tarball   string `yaml:"tarball"`
+		Type      string `yaml:"type"`
 	} `yaml:"resolution"`
+}
+
+func local(pkg pnpmPackage) bool {
+	switch pkg.Resolution.Type {
+	case "directory", "git", "file":
+		return true
+	}
+	return false
 }
 
 func parseKey(key string) (name, version string) {
