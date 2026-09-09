@@ -12,6 +12,7 @@ func TestEcosystem(t *testing.T) {
 		"npm":   "npm",
 		"pnpm":  "npm",
 		"yarn":  "npm",
+		"bun":   "npm",
 		"cargo": "crates.io",
 		"go":    "Go",
 		"pypi":  "PyPI",

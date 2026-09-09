@@ -1,6 +1,7 @@
 package ecosystem
 
 import (
+	"github.com/securock/securock/internal/ecosystem/bun"
 	"github.com/securock/securock/internal/ecosystem/cargo"
 	"github.com/securock/securock/internal/ecosystem/golang"
 	"github.com/securock/securock/internal/ecosystem/npm"
@@ -13,6 +14,7 @@ func All() []Ecosystem {
 	return []Ecosystem{
 		pnpm.New(),
 		yarn.New(),
+		bun.New(),
 		npm.New(),
 		cargo.New(),
 		golang.New(),
@@ -40,7 +42,7 @@ func npmFamilyChoice(found []Ecosystem) string {
 	for _, e := range found {
 		present[e.Name()] = true
 	}
-	for _, name := range []string{"pnpm", "yarn", "npm"} {
+	for _, name := range []string{"pnpm", "yarn", "bun", "npm"} {
 		if present[name] {
 			return name
 		}
@@ -50,7 +52,7 @@ func npmFamilyChoice(found []Ecosystem) string {
 
 func npmFamily(name string) bool {
 	switch name {
-	case "npm", "pnpm", "yarn":
+	case "npm", "pnpm", "yarn", "bun":
 		return true
 	default:
 		return false

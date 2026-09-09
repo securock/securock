@@ -1,0 +1,17 @@
+{
+  "lockfileVersion": 1,
+  "workspaces": {
+    "": {
+      "name": "fixture",
+      "dependencies": {
+        "react": "^19.2.0",
+        "@scope/pkg": "1.2.3",
+      },
+    },
+  },
+  "packages": {
+    "react": ["react@19.2.0", "https://registry.npmjs.org/react/-/react-19.2.0.tgz", {}, "sha256-n4bQgYhMfWWaL+qgxVrQFaO/TxsrC4Is0V1sFbDwCgg="],
+    "@scope/pkg": ["@scope/pkg@1.2.3", "https://registry.npmjs.org/@scope/pkg/-/pkg-1.2.3.tgz", {}, "sha256-n4bQgYhMfWWaL+qgxVrQFaO/TxsrC4Is0V1sFbDwCgg="],
+    "local-pkg": ["local-pkg@workspace:packages/local-pkg"],
+  },
+}

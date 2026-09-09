@@ -37,6 +37,6 @@ npm run docs:dev
 
 ## Scope
 
-v0.1 treats npm, pnpm, and Yarn as the stable evidence path. Cargo, Go, and PyPI
+v0.1 treats npm, pnpm, Yarn, and Bun as the stable evidence path. Cargo, Go, and PyPI
 parsers exist, but provenance and signature evidence for those
 ecosystems is experimental.
