@@ -14,6 +14,7 @@ func DefaultRegistries() map[string][]string {
 	return map[string][]string{
 		"npm": {
 			"https://registry.npmjs.org",
+			"https://registry.yarnpkg.com",
 		},
 		"cargo": {
 			"https://index.crates.io",

@@ -9,6 +9,8 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+const DefaultRegistry = "https://registry.yarnpkg.com"
+
 func Registry(project, name, tarball string) string {
 	tarball = strings.TrimSpace(tarball)
 	if strings.HasPrefix(tarball, "https://") || strings.HasPrefix(tarball, "http://") {
@@ -19,14 +21,57 @@ func Registry(project, name, tarball string) string {
 	}
 
 	cfg := parsed{}
-	if home, err := os.UserHomeDir(); err == nil {
-		applyFile(&cfg, filepath.Join(home, ".yarnrc.yml"), name)
+	var applied []os.FileInfo
+	applyOnce := func(path string) {
+		info, err := os.Stat(path)
+		if err != nil {
+			return
+		}
+		for _, prev := range applied {
+			if os.SameFile(prev, info) {
+				return
+			}
+		}
+		applied = append(applied, info)
+		applyFile(&cfg, path, name)
 	}
-	applyFile(&cfg, filepath.Join(project, ".yarnrc.yml"), name)
+
+	if home, err := os.UserHomeDir(); err == nil {
+		applyOnce(filepath.Join(home, ".yarnrc.yml"))
+	}
+	for _, dir := range dirsFromRoot(project) {
+		applyOnce(filepath.Join(dir, ".yarnrc.yml"))
+	}
+
 	if cfg.scoped != "" {
 		return strings.TrimRight(cfg.scoped, "/")
 	}
-	return strings.TrimRight(cfg.general, "/")
+	if cfg.general != "" {
+		return strings.TrimRight(cfg.general, "/")
+	}
+	return DefaultRegistry
+}
+
+func dirsFromRoot(project string) []string {
+	abs, err := filepath.Abs(project)
+	if err != nil {
+		abs = project
+	}
+	var fromLeaf []string
+	dir := abs
+	for i := 0; i < 64; i++ {
+		fromLeaf = append(fromLeaf, dir)
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			break
+		}
+		dir = parent
+	}
+	out := make([]string, len(fromLeaf))
+	for i := range fromLeaf {
+		out[i] = fromLeaf[len(fromLeaf)-1-i]
+	}
+	return out
 }
 
 type parsed struct {

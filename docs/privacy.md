@@ -8,13 +8,14 @@ looks up vulnerabilities and npm evidence.
 The default network mode is `public-only`. Securock only queries:
 
 - OSV (`https://api.osv.dev`)
-- the npm registry (`https://registry.npmjs.org`)
+- the npm registry (`https://registry.npmjs.org`) and Yarn's default
+  (`https://registry.yarnpkg.com`)
 
 and only for artifacts whose lockfile registry is a known public registry:
 
 | Ecosystem | Allowed registries |
 | --- | --- |
-| npm | `https://registry.npmjs.org` |
+| npm | `https://registry.npmjs.org`, `https://registry.yarnpkg.com` |
 | cargo | crates.io index URLs |
 | go | `https://proxy.golang.org` (skips `GOPRIVATE`, same prefix globs as `go`) |
 | pypi | `https://pypi.org` |
@@ -34,12 +35,15 @@ public registry.
 pnpm often omits tarball URLs. Securock does **not** assume
 `registry.npmjs.org` in that case. It only treats a package as public when
 a tarball origin or an explicit registry setting (environment, project
-`.npmrc` / `.yarnrc.yml`, or user `~/.npmrc` / `~/.yarnrc.yml`) proves a public origin. The same fail-closed
-rule applies to NuGet (`NuGet.Config` package sources, merged like NuGet
-from machine and user configs through every parent directory down to the
-project), PDM (lockfile file URLs), Mix (`mix.lock` repository identity),
-and Gradle (`gradle.lockfile` has no repository URL). Mixed public and
-private sources are treated as unknown.
+`.npmrc` / `.yarnrc.yml`, parent `.yarnrc.yml`, or user `~/.npmrc` /
+`~/.yarnrc.yml`) proves a public origin. Yarn Berry projects without a
+registry setting use Yarn's documented default,
+`https://registry.yarnpkg.com`, which is treated as public npm. The same
+fail-closed rule applies to NuGet (`NuGet.Config` package sources, merged
+like NuGet from machine and user configs through every parent directory
+down to the project), PDM (lockfile file URLs), Mix (`mix.lock`
+repository identity), and Gradle (`gradle.lockfile` has no repository
+URL). Mixed public and private sources are treated as unknown.
 
 ## Modes
 

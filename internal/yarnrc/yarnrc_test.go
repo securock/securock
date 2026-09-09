@@ -15,10 +15,10 @@ func isolate(t *testing.T) {
 	t.Setenv("USERPROFILE", home)
 }
 
-func TestRegistryUnknownWithoutConfig(t *testing.T) {
+func TestRegistryDefaultsWithoutConfig(t *testing.T) {
 	isolate(t)
-	if got := yarnrc.Registry(t.TempDir(), "react", ""); got != "" {
-		t.Fatalf("unproven = %q", got)
+	if got := yarnrc.Registry(t.TempDir(), "react", ""); got != yarnrc.DefaultRegistry {
+		t.Fatalf("default = %q", got)
 	}
 }
 
@@ -34,6 +34,25 @@ func TestRegistryFromYarnrc(t *testing.T) {
 	}
 	if got := yarnrc.Registry(dir, "@company/internal-auth", ""); got != "https://npm.company.example" {
 		t.Fatalf("scoped = %q", got)
+	}
+}
+
+func TestRegistryFromParentYarnrc(t *testing.T) {
+	isolate(t)
+	root := t.TempDir()
+	project := filepath.Join(root, "apps", "web")
+	if err := os.MkdirAll(project, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	raw := "npmRegistryServer: https://registry.npmjs.org\nnpmScopes:\n  company:\n    npmRegistryServer: https://npm.company.example\n"
+	if err := os.WriteFile(filepath.Join(root, ".yarnrc.yml"), []byte(raw), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if got := yarnrc.Registry(project, "react", ""); got != "https://registry.npmjs.org" {
+		t.Fatalf("parent public = %q", got)
+	}
+	if got := yarnrc.Registry(project, "@company/internal-auth", ""); got != "https://npm.company.example" {
+		t.Fatalf("parent scoped = %q", got)
 	}
 }
 

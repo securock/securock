@@ -37,6 +37,16 @@ func TestAllowPublicOnly(t *testing.T) {
 	if network.Allow(policy.ModePublicOnly, nil, missing) {
 		t.Fatal("missing registry must not be queried")
 	}
+
+	yarnpkg := core.Dependency{
+		Ecosystem: "npm",
+		Name:      "react",
+		Version:   "19.2.0",
+		Registry:  "https://registry.yarnpkg.com",
+	}
+	if !network.Allow(policy.ModePublicOnly, nil, yarnpkg) {
+		t.Fatal("yarn default registry must be public npm")
+	}
 }
 
 func TestAllowOffline(t *testing.T) {

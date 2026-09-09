@@ -112,6 +112,34 @@ func TestPrivacyMatrix(t *testing.T) {
 			wantAll: lockfile.VulnUnknown,
 		},
 		{
+			name: "yarn berry default registry",
+			files: map[string]string{
+				"yarn.lock": `__metadata:
+  version: 8
+"react@npm:19.2.0":
+  version: 19.2.0
+  resolution: "react@npm:19.2.0"
+`,
+			},
+			wantN:   1,
+			wantAll: lockfile.VulnChecked,
+		},
+		{
+			name: "yarn parent private scope",
+			scan: "apps/web",
+			files: map[string]string{
+				".yarnrc.yml": "npmRegistryServer: https://registry.npmjs.org\nnpmScopes:\n  company:\n    npmRegistryServer: https://npm.company.example\n",
+				"apps/web/yarn.lock": `__metadata:
+  version: 8
+"@company/internal-auth@npm:1.0.0":
+  version: 1.0.0
+  resolution: "@company/internal-auth@npm:1.0.0"
+`,
+			},
+			wantN:   0,
+			wantAll: lockfile.VulnUnknown,
+		},
+		{
 			name: "pdm private index",
 			files: map[string]string{
 				"pdm.lock": `[[package]]

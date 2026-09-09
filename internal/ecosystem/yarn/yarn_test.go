@@ -103,3 +103,53 @@ func TestBerryPrivateScope(t *testing.T) {
 		t.Fatalf("private yarn scope = %#v", deps)
 	}
 }
+
+func TestBerryDefaultRegistry(t *testing.T) {
+	isolate(t)
+	dir := t.TempDir()
+	lock := `__metadata:
+  version: 8
+"react@npm:19.2.0":
+  version: 19.2.0
+  resolution: "react@npm:19.2.0"
+`
+	if err := os.WriteFile(filepath.Join(dir, "yarn.lock"), []byte(lock), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	deps, err := yarn.New().Dependencies(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(deps) != 1 || deps[0].Registry != "https://registry.yarnpkg.com" {
+		t.Fatalf("yarn default registry = %#v", deps)
+	}
+}
+
+func TestBerryParentPrivateScope(t *testing.T) {
+	isolate(t)
+	root := t.TempDir()
+	project := filepath.Join(root, "apps", "web")
+	if err := os.MkdirAll(project, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	lock := `__metadata:
+  version: 8
+"@company/internal-auth@npm:1.0.0":
+  version: 1.0.0
+  resolution: "@company/internal-auth@npm:1.0.0"
+`
+	if err := os.WriteFile(filepath.Join(project, "yarn.lock"), []byte(lock), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cfg := "npmRegistryServer: https://registry.npmjs.org\nnpmScopes:\n  company:\n    npmRegistryServer: https://npm.company.example\n"
+	if err := os.WriteFile(filepath.Join(root, ".yarnrc.yml"), []byte(cfg), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	deps, err := yarn.New().Dependencies(project)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(deps) != 1 || deps[0].Registry != "https://npm.company.example" {
+		t.Fatalf("parent yarn scope = %#v", deps)
+	}
+}
