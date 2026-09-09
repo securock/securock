@@ -23,6 +23,7 @@ func TestEcosystem(t *testing.T) {
 		"swift":     "SwiftURL",
 		"pub":       "Pub",
 		"hex":       "Hex",
+		"maven":     "Maven",
 	}
 	for in, want := range cases {
 		if got := osv.Ecosystem(in); got != want {

@@ -34,7 +34,9 @@ public registry.
 pnpm often omits tarball URLs. Securock does **not** assume
 `registry.npmjs.org` in that case. It only treats a package as public when
 a tarball origin or an explicit registry setting (environment, project
-`.npmrc`, or user `~/.npmrc`) proves a public origin.
+`.npmrc`, or user `~/.npmrc`) proves a public origin. `gradle.lockfile`
+likewise has no repository URL, so Gradle artifacts stay on-machine in
+`public-only`.
 
 ## Modes
 
