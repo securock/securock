@@ -11,6 +11,7 @@ func TestEcosystem(t *testing.T) {
 	cases := map[string]string{
 		"npm":   "npm",
 		"pnpm":  "npm",
+		"yarn":  "npm",
 		"cargo": "crates.io",
 		"go":    "Go",
 		"pypi":  "PyPI",

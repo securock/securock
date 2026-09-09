@@ -25,6 +25,21 @@ func TestPreferPnpmOverNpm(t *testing.T) {
 	}
 }
 
+func TestPreferYarnOverNpm(t *testing.T) {
+	found := []ecosystem.Ecosystem{
+		fakeEco("npm"),
+		fakeEco("yarn"),
+		fakeEco("go"),
+	}
+	got := ecosystem.Prefer(found)
+	if len(got) != 2 {
+		t.Fatalf("got %d ecosystems, want 2", len(got))
+	}
+	if got[0].Name() != "yarn" || got[1].Name() != "go" {
+		t.Fatalf("unexpected order: %v", names(got))
+	}
+}
+
 func TestCollectArtifactConflict(t *testing.T) {
 	dir := t.TempDir()
 	raw := `{

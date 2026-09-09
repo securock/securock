@@ -176,7 +176,7 @@ func cratesIO(registry string) bool {
 
 func Ecosystem(name string) string {
 	switch name {
-	case "npm", "pnpm":
+	case "npm", "pnpm", "yarn":
 		return "npm"
 	case "cargo":
 		return "crates.io"

@@ -3,7 +3,7 @@
 A lockfile for trust, not just versions.
 
 Securock reads the lockfiles you already commit (`package-lock.json`,
-`pnpm-lock.yaml`, `Cargo.lock`, `go.sum`, `uv.lock`), records digest,
+`pnpm-lock.yaml`, `yarn.lock`, `Cargo.lock`, `go.sum`, `uv.lock`), records digest,
 provenance, signature, and vulnerability evidence for each artifact,
 and fails CI when that trust state drifts.
 
@@ -42,7 +42,7 @@ not trusted.
 
 ## Status
 
-Pre-1.0. npm and pnpm are the stable evidence path. Cargo, Go, and PyPI
+Pre-1.0. npm, pnpm, and Yarn are the stable evidence path. Cargo, Go, and PyPI
 parsers exist; provenance and signature evidence there is still
 experimental.
 
@@ -158,6 +158,7 @@ it cannot comment on a fork PR.
 | --------- | -------- | ------------------- | ------------- |
 | npm       | npm      | `package-lock.json` | stable target |
 | npm       | pnpm     | `pnpm-lock.yaml`    | stable target |
+| npm       | yarn     | `yarn.lock`         | stable target |
 | cargo     | cargo    | `Cargo.lock`        | experimental  |
 | go        | go       | `go.sum`            | experimental  |
 | pypi      | uv       | `uv.lock`           | experimental  |

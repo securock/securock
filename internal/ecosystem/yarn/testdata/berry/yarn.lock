@@ -1,0 +1,23 @@
+__metadata:
+  version: 8
+  cacheKey: 10c0
+
+"local-pkg@workspace:packages/local-pkg":
+  version: 0.0.1
+  resolution: "local-pkg@workspace:packages/local-pkg"
+  languageName: unknown
+  linkType: soft
+
+"react@npm:19.2.0":
+  version: 19.2.0
+  resolution: "react@npm:19.2.0"
+  checksum: 10c0/9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08
+  languageName: node
+  linkType: hard
+
+"react@npm:19.2.0::locator=app@workspace:.":
+  version: 19.2.0
+  resolution: "react@npm:19.2.0"
+  checksum: 10c0/9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08
+  languageName: node
+  linkType: hard

@@ -21,7 +21,7 @@
         },
         "resolvers": {
           "type": "array",
-          "items": { "type": "string", "enum": ["npm", "pnpm", "cargo", "go", "uv"] },
+          "items": { "type": "string", "enum": ["npm", "pnpm", "yarn", "cargo", "go", "uv"] },
           "uniqueItems": true
         }
       }
@@ -71,7 +71,7 @@
       "properties": {
         "resolver": {
           "type": "string",
-          "enum": ["npm", "pnpm", "cargo", "go", "uv"]
+          "enum": ["npm", "pnpm", "yarn", "cargo", "go", "uv"]
         },
         "registry": { "type": "string" }
       }
