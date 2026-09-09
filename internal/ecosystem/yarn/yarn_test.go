@@ -1,13 +1,25 @@
 package yarn_test
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/securock/securock/internal/ecosystem/core"
 	"github.com/securock/securock/internal/ecosystem/yarn"
 )
 
+func isolate(t *testing.T) {
+	t.Helper()
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	t.Setenv("npm_config_registry", "")
+	t.Setenv("NPM_CONFIG_REGISTRY", "")
+}
+
 func TestClassicDependencies(t *testing.T) {
+	isolate(t)
 	eco := yarn.New()
 	if !eco.Detect("testdata") {
 		t.Fatal("expected yarn.lock to be detected")
@@ -39,6 +51,7 @@ func TestClassicDependencies(t *testing.T) {
 }
 
 func TestBerryVirtualPackages(t *testing.T) {
+	isolate(t)
 	deps, err := yarn.New().Dependencies("testdata/berry")
 	if err != nil {
 		t.Fatal(err)
@@ -54,11 +67,39 @@ func TestBerryVirtualPackages(t *testing.T) {
 	if react.Resolver != "yarn" || react.Ecosystem != "npm" {
 		t.Fatalf("react identity = %s/%s", react.Ecosystem, react.Resolver)
 	}
+	if react.Registry != "https://registry.npmjs.org" {
+		t.Fatalf("berry registry = %q", react.Registry)
+	}
 	if react.Digest != "sha256:9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08" {
 		t.Fatalf("react digest = %q", react.Digest)
 	}
 	local := got["local-pkg@0.0.1"]
 	if local.SourceKind != core.SourceWorkspace {
 		t.Fatalf("local-pkg kind = %q", local.SourceKind)
+	}
+}
+
+func TestBerryPrivateScope(t *testing.T) {
+	isolate(t)
+	dir := t.TempDir()
+	lock := `__metadata:
+  version: 8
+"@company/internal-auth@npm:1.0.0":
+  version: 1.0.0
+  resolution: "@company/internal-auth@npm:1.0.0"
+`
+	if err := os.WriteFile(filepath.Join(dir, "yarn.lock"), []byte(lock), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cfg := "npmRegistryServer: https://registry.npmjs.org\nnpmScopes:\n  company:\n    npmRegistryServer: https://npm.company.example\n"
+	if err := os.WriteFile(filepath.Join(dir, ".yarnrc.yml"), []byte(cfg), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	deps, err := yarn.New().Dependencies(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(deps) != 1 || deps[0].Registry != "https://npm.company.example" {
+		t.Fatalf("private yarn scope = %#v", deps)
 	}
 }

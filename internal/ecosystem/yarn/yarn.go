@@ -8,6 +8,7 @@ import (
 
 	"github.com/securock/securock/internal/ecosystem/core"
 	"github.com/securock/securock/internal/npmrc"
+	"github.com/securock/securock/internal/yarnrc"
 	"gopkg.in/yaml.v3"
 )
 
@@ -78,7 +79,10 @@ func berryDeps(project string, raw []byte) ([]core.Dependency, error) {
 		kind, tarball := classifyProtocol(protocol, locator)
 		registry := ""
 		if kind == core.SourceRegistry {
-			registry = npmrc.Registry(project, name, tarball)
+			registry = yarnrc.Registry(project, name, tarball)
+			if registry == "" {
+				registry = npmrc.Registry(project, name, tarball)
+			}
 		}
 		deps = append(deps, core.Dependency{
 			Ecosystem:  "npm",
@@ -98,10 +102,10 @@ func classicDeps(project string, raw []byte) ([]core.Dependency, error) {
 	sc.Buffer(make([]byte, 0, 64*1024), 1024*1024)
 
 	var (
-		deps    []core.Dependency
-		name    string
-		version string
-		resolved string
+		deps      []core.Dependency
+		name      string
+		version   string
+		resolved  string
 		integrity string
 	)
 	flush := func() {
