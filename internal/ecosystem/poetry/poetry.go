@@ -43,7 +43,7 @@ func (Ecosystem) Dependencies(path string) ([]core.Dependency, error) {
 		}
 		kind, registry := classify(pkg.Source)
 		for _, file := range files(pkg) {
-			deps = append(deps, core.Dependency{
+			dep := core.Dependency{
 				Ecosystem:  "pypi",
 				Resolver:   "poetry",
 				Registry:   registry,
@@ -52,7 +52,20 @@ func (Ecosystem) Dependencies(path string) ([]core.Dependency, error) {
 				Version:    pkg.Version,
 				Filename:   file.Name,
 				Digest:     core.NormalizeDigest(file.Hash),
-			})
+			}
+			if src := pkg.Source; src != nil {
+				switch kind {
+				case core.SourceGit:
+					dep.Artifact = core.RemoteLocation(src.URL)
+					dep.Resolved = src.ResolvedReference
+					if dep.Resolved == "" {
+						dep.Resolved = src.Reference
+					}
+				case core.SourceURL:
+					dep.Artifact = core.RemoteLocation(src.URL)
+				}
+			}
+			deps = append(deps, dep)
 		}
 	}
 	return deps, nil
@@ -75,8 +88,10 @@ type poetryFile struct {
 }
 
 type poetrySource struct {
-	Type string `toml:"type"`
-	URL  string `toml:"url"`
+	Type              string `toml:"type"`
+	URL               string `toml:"url"`
+	Reference         string `toml:"reference"`
+	ResolvedReference string `toml:"resolved_reference"`
 }
 
 type hashedFile struct {

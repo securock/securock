@@ -54,6 +54,38 @@ func TestDependencies(t *testing.T) {
 	}
 }
 
+func TestGitSource(t *testing.T) {
+	isolate(t)
+	dir := t.TempDir()
+	raw := `[[package]]
+name = "git-pkg"
+version = "1.0.0"
+git = "https://github.com/example/git-pkg.git"
+revision = "0123456789abcdef0123456789abcdef01234567"
+files = []
+`
+	if err := os.WriteFile(filepath.Join(dir, "pdm.lock"), []byte(raw), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	deps, err := pdm.New().Dependencies(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(deps) != 1 {
+		t.Fatalf("got %#v", deps)
+	}
+	dep := deps[0]
+	if dep.SourceKind != core.SourceGit || dep.Registry != "" {
+		t.Fatalf("git = %+v", dep)
+	}
+	if dep.Artifact != "https://github.com/example/git-pkg.git" {
+		t.Fatalf("artifact = %q", dep.Artifact)
+	}
+	if dep.Resolved != "0123456789abcdef0123456789abcdef01234567" {
+		t.Fatalf("resolved = %q", dep.Resolved)
+	}
+}
+
 func TestFileURLProvenance(t *testing.T) {
 	isolate(t)
 	dir := t.TempDir()

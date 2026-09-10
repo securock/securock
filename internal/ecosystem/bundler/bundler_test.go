@@ -1,6 +1,8 @@
 package bundler_test
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/securock/securock/internal/ecosystem/bundler"
@@ -38,5 +40,38 @@ func TestDependencies(t *testing.T) {
 	}
 	if _, ok := got["rack-session"]; !ok {
 		t.Fatalf("missing rack-session: %#v", got)
+	}
+}
+
+func TestGitSource(t *testing.T) {
+	dir := t.TempDir()
+	raw := `GIT
+  remote: https://github.com/example/foo.git
+  revision: 0123456789abcdef0123456789abcdef01234567
+  specs:
+    foo (1.0.0)
+
+BUNDLED WITH
+   2.5.11
+`
+	if err := os.WriteFile(filepath.Join(dir, "Gemfile.lock"), []byte(raw), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	deps, err := bundler.New().Dependencies(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(deps) != 1 {
+		t.Fatalf("got %#v", deps)
+	}
+	dep := deps[0]
+	if dep.SourceKind != core.SourceGit || dep.Registry != "" {
+		t.Fatalf("git = %+v", dep)
+	}
+	if dep.Artifact != "https://github.com/example/foo.git" {
+		t.Fatalf("artifact = %q", dep.Artifact)
+	}
+	if dep.Resolved != "0123456789abcdef0123456789abcdef01234567" {
+		t.Fatalf("resolved = %q", dep.Resolved)
 	}
 }

@@ -62,6 +62,12 @@ source = { git = "https://github.com/example/git-pkg#abc123" }
 	if deps[0].SourceKind != core.SourceGit || deps[0].Registry != "" {
 		t.Fatalf("git source = %+v", deps[0])
 	}
+	if deps[0].Artifact != "https://github.com/example/git-pkg" {
+		t.Fatalf("artifact = %q", deps[0].Artifact)
+	}
+	if deps[0].Resolved != "abc123" {
+		t.Fatalf("resolved = %q", deps[0].Resolved)
+	}
 }
 
 func TestPathSource(t *testing.T) {

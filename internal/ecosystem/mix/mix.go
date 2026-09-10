@@ -60,7 +60,15 @@ func (Ecosystem) Dependencies(path string) ([]core.Dependency, error) {
 				Digest:     core.NormalizeDigest(digest),
 			})
 		case "git":
-			version := firstQuoted(payload)
+			quoted := quotedStrings(payload)
+			repo, rev := "", ""
+			if len(quoted) > 0 {
+				repo = quoted[0]
+			}
+			if len(quoted) > 1 {
+				rev = quoted[1]
+			}
+			version := rev
 			if version == "" {
 				version = "git"
 			}
@@ -70,6 +78,8 @@ func (Ecosystem) Dependencies(path string) ([]core.Dependency, error) {
 				SourceKind: core.SourceGit,
 				Name:       name,
 				Version:    version,
+				Artifact:   core.RemoteLocation(repo),
+				Resolved:   rev,
 			})
 		case "path":
 			version := firstQuoted(payload)

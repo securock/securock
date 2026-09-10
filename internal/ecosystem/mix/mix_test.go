@@ -40,6 +40,37 @@ func TestDependencies(t *testing.T) {
 	}
 }
 
+func TestGitSource(t *testing.T) {
+	dir := t.TempDir()
+	raw := `%{
+  "foo": {:git, "https://github.com/example/foo.git", "0123456789abcdef0123456789abcdef01234567", []},
+}
+`
+	if err := os.WriteFile(filepath.Join(dir, "mix.lock"), []byte(raw), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	deps, err := mix.New().Dependencies(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(deps) != 1 {
+		t.Fatalf("got %#v", deps)
+	}
+	dep := deps[0]
+	if dep.SourceKind != core.SourceGit || dep.Registry != "" {
+		t.Fatalf("git = %+v", dep)
+	}
+	if dep.Artifact != "https://github.com/example/foo.git" {
+		t.Fatalf("artifact = %q", dep.Artifact)
+	}
+	if dep.Resolved != "0123456789abcdef0123456789abcdef01234567" {
+		t.Fatalf("resolved = %q", dep.Resolved)
+	}
+	if dep.Version != "0123456789abcdef0123456789abcdef01234567" {
+		t.Fatalf("version = %q", dep.Version)
+	}
+}
+
 func TestPrivateHexRepo(t *testing.T) {
 	dir := t.TempDir()
 	raw := `%{

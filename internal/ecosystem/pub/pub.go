@@ -45,7 +45,7 @@ func (Ecosystem) Dependencies(path string) ([]core.Dependency, error) {
 			continue
 		}
 		kind, registry, digest := classify(pkg)
-		deps = append(deps, core.Dependency{
+		dep := core.Dependency{
 			Ecosystem:  "pub",
 			Resolver:   "pub",
 			Registry:   registry,
@@ -53,7 +53,16 @@ func (Ecosystem) Dependencies(path string) ([]core.Dependency, error) {
 			Name:       name,
 			Version:    pkg.Version,
 			Digest:     core.NormalizeDigest(digest),
-		})
+		}
+		if kind == core.SourceGit {
+			desc := mapping(pkg.Description)
+			dep.Artifact = core.RemoteLocation(desc["url"])
+			dep.Resolved = desc["resolved-ref"]
+			if dep.Resolved == "" {
+				dep.Resolved = desc["ref"]
+			}
+		}
+		deps = append(deps, dep)
 	}
 	return deps, nil
 }

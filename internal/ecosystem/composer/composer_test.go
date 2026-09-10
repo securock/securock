@@ -41,6 +41,13 @@ func TestDependencies(t *testing.T) {
 	if got["phpunit/phpunit"].SourceKind != core.SourceGit {
 		t.Fatalf("phpunit kind = %q", got["phpunit/phpunit"].SourceKind)
 	}
+	phpunit := got["phpunit/phpunit"]
+	if phpunit.Artifact != "https://github.com/sebastianbergmann/phpunit.git" {
+		t.Fatalf("phpunit artifact = %q", phpunit.Artifact)
+	}
+	if phpunit.Resolved != "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" {
+		t.Fatalf("phpunit resolved = %q", phpunit.Resolved)
+	}
 }
 
 func TestDistURLIsNotRegistry(t *testing.T) {

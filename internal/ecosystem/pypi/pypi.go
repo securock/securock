@@ -44,7 +44,7 @@ func (Ecosystem) Dependencies(path string) ([]core.Dependency, error) {
 		}
 		kind, registry := classify(pkg.Source)
 		for _, file := range files(pkg) {
-			deps = append(deps, core.Dependency{
+			dep := core.Dependency{
 				Ecosystem:  "pypi",
 				Resolver:   "uv",
 				Registry:   registry,
@@ -53,7 +53,18 @@ func (Ecosystem) Dependencies(path string) ([]core.Dependency, error) {
 				Version:    pkg.Version,
 				Filename:   file.Name,
 				Digest:     core.NormalizeDigest(file.Hash),
-			})
+			}
+			switch kind {
+			case core.SourceGit:
+				dep.Artifact = core.RemoteLocation(pkg.Source.Git)
+				dep.Resolved = pkg.Source.Rev
+				if dep.Resolved == "" {
+					dep.Resolved = core.RemoteRevision(pkg.Source.Git)
+				}
+			case core.SourceURL:
+				dep.Artifact = core.RemoteLocation(pkg.Source.URL)
+			}
+			deps = append(deps, dep)
 		}
 	}
 	return deps, nil
@@ -67,7 +78,7 @@ type uvPackage struct {
 	Name    string   `toml:"name"`
 	Version string   `toml:"version"`
 	Source  uvSource `toml:"source"`
-	SDist *struct {
+	SDist   *struct {
 		URL  string `toml:"url"`
 		Hash string `toml:"hash"`
 	} `toml:"sdist"`
@@ -80,6 +91,7 @@ type uvPackage struct {
 type uvSource struct {
 	Registry  string `toml:"registry"`
 	Git       string `toml:"git"`
+	Rev       string `toml:"rev"`
 	Path      string `toml:"path"`
 	Directory string `toml:"directory"`
 	Editable  string `toml:"editable"`

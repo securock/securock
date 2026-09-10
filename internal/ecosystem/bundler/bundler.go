@@ -34,14 +34,20 @@ func (Ecosystem) Dependencies(path string) ([]core.Dependency, error) {
 	var deps []core.Dependency
 	section := ""
 	remote := ""
+	revision := ""
 	for line := range strings.SplitSeq(string(raw), "\n") {
 		if header, ok := sectionHeader(line); ok {
 			section = header
 			remote = ""
+			revision = ""
 			continue
 		}
 		if trimmed := strings.TrimSpace(line); strings.HasPrefix(trimmed, "remote:") && (section == "GEM" || section == "GIT" || section == "PATH") {
 			remote = strings.TrimSpace(strings.TrimPrefix(trimmed, "remote:"))
+			continue
+		}
+		if trimmed := strings.TrimSpace(line); strings.HasPrefix(trimmed, "revision:") && (section == "GIT" || section == "PATH") {
+			revision = strings.TrimSpace(strings.TrimPrefix(trimmed, "revision:"))
 			continue
 		}
 		if section != "GEM" && section != "GIT" && section != "PATH" {
@@ -57,7 +63,7 @@ func (Ecosystem) Dependencies(path string) ([]core.Dependency, error) {
 		}
 		seen[key] = struct{}{}
 		kind, registry := classify(section, remote)
-		deps = append(deps, core.Dependency{
+		dep := core.Dependency{
 			Ecosystem:  "rubygems",
 			Resolver:   "bundler",
 			Registry:   registry,
@@ -65,7 +71,12 @@ func (Ecosystem) Dependencies(path string) ([]core.Dependency, error) {
 			Name:       name,
 			Version:    version,
 			Digest:     checksums[key],
-		})
+		}
+		if kind == core.SourceGit {
+			dep.Artifact = core.RemoteLocation(remote)
+			dep.Resolved = revision
+		}
+		deps = append(deps, dep)
 	}
 	return deps, nil
 }

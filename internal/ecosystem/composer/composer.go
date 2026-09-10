@@ -41,16 +41,24 @@ func (Ecosystem) Dependencies(path string) ([]core.Dependency, error) {
 			continue
 		}
 		kind, registry := classify(pkg)
-		deps = append(deps, core.Dependency{
+		dep := core.Dependency{
 			Ecosystem:  "packagist",
 			Resolver:   "composer",
 			Registry:   registry,
-			Artifact:   pkg.Dist.URL,
 			SourceKind: kind,
 			Name:       pkg.Name,
 			Version:    pkg.Version,
 			Digest:     core.NormalizeDigest(pkg.Dist.Shasum),
-		})
+		}
+		if pkg.Dist.URL != "" {
+			dep.Artifact = pkg.Dist.URL
+		} else if kind == core.SourceGit {
+			dep.Artifact = core.RemoteLocation(pkg.Source.URL)
+		}
+		if pkg.Source.Reference != "" {
+			dep.Resolved = pkg.Source.Reference
+		}
+		deps = append(deps, dep)
 	}
 	return deps, nil
 }
@@ -70,8 +78,9 @@ type composerPackage struct {
 		Shasum string `json:"shasum"`
 	} `json:"dist"`
 	Source struct {
-		Type string `json:"type"`
-		URL  string `json:"url"`
+		Type      string `json:"type"`
+		URL       string `json:"url"`
+		Reference string `json:"reference"`
 	} `json:"source"`
 }
 

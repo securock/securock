@@ -1,6 +1,8 @@
 package poetry_test
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/securock/securock/internal/ecosystem/core"
@@ -35,5 +37,40 @@ func TestDependencies(t *testing.T) {
 	}
 	if got["local-pkg"].SourceKind != core.SourceFile {
 		t.Fatalf("local-pkg kind = %q", got["local-pkg"].SourceKind)
+	}
+}
+
+func TestGitSource(t *testing.T) {
+	dir := t.TempDir()
+	raw := `[[package]]
+name = "git-pkg"
+version = "1.0.0"
+files = []
+
+[package.source]
+type = "git"
+url = "https://github.com/example/git-pkg.git"
+reference = "main"
+resolved_reference = "0123456789abcdef0123456789abcdef01234567"
+`
+	if err := os.WriteFile(filepath.Join(dir, "poetry.lock"), []byte(raw), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	deps, err := poetry.New().Dependencies(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(deps) != 1 {
+		t.Fatalf("got %#v", deps)
+	}
+	dep := deps[0]
+	if dep.SourceKind != core.SourceGit || dep.Registry != "" {
+		t.Fatalf("git = %+v", dep)
+	}
+	if dep.Artifact != "https://github.com/example/git-pkg.git" {
+		t.Fatalf("artifact = %q", dep.Artifact)
+	}
+	if dep.Resolved != "0123456789abcdef0123456789abcdef01234567" {
+		t.Fatalf("resolved = %q", dep.Resolved)
 	}
 }

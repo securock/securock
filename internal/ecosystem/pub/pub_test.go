@@ -1,6 +1,8 @@
 package pub_test
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/securock/securock/internal/ecosystem/core"
@@ -35,5 +37,38 @@ func TestDependencies(t *testing.T) {
 	}
 	if got["local_pkg"].SourceKind != core.SourceFile {
 		t.Fatalf("local_pkg kind = %q", got["local_pkg"].SourceKind)
+	}
+}
+
+func TestGitSource(t *testing.T) {
+	dir := t.TempDir()
+	raw := `packages:
+  foo:
+    dependency: "direct main"
+    description:
+      resolved-ref: "0123456789abcdef0123456789abcdef01234567"
+      url: "https://github.com/example/foo.git"
+    source: git
+    version: "1.0.0"
+`
+	if err := os.WriteFile(filepath.Join(dir, "pubspec.lock"), []byte(raw), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	deps, err := pub.New().Dependencies(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(deps) != 1 {
+		t.Fatalf("got %#v", deps)
+	}
+	dep := deps[0]
+	if dep.SourceKind != core.SourceGit || dep.Registry != "" {
+		t.Fatalf("git = %+v", dep)
+	}
+	if dep.Artifact != "https://github.com/example/foo.git" {
+		t.Fatalf("artifact = %q", dep.Artifact)
+	}
+	if dep.Resolved != "0123456789abcdef0123456789abcdef01234567" {
+		t.Fatalf("resolved = %q", dep.Resolved)
 	}
 }

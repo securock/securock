@@ -47,7 +47,7 @@ func (Ecosystem) Dependencies(path string) ([]core.Dependency, error) {
 		}
 		kind, registry := classify(pkg, sources)
 		for _, file := range files(pkg) {
-			deps = append(deps, core.Dependency{
+			dep := core.Dependency{
 				Ecosystem:  "pypi",
 				Resolver:   "pdm",
 				Registry:   registry,
@@ -56,7 +56,15 @@ func (Ecosystem) Dependencies(path string) ([]core.Dependency, error) {
 				Version:    pkg.Version,
 				Filename:   file.Name,
 				Digest:     core.NormalizeDigest(file.Hash),
-			})
+			}
+			switch kind {
+			case core.SourceGit:
+				dep.Artifact = core.RemoteLocation(pkg.Git)
+				dep.Resolved = pkg.Revision
+			case core.SourceURL:
+				dep.Artifact = core.RemoteLocation(pkg.URL)
+			}
+			deps = append(deps, dep)
 		}
 	}
 	return deps, nil
