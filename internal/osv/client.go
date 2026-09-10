@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -161,9 +162,21 @@ func Queryable(dep ecosystem.Dependency) bool {
 
 func QueryName(dep ecosystem.Dependency) string {
 	if dep.Ecosystem == "swift" && dep.Registry != "" {
-		return dep.Registry
+		return swiftURLName(dep.Registry)
 	}
 	return dep.Name
+}
+
+// swiftURLName maps a SwiftPM repository location to the identifier form
+// OSV uses for the SwiftURL ecosystem: the transport is omitted and a
+// trailing ".git" is dropped, but the host and path keep their case.
+func swiftURLName(location string) string {
+	u, err := url.Parse(location)
+	if err != nil || u.Hostname() == "" {
+		return location
+	}
+	path := strings.TrimSuffix(u.Path, ".git")
+	return u.Hostname() + path
 }
 
 func QueryEcosystem(dep ecosystem.Dependency) string {

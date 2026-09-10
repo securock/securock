@@ -71,10 +71,22 @@ func TestQueryNameUsesSwiftLocation(t *testing.T) {
 		Version:   "1.2.3",
 		Registry:  "https://github.com/apple/swift-argument-parser",
 	}
-	if osv.QueryName(dep) != dep.Registry {
-		t.Fatal("swift OSV queries must use the repository URL")
+	if osv.QueryName(dep) != "github.com/apple/swift-argument-parser" {
+		t.Fatal("swift OSV queries must drop the transport scheme")
 	}
 	if osv.QueryEcosystem(dep) != "SwiftURL" {
 		t.Fatal("swift must map to SwiftURL")
+	}
+}
+
+func TestQueryNameStripsSwiftDotGit(t *testing.T) {
+	dep := ecosystem.Dependency{
+		Ecosystem: "swift",
+		Name:      "grpc-swift",
+		Version:   "1.0.0",
+		Registry:  "https://github.com/grpc/grpc-swift.git",
+	}
+	if osv.QueryName(dep) != "github.com/grpc/grpc-swift" {
+		t.Fatalf("swift OSV query name = %q", osv.QueryName(dep))
 	}
 }
