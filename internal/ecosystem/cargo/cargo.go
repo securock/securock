@@ -44,13 +44,10 @@ func (Ecosystem) Dependencies(path string) ([]core.Dependency, error) {
 		if pkg.Source == "" {
 			continue
 		}
-		if !strings.Contains(pkg.Source, "crates.io") && !strings.HasPrefix(pkg.Source, "registry+") {
+		if !strings.HasPrefix(pkg.Source, "registry+") && !strings.HasPrefix(pkg.Source, "sparse+") {
 			continue
 		}
 		registry := network.RegistryURL(pkg.Source)
-		if strings.Contains(pkg.Source, "crates.io") && registry == "" {
-			registry = "https://index.crates.io"
-		}
 		deps = append(deps, core.Dependency{
 			Ecosystem: "cargo",
 			Resolver:  "cargo",
