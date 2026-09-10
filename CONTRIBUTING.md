@@ -37,6 +37,6 @@ npm run docs:dev
 
 ## Scope
 
-v0.1 treats npm, pnpm, Yarn, Bun, and Deno as the stable resolvers. Other
-lockfile parsers exist, but provenance and signature evidence for those
-ecosystems is experimental.
+All lockfile resolvers are stable. Provenance and signature evidence is
+collected from the npm registry for npm, pnpm, Yarn, Bun, and Deno; other
+ecosystems record `unknown` for provenance and signature.

@@ -28,8 +28,8 @@ fail CI:
 - runtime integrity after install (memory, disk, or container attacks)
 - malicious build systems that produce a matching digest for bad code
 - full cryptographic verification of npm provenance/signatures in v0.1
-- supply-chain attacks in Cargo, Go, or PyPI provenance, which remain
-  experimental
+- supply-chain attacks in ecosystems whose provenance and signature
+  evidence Securock does not collect
 - installer compromise if `checksums.txt` and GitHub attestations are
   both attacker-controlled
 

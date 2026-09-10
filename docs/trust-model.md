@@ -60,7 +60,7 @@ network mode. See [Privacy](privacy.md).
 
 ## Evidence Securock records
 
-| Evidence | npm / pnpm / yarn / bun / deno npm | cargo / go / pypi |
+| Evidence | npm / pnpm / yarn / bun / deno npm | all other ecosystems |
 | --- | --- | --- |
 | digest | from the language lockfile | from the language lockfile |
 | vulnerabilities | OSV ids | OSV ids |
@@ -81,4 +81,4 @@ registry-key cryptographic verification, so it will not emit
 - that a version bump is a security fix
 - that transitive behavior is reachable or exploitable
 - that GitHub, npm, or OSV are uncompromised
-- that experimental ecosystems have the same evidence quality as npm
+- that non-npm ecosystems collect provenance or signature evidence
