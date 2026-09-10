@@ -12,8 +12,8 @@ drifts.
 **Docs:** [securock.dev](https://securock.dev)
 
 **Status:** pre-1.0. npm, pnpm, Yarn, Bun, Deno, Cargo, Go, uv, Poetry, PDM,
-Composer, Bundler, and NuGet are stable. Other resolvers parse today;
-their provenance and signature evidence is still experimental.
+Composer, Bundler, NuGet, and SwiftPM are stable. Other resolvers parse
+today; their provenance and signature evidence is still experimental.
 
 ## Why
 
@@ -174,6 +174,7 @@ it cannot comment on a fork PR.
 | packagist | composer | `composer.lock`     |
 | rubygems  | bundler  | `Gemfile.lock`      |
 | nuget     | nuget    | `packages.lock.json` |
+| swift     | swiftpm  | `Package.resolved`   |
 
 Deno `deno.lock` v5 is the stable target. v3/v4 are supported for
 compatibility. Deno npm packages use OSV and npm evidence. JSR and
@@ -184,7 +185,6 @@ so vulnerability state stays `unknown`.
 
 | Ecosystem | Resolver | Lockfile             |
 | --------- | -------- | -------------------- |
-| swift     | swiftpm  | `Package.resolved`   |
 | pub       | pub      | `pubspec.lock`       |
 | hex       | mix      | `mix.lock`           |
 | maven     | gradle   | `gradle.lockfile`    |
