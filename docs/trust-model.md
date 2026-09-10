@@ -63,7 +63,7 @@ network mode. See [Privacy](privacy.md).
 | Evidence | npm / pnpm / yarn / bun / deno npm | all other ecosystems |
 | --- | --- | --- |
 | digest | from the language lockfile | from the language lockfile |
-| vulnerabilities | OSV ids | OSV ids |
+| vulnerabilities | OSV ids | OSV ids when the source is proven public |
 | provenance | npm provenance attestation present | `unknown` |
 | signature | npm `dist.signatures` present | `unknown` |
 

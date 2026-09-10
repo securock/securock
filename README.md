@@ -12,10 +12,10 @@ drifts.
 **Docs:** [securock.dev](https://securock.dev)
 
 **Status:** pre-1.0. All resolvers are stable. npm, pnpm, Yarn, Bun, and
-Deno collect provenance and signature evidence from the npm registry. The
-remaining resolvers record OSV vulnerability evidence and prove their
-registries from their lockfiles, but their provenance and signature
-evidence stays `unknown`.
+Deno collect provenance and signature evidence from the npm registry.
+Other resolvers query OSV when their package source can be proven public.
+Otherwise vulnerability evidence remains `unknown`, and their provenance
+and signature evidence stays `unknown`.
 
 ## Why
 
@@ -169,7 +169,7 @@ it cannot comment on a fork PR.
 | jsr       | deno     | `deno.lock`          |
 | url       | deno     | `deno.lock`          |
 | cargo     | cargo    | `Cargo.lock`         |
-| go        | go       | `go.sum`             |
+| go        | go       | `go.mod` + `go.sum`  |
 | pypi      | uv       | `uv.lock`            |
 | pypi      | poetry   | `poetry.lock`        |
 | pypi      | pdm      | `pdm.lock`           |
@@ -184,7 +184,9 @@ it cannot comment on a fork PR.
 Deno `deno.lock` v5 is the stable target. v3/v4 are supported for
 compatibility. Deno npm packages use OSV and npm evidence. JSR and
 HTTPS URL artifacts are stable to parse; OSV does not cover them yet,
-so vulnerability state stays `unknown`.
+so vulnerability state stays `unknown`. Gradle records Maven
+coordinates from `gradle.lockfile` but does not prove a registry, so
+OSV is not queried in `public-only`.
 
 ## Documentation
 
