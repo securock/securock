@@ -85,7 +85,14 @@ func TestAllowSkipsWorkspace(t *testing.T) {
 	}
 }
 
+func isolateGo(t *testing.T) {
+	t.Helper()
+	t.Setenv("GOPRIVATE", "")
+	t.Setenv("GONOPROXY", "")
+}
+
 func TestGoPrivate(t *testing.T) {
+	isolateGo(t)
 	t.Setenv("GOPRIVATE", "github.com/company/*")
 	dep := core.Dependency{
 		Ecosystem: "go",
@@ -109,6 +116,7 @@ func TestGoPrivate(t *testing.T) {
 }
 
 func TestGoPrivateWildcardHost(t *testing.T) {
+	isolateGo(t)
 	t.Setenv("GOPRIVATE", "*.corp.example.com")
 	private := core.Dependency{
 		Ecosystem: "go",
@@ -128,6 +136,73 @@ func TestGoPrivateWildcardHost(t *testing.T) {
 	}
 	if !network.Allow(policy.ModePublicOnly, nil, public) {
 		t.Fatal("unrelated modules must not match GOPRIVATE host wildcards")
+	}
+}
+
+func TestGoNoProxy(t *testing.T) {
+	isolateGo(t)
+	t.Setenv("GONOPROXY", "example.com/foo")
+	dep := core.Dependency{
+		Ecosystem: "go",
+		Name:      "example.com/foo",
+		Version:   "v1.2.3",
+		Registry:  "https://proxy.golang.org",
+	}
+	if network.Allow(policy.ModePublicOnly, nil, dep) {
+		t.Fatal("GONOPROXY modules must not be queried")
+	}
+}
+
+func TestGoReplacePrivacyUsesFork(t *testing.T) {
+	isolateGo(t)
+	t.Setenv("GOPRIVATE", "example.com/fork/*")
+	dep := core.Dependency{
+		Ecosystem: "go",
+		Name:      "example.com/foo",
+		Version:   "v1.3.0",
+		Artifact:  "example.com/fork/foo",
+		Registry:  "https://proxy.golang.org",
+	}
+	if network.Allow(policy.ModePublicOnly, nil, dep) {
+		t.Fatal("private replacement module must not be queried")
+	}
+	public := core.Dependency{
+		Ecosystem: "go",
+		Name:      "example.com/foo",
+		Version:   "v1.3.0",
+		Artifact:  "github.com/public/foo",
+		Registry:  "https://proxy.golang.org",
+	}
+	if !network.Allow(policy.ModePublicOnly, nil, public) {
+		t.Fatal("public replacement module may be queried")
+	}
+}
+
+func TestGoReplacePrivacyFollowsForkNotRequire(t *testing.T) {
+	isolateGo(t)
+	t.Setenv("GOPRIVATE", "example.com/foo")
+	dep := core.Dependency{
+		Ecosystem: "go",
+		Name:      "example.com/foo",
+		Version:   "v1.3.0",
+		Artifact:  "github.com/public/foo",
+		Registry:  "https://proxy.golang.org",
+	}
+	if !network.Allow(policy.ModePublicOnly, nil, dep) {
+		t.Fatal("privacy must follow the replacement module, not the require path")
+	}
+}
+
+func TestGoCompanyProxy(t *testing.T) {
+	isolateGo(t)
+	dep := core.Dependency{
+		Ecosystem: "go",
+		Name:      "github.com/spf13/cobra",
+		Version:   "v1.9.1",
+		Registry:  "https://proxy.company.example",
+	}
+	if network.Allow(policy.ModePublicOnly, nil, dep) {
+		t.Fatal("custom GOPROXY must not look public")
 	}
 }
 

@@ -17,7 +17,7 @@ and only for artifacts whose lockfile registry is a known public registry:
 | --- | --- |
 | npm | `https://registry.npmjs.org`, `https://registry.yarnpkg.com` |
 | cargo | crates.io index URLs |
-| go | `https://proxy.golang.org` (skips `GOPRIVATE`, same prefix globs as `go`) |
+| go | `https://proxy.golang.org` when `GOPROXY` is the public proxy (skips `GOPRIVATE` and `GONOPROXY`, same prefix globs as `go`) |
 | pypi | `https://pypi.org` |
 | packagist | `https://repo.packagist.org` |
 | rubygems | `https://rubygems.org` |
@@ -26,11 +26,12 @@ and only for artifacts whose lockfile registry is a known public registry:
 | hex | `https://repo.hex.pm` |
 | jsr | `https://jsr.io` (names are not sent to OSV yet) |
 
-Private registries, missing `resolved` URLs, and `GOPRIVATE` modules are
-recorded in `securock.lock` but are **not** sent off-machine. Their
-vulnerability state is `unknown`, not `trusted`. Swift package URLs
-are recorded the same way: `public-only` does not treat Git hosts as a
-public registry.
+Private registries, missing `resolved` URLs, custom `GOPROXY` proxies, and
+`GOPRIVATE` / `GONOPROXY` modules are recorded in `securock.lock` but are
+**not** sent off-machine. Their vulnerability state is `unknown`, not
+`trusted`. For Go `replace`, privacy and OSV use the replacement module
+path, not the original require path. Swift package URLs are recorded the
+same way: `public-only` does not treat Git hosts as a public registry.
 
 pnpm often omits tarball URLs. Securock does **not** assume
 `registry.npmjs.org` in that case. It only treats a package as public when

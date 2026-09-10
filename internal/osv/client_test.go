@@ -90,3 +90,17 @@ func TestQueryNameStripsSwiftDotGit(t *testing.T) {
 		t.Fatalf("swift OSV query name = %q", osv.QueryName(dep))
 	}
 }
+
+func TestQueryNameUsesGoReplaceArtifact(t *testing.T) {
+	dep := ecosystem.Dependency{
+		Ecosystem: "go",
+		Name:      "example.com/foo",
+		Version:   "v1.3.0",
+		Artifact:  "example.com/fork/foo",
+		Resolved:  "v1.3.0",
+		Registry:  "https://proxy.golang.org",
+	}
+	if osv.QueryName(dep) != "example.com/fork/foo" {
+		t.Fatalf("go replace OSV name = %q", osv.QueryName(dep))
+	}
+}

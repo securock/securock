@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/securock/securock/internal/ecosystem/core"
+	"github.com/securock/securock/internal/network"
 	"golang.org/x/mod/modfile"
 )
 
@@ -44,6 +45,7 @@ func (Ecosystem) Dependencies(path string) ([]core.Dependency, error) {
 	}
 
 	sums := parseSum(core.Join(path, sumName))
+	proxy := moduleProxy()
 	excluded := map[string]struct{}{}
 	for _, ex := range mod.Exclude {
 		if ex == nil {
@@ -61,7 +63,7 @@ func (Ecosystem) Dependencies(path string) ([]core.Dependency, error) {
 		if _, skip := excluded[req.Mod.Path+"@"+req.Mod.Version]; skip {
 			continue
 		}
-		dep := resolveRequire(req, mod.Replace, sums)
+		dep := resolveRequire(req, mod.Replace, sums, proxy)
 		key := core.Identity(dep)
 		if _, ok := seen[key]; ok {
 			continue
@@ -72,34 +74,54 @@ func (Ecosystem) Dependencies(path string) ([]core.Dependency, error) {
 	return deps, nil
 }
 
-func resolveRequire(req *modfile.Require, replaces []*modfile.Replace, sums map[string]string) core.Dependency {
+func resolveRequire(req *modfile.Require, replaces []*modfile.Replace, sums map[string]string, proxy string) core.Dependency {
 	dep := core.Dependency{
 		Ecosystem:  "go",
 		Resolver:   "go",
 		SourceKind: core.SourceRegistry,
-		Registry:   goProxy,
 		Name:       req.Mod.Path,
 		Version:    req.Mod.Version,
 		Digest:     sums[req.Mod.Path+"@"+req.Mod.Version],
 	}
+	fetch := req.Mod.Path
 	rep := replacement(replaces, req.Mod.Path, req.Mod.Version)
-	if rep == nil {
-		return dep
+	if rep != nil {
+		dep.Requested = req.Mod.Path + "@" + req.Mod.Version
+		if modfile.IsDirectoryPath(rep.New.Path) {
+			dep.SourceKind = core.SourceFile
+			dep.Digest = ""
+			return dep
+		}
+		dep.Artifact = rep.New.Path
+		fetch = rep.New.Path
+		if rep.New.Version != "" {
+			dep.Version = rep.New.Version
+			dep.Resolved = rep.New.Version
+			dep.Digest = sums[rep.New.Path+"@"+rep.New.Version]
+		}
 	}
-	dep.Requested = req.Mod.Path + "@" + req.Mod.Version
-	if modfile.IsDirectoryPath(rep.New.Path) {
-		dep.SourceKind = core.SourceFile
-		dep.Registry = ""
-		dep.Digest = ""
-		return dep
-	}
-	dep.Artifact = rep.New.Path
-	if rep.New.Version != "" {
-		dep.Version = rep.New.Version
-		dep.Resolved = rep.New.Version
-		dep.Digest = sums[rep.New.Path+"@"+rep.New.Version]
+	if !network.GoPrivate(fetch) {
+		dep.Registry = proxy
 	}
 	return dep
+}
+
+func moduleProxy() string {
+	raw, ok := os.LookupEnv("GOPROXY")
+	if !ok || strings.TrimSpace(raw) == "" {
+		raw = goProxy
+	}
+	for _, part := range strings.Split(raw, ",") {
+		part = strings.TrimSpace(part)
+		if part == "" {
+			continue
+		}
+		if part == "direct" || part == "off" {
+			return ""
+		}
+		return network.RegistryURL(part)
+	}
+	return ""
 }
 
 func replacement(replaces []*modfile.Replace, path, version string) *modfile.Replace {

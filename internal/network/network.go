@@ -64,7 +64,7 @@ func Allow(mode policy.Mode, allowlist map[string][]string, dep core.Dependency)
 }
 
 func public(allowlist map[string][]string, dep core.Dependency) bool {
-	if dep.Ecosystem == "go" && goPrivate(dep.Name) {
+	if dep.Ecosystem == "go" && GoPrivate(goModule(dep)) {
 		return false
 	}
 	allowed := allowlist[dep.Ecosystem]
@@ -149,8 +149,22 @@ func parse(raw string) *url.URL {
 	return u
 }
 
-func goPrivate(name string) bool {
-	return matchPrefixPatterns(os.Getenv("GOPRIVATE"), name)
+func GoPrivate(path string) bool {
+	if matchPrefixPatterns(os.Getenv("GOPRIVATE"), path) {
+		return true
+	}
+	noproxy, ok := os.LookupEnv("GONOPROXY")
+	if !ok {
+		noproxy = os.Getenv("GOPRIVATE")
+	}
+	return matchPrefixPatterns(noproxy, path)
+}
+
+func goModule(dep core.Dependency) string {
+	if dep.Ecosystem == "go" && dep.Artifact != "" {
+		return dep.Artifact
+	}
+	return dep.Name
 }
 
 // matchPrefixPatterns is the GOPRIVATE algorithm from

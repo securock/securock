@@ -164,6 +164,9 @@ func QueryName(dep ecosystem.Dependency) string {
 	if dep.Ecosystem == "swift" && dep.Registry != "" {
 		return swiftURLName(dep.Registry)
 	}
+	if dep.Ecosystem == "go" && dep.Artifact != "" {
+		return dep.Artifact
+	}
 	return dep.Name
 }
 
