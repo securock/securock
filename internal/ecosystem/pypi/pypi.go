@@ -42,19 +42,17 @@ func (Ecosystem) Dependencies(path string) ([]core.Dependency, error) {
 		if pkg.Name == "" || pkg.Version == "" {
 			continue
 		}
-		registry := network.Origin(pkg.Source.Registry)
-		if registry == "" && pkg.Source.Registry != "" {
-			registry = strings.TrimRight(pkg.Source.Registry, "/")
-		}
+		kind, registry := classify(pkg.Source)
 		for _, file := range files(pkg) {
 			deps = append(deps, core.Dependency{
-				Ecosystem: "pypi",
-				Resolver:  "uv",
-				Registry:  registry,
-				Name:      pkg.Name,
-				Version:   pkg.Version,
-				Filename:  file.Name,
-				Digest:    core.NormalizeDigest(file.Hash),
+				Ecosystem:  "pypi",
+				Resolver:   "uv",
+				Registry:   registry,
+				SourceKind: kind,
+				Name:       pkg.Name,
+				Version:    pkg.Version,
+				Filename:   file.Name,
+				Digest:     core.NormalizeDigest(file.Hash),
 			})
 		}
 	}
@@ -66,11 +64,9 @@ type uvLock struct {
 }
 
 type uvPackage struct {
-	Name    string `toml:"name"`
-	Version string `toml:"version"`
-	Source  struct {
-		Registry string `toml:"registry"`
-	} `toml:"source"`
+	Name    string   `toml:"name"`
+	Version string   `toml:"version"`
+	Source  uvSource `toml:"source"`
 	SDist *struct {
 		URL  string `toml:"url"`
 		Hash string `toml:"hash"`
@@ -79,6 +75,33 @@ type uvPackage struct {
 		URL  string `toml:"url"`
 		Hash string `toml:"hash"`
 	} `toml:"wheels"`
+}
+
+type uvSource struct {
+	Registry  string `toml:"registry"`
+	Git       string `toml:"git"`
+	Path      string `toml:"path"`
+	Directory string `toml:"directory"`
+	Editable  string `toml:"editable"`
+	URL       string `toml:"url"`
+}
+
+func classify(src uvSource) (kind, registry string) {
+	switch {
+	case src.Git != "":
+		return core.SourceGit, ""
+	case src.Path != "" || src.Directory != "" || src.Editable != "":
+		return core.SourceFile, ""
+	case src.URL != "":
+		return core.SourceURL, ""
+	case src.Registry != "":
+		if origin := network.Origin(src.Registry); origin != "" {
+			return core.SourceRegistry, origin
+		}
+		return core.SourceRegistry, strings.TrimRight(src.Registry, "/")
+	default:
+		return core.SourceRegistry, "https://pypi.org"
+	}
 }
 
 type uvFile struct {
