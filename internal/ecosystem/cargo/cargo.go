@@ -1,6 +1,7 @@
 package cargo
 
 import (
+	"net/url"
 	"os"
 	"strings"
 
@@ -38,33 +39,62 @@ func (Ecosystem) Dependencies(path string) ([]core.Dependency, error) {
 
 	var deps []core.Dependency
 	for _, pkg := range lock.Package {
-		if pkg.Name == "" || pkg.Version == "" {
+		if pkg.Name == "" || pkg.Version == "" || pkg.Source == "" {
 			continue
 		}
-		if pkg.Source == "" {
-			continue
+		if dep, ok := cargoDep(pkg); ok {
+			deps = append(deps, dep)
 		}
-		if !strings.HasPrefix(pkg.Source, "registry+") && !strings.HasPrefix(pkg.Source, "sparse+") {
-			continue
-		}
-		registry := network.RegistryURL(pkg.Source)
-		deps = append(deps, core.Dependency{
-			Ecosystem: "cargo",
-			Resolver:  "cargo",
-			Registry:  registry,
-			Name:      pkg.Name,
-			Version:   pkg.Version,
-			Digest:    core.NormalizeDigest(pkg.Checksum),
-		})
 	}
 	return deps, nil
 }
 
+func cargoDep(pkg cargoPackage) (core.Dependency, bool) {
+	dep := core.Dependency{
+		Ecosystem: "cargo",
+		Resolver:  "cargo",
+		Name:      pkg.Name,
+		Version:   pkg.Version,
+		Digest:    core.NormalizeDigest(pkg.Checksum),
+	}
+	switch {
+	case strings.HasPrefix(pkg.Source, "registry+"), strings.HasPrefix(pkg.Source, "sparse+"):
+		dep.SourceKind = core.SourceRegistry
+		dep.Registry = network.RegistryURL(pkg.Source)
+		return dep, true
+	case strings.HasPrefix(pkg.Source, "git+"):
+		dep.SourceKind = core.SourceGit
+		dep.Artifact, dep.Resolved = gitSource(pkg.Source)
+		return dep, true
+	case strings.HasPrefix(pkg.Source, "path+"):
+		dep.SourceKind = core.SourceFile
+		return dep, true
+	default:
+		return core.Dependency{}, false
+	}
+}
+
+func gitSource(raw string) (repo, rev string) {
+	raw = strings.TrimPrefix(raw, "git+")
+	u, err := url.Parse(raw)
+	if err != nil || u.Scheme == "" || u.Host == "" {
+		return "", ""
+	}
+	rev = u.Fragment
+	u.User = nil
+	u.RawQuery = ""
+	u.Fragment = ""
+	u.RawFragment = ""
+	return strings.TrimRight(u.String(), "/"), rev
+}
+
 type cargoLock struct {
-	Package []struct {
-		Name     string `toml:"name"`
-		Version  string `toml:"version"`
-		Source   string `toml:"source"`
-		Checksum string `toml:"checksum"`
-	} `toml:"package"`
+	Package []cargoPackage `toml:"package"`
+}
+
+type cargoPackage struct {
+	Name     string `toml:"name"`
+	Version  string `toml:"version"`
+	Source   string `toml:"source"`
+	Checksum string `toml:"checksum"`
 }
