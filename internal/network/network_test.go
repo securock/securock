@@ -1,6 +1,8 @@
 package network_test
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/securock/securock/internal/ecosystem/core"
@@ -87,6 +89,7 @@ func TestAllowSkipsWorkspace(t *testing.T) {
 
 func isolateGo(t *testing.T) {
 	t.Helper()
+	t.Setenv("GOENV", "off")
 	t.Setenv("GOPRIVATE", "")
 	t.Setenv("GONOPROXY", "")
 }
@@ -190,6 +193,40 @@ func TestGoReplacePrivacyFollowsForkNotRequire(t *testing.T) {
 	}
 	if !network.Allow(policy.ModePublicOnly, nil, dep) {
 		t.Fatal("privacy must follow the replacement module, not the require path")
+	}
+}
+
+func TestGoNoProxyNoneStillPrivate(t *testing.T) {
+	isolateGo(t)
+	t.Setenv("GOPRIVATE", "*.corp.example.com")
+	t.Setenv("GONOPROXY", "none")
+	dep := core.Dependency{
+		Ecosystem: "go",
+		Name:      "git.corp.example.com/xyzzy",
+		Version:   "v1.0.0",
+		Registry:  "https://proxy.golang.org",
+	}
+	if network.Allow(policy.ModePublicOnly, nil, dep) {
+		t.Fatal("GOPRIVATE names must not be sent to OSV even when GONOPROXY=none")
+	}
+}
+
+func TestGoPrivateFromEnvFile(t *testing.T) {
+	isolateGo(t)
+	dir := t.TempDir()
+	path := filepath.Join(dir, "env")
+	if err := os.WriteFile(path, []byte("GOPRIVATE=github.com/company/*\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("GOENV", path)
+	dep := core.Dependency{
+		Ecosystem: "go",
+		Name:      "github.com/company/secret-project-sdk",
+		Version:   "v1.0.0",
+		Registry:  "https://proxy.golang.org",
+	}
+	if network.Allow(policy.ModePublicOnly, nil, dep) {
+		t.Fatal("go env -w GOPRIVATE must keep names on-machine")
 	}
 }
 

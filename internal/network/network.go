@@ -2,11 +2,10 @@ package network
 
 import (
 	"net/url"
-	"os"
-	"path"
 	"strings"
 
 	"github.com/securock/securock/internal/ecosystem/core"
+	"github.com/securock/securock/internal/goenv"
 	"github.com/securock/securock/pkg/policy"
 )
 
@@ -64,7 +63,7 @@ func Allow(mode policy.Mode, allowlist map[string][]string, dep core.Dependency)
 }
 
 func public(allowlist map[string][]string, dep core.Dependency) bool {
-	if dep.Ecosystem == "go" && GoPrivate(goModule(dep)) {
+	if dep.Ecosystem == "go" && goHidden(goModule(dep)) {
 		return false
 	}
 	allowed := allowlist[dep.Ecosystem]
@@ -149,15 +148,9 @@ func parse(raw string) *url.URL {
 	return u
 }
 
-func GoPrivate(path string) bool {
-	if matchPrefixPatterns(os.Getenv("GOPRIVATE"), path) {
-		return true
-	}
-	noproxy, ok := os.LookupEnv("GONOPROXY")
-	if !ok {
-		noproxy = os.Getenv("GOPRIVATE")
-	}
-	return matchPrefixPatterns(noproxy, path)
+func goHidden(path string) bool {
+	env := goenv.Load()
+	return env.Private(path) || env.NoProxy(path)
 }
 
 func goModule(dep core.Dependency) string {
@@ -165,44 +158,6 @@ func goModule(dep core.Dependency) string {
 		return dep.Artifact
 	}
 	return dep.Name
-}
-
-// matchPrefixPatterns is the GOPRIVATE algorithm from
-// golang.org/x/mod/module.MatchPrefixPatterns: each comma-separated
-// glob is matched against the corresponding prefix of the module path.
-func matchPrefixPatterns(globs, target string) bool {
-	for globs != "" {
-		var glob string
-		if before, after, ok := strings.Cut(globs, ","); ok {
-			glob, globs = before, after
-		} else {
-			glob, globs = globs, ""
-		}
-		glob = strings.TrimSpace(strings.TrimSuffix(glob, "/"))
-		if glob == "" {
-			continue
-		}
-
-		n := strings.Count(glob, "/")
-		prefix := target
-		for i := 0; i < len(target); i++ {
-			if target[i] == '/' {
-				if n == 0 {
-					prefix = target[:i]
-					break
-				}
-				n--
-			}
-		}
-		if n > 0 {
-			continue
-		}
-		matched, _ := path.Match(glob, prefix)
-		if matched {
-			return true
-		}
-	}
-	return false
 }
 
 func remote(dep core.Dependency) bool {

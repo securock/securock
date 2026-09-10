@@ -11,6 +11,7 @@ import (
 
 func isolate(t *testing.T) {
 	t.Helper()
+	t.Setenv("GOENV", "off")
 	t.Setenv("GOPROXY", "")
 	t.Setenv("GOPRIVATE", "")
 	t.Setenv("GONOPROXY", "")
@@ -259,6 +260,76 @@ example.com/fork/foo v1.3.0 h1:n4bQgYhMfWWaL+qgxVrQFaO/TxsrC4Is0V1sFbDwCgg=
 	}
 	if dep.Registry != "" {
 		t.Fatalf("private fork must not use the public proxy: %+v", dep)
+	}
+}
+
+func TestGoEnvFilePrivate(t *testing.T) {
+	isolate(t)
+	envFile := filepath.Join(t.TempDir(), "env")
+	if err := os.WriteFile(envFile, []byte("GOPRIVATE=github.com/spf13/*\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("GOENV", envFile)
+	dir := t.TempDir()
+	writeGo(t, dir, `module example.com/app
+
+go 1.22
+
+require github.com/spf13/cobra v1.9.1
+`, `github.com/spf13/cobra v1.9.1 h1:n4bQgYhMfWWaL+qgxVrQFaO/TxsrC4Is0V1sFbDwCgg=
+`)
+	deps, err := golang.New().Dependencies(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(deps) != 1 || deps[0].Registry != "" {
+		t.Fatalf("go env -w GOPRIVATE must skip the public proxy: %#v", deps)
+	}
+}
+
+func TestGoProxyChainUnknown(t *testing.T) {
+	isolate(t)
+	t.Setenv("GOPROXY", "https://proxy.golang.org,https://proxy.company.example")
+	dir := t.TempDir()
+	writeGo(t, dir, `module example.com/app
+
+go 1.22
+
+require github.com/spf13/cobra v1.9.1
+`, `github.com/spf13/cobra v1.9.1 h1:n4bQgYhMfWWaL+qgxVrQFaO/TxsrC4Is0V1sFbDwCgg=
+`)
+	deps, err := golang.New().Dependencies(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(deps) != 1 || deps[0].Registry != "" {
+		t.Fatalf("ambiguous GOPROXY must not claim an origin: %#v", deps)
+	}
+}
+
+func TestGoNoProxyNoneUsesProxy(t *testing.T) {
+	isolate(t)
+	t.Setenv("GOPRIVATE", "example.com/fork/*")
+	t.Setenv("GONOPROXY", "none")
+	dir := t.TempDir()
+	writeGo(t, dir, `module example.com/app
+
+go 1.22
+
+require example.com/foo v1.2.3
+
+replace example.com/foo => example.com/fork/foo v1.3.0
+`, `example.com/fork/foo v1.3.0 h1:n4bQgYhMfWWaL+qgxVrQFaO/TxsrC4Is0V1sFbDwCgg=
+`)
+	deps, err := golang.New().Dependencies(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(deps) != 1 {
+		t.Fatalf("got %#v", deps)
+	}
+	if deps[0].Registry != "https://proxy.golang.org" {
+		t.Fatalf("GONOPROXY=none must use GOPROXY: %+v", deps[0])
 	}
 }
 

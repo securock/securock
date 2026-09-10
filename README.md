@@ -39,8 +39,8 @@ not trusted.
 - Deterministic `securock.lock` (no timestamps, no absolute paths)
 - `diff` / `verify` on artifact identity, not just package name
 - Default network mode is `public-only`: private registries,
-  `GOPRIVATE` / `GONOPROXY` modules, and custom `GOPROXY` proxies stay
-  on-machine ([privacy](docs/privacy.md))
+  `GOPRIVATE` / `GONOPROXY` modules (including `go env -w`), and custom
+  or ambiguous `GOPROXY` lists stay on-machine ([privacy](docs/privacy.md))
 - GitHub Action that can run an attested release binary
 - JSON reports (`--format json`) with exit `0` / `1` / `2`
 

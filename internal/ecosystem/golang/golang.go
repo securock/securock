@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/securock/securock/internal/ecosystem/core"
+	"github.com/securock/securock/internal/goenv"
 	"github.com/securock/securock/internal/network"
 	"golang.org/x/mod/modfile"
 )
@@ -13,7 +14,6 @@ import (
 const (
 	sumName = "go.sum"
 	modName = "go.mod"
-	goProxy = "https://proxy.golang.org"
 )
 
 type Ecosystem struct{}
@@ -45,7 +45,7 @@ func (Ecosystem) Dependencies(path string) ([]core.Dependency, error) {
 	}
 
 	sums := parseSum(core.Join(path, sumName))
-	proxy := moduleProxy()
+	env := goenv.Load()
 	excluded := map[string]struct{}{}
 	for _, ex := range mod.Exclude {
 		if ex == nil {
@@ -63,7 +63,7 @@ func (Ecosystem) Dependencies(path string) ([]core.Dependency, error) {
 		if _, skip := excluded[req.Mod.Path+"@"+req.Mod.Version]; skip {
 			continue
 		}
-		dep := resolveRequire(req, mod.Replace, sums, proxy)
+		dep := resolveRequire(req, mod.Replace, sums, env)
 		key := core.Identity(dep)
 		if _, ok := seen[key]; ok {
 			continue
@@ -74,7 +74,7 @@ func (Ecosystem) Dependencies(path string) ([]core.Dependency, error) {
 	return deps, nil
 }
 
-func resolveRequire(req *modfile.Require, replaces []*modfile.Replace, sums map[string]string, proxy string) core.Dependency {
+func resolveRequire(req *modfile.Require, replaces []*modfile.Replace, sums map[string]string, env goenv.Env) core.Dependency {
 	dep := core.Dependency{
 		Ecosystem:  "go",
 		Resolver:   "go",
@@ -100,28 +100,10 @@ func resolveRequire(req *modfile.Require, replaces []*modfile.Replace, sums map[
 			dep.Digest = sums[rep.New.Path+"@"+rep.New.Version]
 		}
 	}
-	if !network.GoPrivate(fetch) {
-		dep.Registry = proxy
+	if !env.NoProxy(fetch) {
+		dep.Registry = network.RegistryURL(env.Proxy())
 	}
 	return dep
-}
-
-func moduleProxy() string {
-	raw, ok := os.LookupEnv("GOPROXY")
-	if !ok || strings.TrimSpace(raw) == "" {
-		raw = goProxy
-	}
-	for _, part := range strings.Split(raw, ",") {
-		part = strings.TrimSpace(part)
-		if part == "" {
-			continue
-		}
-		if part == "direct" || part == "off" {
-			return ""
-		}
-		return network.RegistryURL(part)
-	}
-	return ""
 }
 
 func replacement(replaces []*modfile.Replace, path, version string) *modfile.Replace {

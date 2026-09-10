@@ -17,7 +17,7 @@ and only for artifacts whose lockfile registry is a known public registry:
 | --- | --- |
 | npm | `https://registry.npmjs.org`, `https://registry.yarnpkg.com` |
 | cargo | crates.io index URLs |
-| go | `https://proxy.golang.org` when `GOPROXY` is the public proxy (skips `GOPRIVATE` and `GONOPROXY`, same prefix globs as `go`) |
+| go | `https://proxy.golang.org` when the effective `GOPROXY` is that single public proxy (OS, then `go env -w` / `GOENV`, then Go's default). Multiple proxy URLs (`,` or `|`) are unknown. `GONOPROXY` overrides `GOPRIVATE` for proxy use; `GOPRIVATE` still keeps names off OSV. |
 | pypi | `https://pypi.org` |
 | packagist | `https://repo.packagist.org` |
 | rubygems | `https://rubygems.org` |
@@ -26,12 +26,16 @@ and only for artifacts whose lockfile registry is a known public registry:
 | hex | `https://repo.hex.pm` |
 | jsr | `https://jsr.io` (names are not sent to OSV yet) |
 
-Private registries, missing `resolved` URLs, custom `GOPROXY` proxies, and
-`GOPRIVATE` / `GONOPROXY` modules are recorded in `securock.lock` but are
-**not** sent off-machine. Their vulnerability state is `unknown`, not
-`trusted`. For Go `replace`, privacy and OSV use the replacement module
-path, not the original require path. Swift package URLs are recorded the
-same way: `public-only` does not treat Git hosts as a public registry.
+Private registries, missing `resolved` URLs, custom or ambiguous
+`GOPROXY` lists, and `GOPRIVATE` / `GONOPROXY` modules are recorded in
+`securock.lock` but are **not** sent off-machine. Their vulnerability
+state is `unknown`, not `trusted`. Effective Go values include
+`go env -w` (the user `GOENV` file), not only OS environment variables.
+`GONOPROXY=none` can send `GOPRIVATE` modules through a proxy, but
+those names are still not sent to OSV. For Go `replace`, privacy and
+OSV use the replacement module path, not the original require path.
+Swift package URLs are recorded the same way: `public-only` does not
+treat Git hosts as a public registry.
 
 pnpm often omits tarball URLs. Securock does **not** assume
 `registry.npmjs.org` in that case. It only treats a package as public when

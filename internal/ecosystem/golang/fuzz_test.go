@@ -9,6 +9,10 @@ import (
 )
 
 func FuzzDependencies(f *testing.F) {
+	f.Setenv("GOENV", "off")
+	f.Setenv("GOPROXY", "")
+	f.Setenv("GOPRIVATE", "")
+	f.Setenv("GONOPROXY", "")
 	mod, err := os.ReadFile("testdata/go.mod")
 	if err != nil {
 		f.Fatal(err)
