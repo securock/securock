@@ -11,10 +11,11 @@ drifts.
 
 **Docs:** [securock.dev](https://securock.dev)
 
-**Status:** pre-1.0. npm, pnpm, Yarn, Bun, Deno, Cargo, Go, uv, Poetry, PDM,
-Composer, Bundler, NuGet, SwiftPM, Pub, and Mix are stable. Other
-resolvers parse today; their provenance and signature evidence is still
-experimental.
+**Status:** pre-1.0. All resolvers are stable. npm, pnpm, Yarn, Bun, and
+Deno collect provenance and signature evidence from the npm registry. The
+remaining resolvers record OSV vulnerability evidence and prove their
+registries from their lockfiles, but their provenance and signature
+evidence stays `unknown`.
 
 ## Why
 
@@ -158,37 +159,32 @@ it cannot comment on a fork PR.
 
 ### Stable
 
-| Ecosystem | Resolver | Lockfile            |
-| --------- | -------- | ------------------- |
-| npm       | npm      | `package-lock.json` |
-| npm       | pnpm     | `pnpm-lock.yaml`    |
-| npm       | yarn     | `yarn.lock`         |
-| npm       | bun      | `bun.lock`          |
-| npm       | deno     | `deno.lock`         |
-| jsr       | deno     | `deno.lock`         |
-| url       | deno     | `deno.lock`         |
-| cargo     | cargo    | `Cargo.lock`        |
-| go        | go       | `go.sum`            |
-| pypi      | uv       | `uv.lock`           |
-| pypi      | poetry   | `poetry.lock`       |
-| pypi      | pdm      | `pdm.lock`          |
-| packagist | composer | `composer.lock`     |
-| rubygems  | bundler  | `Gemfile.lock`      |
+| Ecosystem | Resolver | Lockfile             |
+| --------- | -------- | -------------------- |
+| npm       | npm      | `package-lock.json`  |
+| npm       | pnpm     | `pnpm-lock.yaml`     |
+| npm       | yarn     | `yarn.lock`          |
+| npm       | bun      | `bun.lock`           |
+| npm       | deno     | `deno.lock`          |
+| jsr       | deno     | `deno.lock`          |
+| url       | deno     | `deno.lock`          |
+| cargo     | cargo    | `Cargo.lock`         |
+| go        | go       | `go.sum`             |
+| pypi      | uv       | `uv.lock`            |
+| pypi      | poetry   | `poetry.lock`        |
+| pypi      | pdm      | `pdm.lock`           |
+| packagist | composer | `composer.lock`      |
+| rubygems  | bundler  | `Gemfile.lock`       |
 | nuget     | nuget    | `packages.lock.json` |
 | swift     | swiftpm  | `Package.resolved`   |
 | pub       | pub      | `pubspec.lock`       |
 | hex       | mix      | `mix.lock`           |
+| maven     | gradle   | `gradle.lockfile`    |
 
 Deno `deno.lock` v5 is the stable target. v3/v4 are supported for
 compatibility. Deno npm packages use OSV and npm evidence. JSR and
 HTTPS URL artifacts are stable to parse; OSV does not cover them yet,
 so vulnerability state stays `unknown`.
-
-### Experimental
-
-| Ecosystem | Resolver | Lockfile             |
-| --------- | -------- | -------------------- |
-| maven     | gradle   | `gradle.lockfile`    |
 
 ## Documentation
 
