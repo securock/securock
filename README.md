@@ -11,8 +11,8 @@ drifts.
 
 **Docs:** [securock.dev](https://securock.dev)
 
-**Status:** pre-1.0. npm, pnpm, Yarn, Bun, Deno, Cargo, Go, and uv are
-stable. Other resolvers parse today; their provenance and signature
+**Status:** pre-1.0. npm, pnpm, Yarn, Bun, Deno, Cargo, Go, uv, and Poetry
+are stable. Other resolvers parse today; their provenance and signature
 evidence is still experimental.
 
 ## Why
@@ -169,6 +169,7 @@ it cannot comment on a fork PR.
 | cargo     | cargo    | `Cargo.lock`        |
 | go        | go       | `go.sum`            |
 | pypi      | uv       | `uv.lock`           |
+| pypi      | poetry   | `poetry.lock`       |
 
 Deno `deno.lock` v5 is the stable target. v3/v4 are supported for
 compatibility. Deno npm packages use OSV and npm evidence. JSR and
@@ -179,7 +180,6 @@ so vulnerability state stays `unknown`.
 
 | Ecosystem | Resolver | Lockfile             |
 | --------- | -------- | -------------------- |
-| pypi      | poetry   | `poetry.lock`        |
 | pypi      | pdm      | `pdm.lock`           |
 | packagist | composer | `composer.lock`      |
 | rubygems  | bundler  | `Gemfile.lock`       |
