@@ -119,6 +119,7 @@ func Scan(ctx context.Context, opts Options) (*Result, error) {
 			Digest:   dep.Digest,
 			Source: lockfile.ArtifactSource{
 				Resolver:  dep.Resolver,
+				Kind:      dep.SourceKind,
 				Registry:  dep.Registry,
 				Artifact:  dep.Artifact,
 				Requested: dep.Requested,

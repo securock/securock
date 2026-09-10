@@ -110,3 +110,25 @@ func TestValidateRejectsEmptyNPMVersion(t *testing.T) {
 		t.Fatal("npm artifacts must require a version")
 	}
 }
+
+func TestValidateRejectsUnknownSourceKind(t *testing.T) {
+	doc := lockfile.Document{
+		Version: 1,
+		Artifacts: []lockfile.Artifact{
+			{
+				Subject: lockfile.Subject{Ecosystem: "npm", Name: "react"},
+				Version: "19.2.0",
+				Source:  lockfile.ArtifactSource{Kind: "banana"},
+				Evidence: lockfile.Evidence{
+					Provenance:      lockfile.EvidenceUnknown,
+					Signature:       lockfile.EvidenceUnknown,
+					Vulnerabilities: lockfile.VulnEvidence{State: lockfile.VulnUnknown},
+				},
+				Trust: lockfile.Trust{Status: lockfile.StatusUnknown},
+			},
+		},
+	}
+	if err := lockfile.Validate(doc); err == nil {
+		t.Fatal("unknown source kind must fail")
+	}
+}

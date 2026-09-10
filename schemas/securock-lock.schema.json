@@ -87,6 +87,10 @@
           "type": "string",
           "enum": ["npm", "pnpm", "yarn", "bun", "deno", "cargo", "go", "uv", "poetry", "pdm", "composer", "bundler", "nuget", "swiftpm", "pub", "mix", "gradle"]
         },
+        "kind": {
+          "type": "string",
+          "enum": ["registry", "workspace", "git", "file", "url"]
+        },
         "registry": { "type": "string" },
         "artifact": { "type": "string" },
         "requested": { "type": "string" },

@@ -66,9 +66,15 @@ pnpm to npm must not rewrite every subject identity.
 
 `source.ecosystems` and `source.resolvers` are optional sorted lists.
 They must not include a path. Artifact `source.registry` is the package
-metadata origin. `source.artifact` is the download URL when it differs.
-`source.requested` and `source.resolved` record a specifier that
-redirected, such as a Deno `deno.lock` HTTPS import.
+metadata origin. `source.artifact` is the download URL when it differs,
+or a Git repository URL. `source.kind` is `registry`, `workspace`,
+`git`, `file`, or `url`. `source.requested` and `source.resolved` record
+a specifier that redirected, such as a Deno `deno.lock` HTTPS import,
+or a Git revision.
+
+A change to `source.kind`, `source.registry`, `source.artifact`,
+`source.requested`, or `source.resolved` is trust drift even when the
+name, version, and digest stay the same.
 
 URL artifacts may omit `version`. Their identity is `subject.name`
 (the requested URL). Do not encode a URL into `version`; that makes

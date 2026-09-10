@@ -14,6 +14,7 @@ func TestURLArtifactOmitsVersion(t *testing.T) {
       "subject": { "ecosystem": "url", "name": "https://esm.sh/preact" },
       "source": {
         "resolver": "deno",
+        "kind": "url",
         "requested": "https://esm.sh/preact",
         "resolved": "https://esm.sh/preact@10.26.8"
       },
@@ -74,6 +75,30 @@ func TestDiffSideRequestedResolved(t *testing.T) {
 		t.Fatal(err)
 	}
 	if err := schemas.Validate("verify-report.schema.json", raw); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestDiffSideRegistries(t *testing.T) {
+	raw := []byte(`{
+  "schema_version": 1,
+  "trust_drift": true,
+  "changes": [
+    {
+      "artifact": "npm:react@19.2.0",
+      "subject": "npm:react",
+      "before": {
+        "kinds": ["registry"],
+        "registries": ["https://registry.example-a.com"]
+      },
+      "after": {
+        "kinds": ["registry"],
+        "registries": ["https://registry.example-b.com"]
+      }
+    }
+  ]
+}`)
+	if err := schemas.Validate("diff-report.schema.json", raw); err != nil {
 		t.Fatal(err)
 	}
 }

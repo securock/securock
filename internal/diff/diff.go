@@ -20,6 +20,9 @@ type Side struct {
 	Vulns       []string               `json:"vulnerabilities,omitempty"`
 	Trust       lockfile.Status        `json:"trust,omitempty"`
 	TrustReason []string               `json:"reasons,omitempty"`
+	Kinds       []string               `json:"kinds,omitempty"`
+	Registries  []string               `json:"registries,omitempty"`
+	Artifacts   []string               `json:"artifacts,omitempty"`
 	Requested   []string               `json:"requested,omitempty"`
 	Resolved    []string               `json:"resolved,omitempty"`
 }
@@ -140,6 +143,9 @@ func Write(w io.Writer, r Result) {
 		writeField(w, "vulnerabilities", ids(c.Before.Vulns), ids(c.After.Vulns), false)
 		writeField(w, "trust", string(c.Before.Trust), string(c.After.Trust), false)
 		writeField(w, "reason", join(c.Before.TrustReason), join(c.After.TrustReason), false)
+		writeField(w, "kind", join(c.Before.Kinds), join(c.After.Kinds), false)
+		writeField(w, "registry", join(c.Before.Registries), join(c.After.Registries), false)
+		writeField(w, "artifact", join(c.Before.Artifacts), join(c.After.Artifacts), false)
 		writeField(w, "requested", join(c.Before.Requested), join(c.After.Requested), false)
 		writeField(w, "resolved", join(c.Before.Resolved), join(c.After.Resolved), false)
 	}
@@ -191,6 +197,15 @@ func sideOf(arts []lockfile.Artifact) Side {
 		s.Signature = worstEvidence(s.Signature, art.Evidence.Signature)
 		s.Trust = worstTrust(s.Trust, art.Trust.Status)
 		s.TrustReason = append(s.TrustReason, art.Trust.Reasons...)
+		if art.Source.Kind != "" {
+			s.Kinds = append(s.Kinds, art.Source.Kind)
+		}
+		if art.Source.Registry != "" {
+			s.Registries = append(s.Registries, art.Source.Registry)
+		}
+		if art.Source.Artifact != "" {
+			s.Artifacts = append(s.Artifacts, art.Source.Artifact)
+		}
 		if art.Source.Requested != "" {
 			s.Requested = append(s.Requested, art.Source.Requested)
 		}
@@ -210,6 +225,12 @@ func sideOf(arts []lockfile.Artifact) Side {
 	s.Requested = slices.Compact(s.Requested)
 	slices.Sort(s.Resolved)
 	s.Resolved = slices.Compact(s.Resolved)
+	slices.Sort(s.Kinds)
+	s.Kinds = slices.Compact(s.Kinds)
+	slices.Sort(s.Registries)
+	s.Registries = slices.Compact(s.Registries)
+	slices.Sort(s.Artifacts)
+	s.Artifacts = slices.Compact(s.Artifacts)
 	return s
 }
 
@@ -222,19 +243,17 @@ func changed(a, b Side) bool {
 		join(a.Vulns) != join(b.Vulns) ||
 		a.Trust != b.Trust ||
 		join(a.TrustReason) != join(b.TrustReason) ||
-		join(a.Requested) != join(b.Requested) ||
-		join(a.Resolved) != join(b.Resolved)
+		sourceChanged(a, b)
 }
 
 func trustRelevant(a, b Side) bool {
-	return join(a.Versions) != join(b.Versions) ||
-		join(a.Digests) != join(b.Digests) ||
-		a.Provenance != b.Provenance ||
-		a.Signature != b.Signature ||
-		a.VulnState != b.VulnState ||
-		join(a.Vulns) != join(b.Vulns) ||
-		a.Trust != b.Trust ||
-		join(a.TrustReason) != join(b.TrustReason) ||
+	return changed(a, b)
+}
+
+func sourceChanged(a, b Side) bool {
+	return join(a.Kinds) != join(b.Kinds) ||
+		join(a.Registries) != join(b.Registries) ||
+		join(a.Artifacts) != join(b.Artifacts) ||
 		join(a.Requested) != join(b.Requested) ||
 		join(a.Resolved) != join(b.Resolved)
 }

@@ -249,3 +249,89 @@ func TestCompareURLRedirectSubject(t *testing.T) {
 		t.Fatalf("artifact = %s", got.Changes[0].Artifact)
 	}
 }
+
+func TestCompareRegistryDrift(t *testing.T) {
+	locked := lockfile.Document{Artifacts: []lockfile.Artifact{
+		{
+			Subject: lockfile.Subject{Ecosystem: "npm", Name: "react"},
+			Version: "19.2.0",
+			Digest:  "sha256:aaa",
+			Source: lockfile.ArtifactSource{
+				Resolver: "npm",
+				Kind:     "registry",
+				Registry: "https://registry.example-a.com",
+			},
+		},
+	}}
+	current := lockfile.Document{Artifacts: []lockfile.Artifact{
+		{
+			Subject: lockfile.Subject{Ecosystem: "npm", Name: "react"},
+			Version: "19.2.0",
+			Digest:  "sha256:aaa",
+			Source: lockfile.ArtifactSource{
+				Resolver: "npm",
+				Kind:     "registry",
+				Registry: "https://registry.example-b.com",
+			},
+		},
+	}}
+	got := diff.Compare(locked, current)
+	if !got.TrustDrift() {
+		t.Fatal("registry change must be trust drift")
+	}
+	if len(got.Changes) != 1 {
+		t.Fatalf("changes = %#v", got.Changes)
+	}
+}
+
+func TestCompareArtifactURLDrift(t *testing.T) {
+	locked := lockfile.Document{Artifacts: []lockfile.Artifact{
+		{
+			Subject: lockfile.Subject{Ecosystem: "cargo", Name: "foo"},
+			Version: "1.0.0",
+			Source: lockfile.ArtifactSource{
+				Resolver: "cargo",
+				Kind:     "git",
+				Artifact: "https://github.com/example/foo",
+				Resolved: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+			},
+		},
+	}}
+	current := lockfile.Document{Artifacts: []lockfile.Artifact{
+		{
+			Subject: lockfile.Subject{Ecosystem: "cargo", Name: "foo"},
+			Version: "1.0.0",
+			Source: lockfile.ArtifactSource{
+				Resolver: "cargo",
+				Kind:     "git",
+				Artifact: "https://github.com/other/foo",
+				Resolved: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+			},
+		},
+	}}
+	got := diff.Compare(locked, current)
+	if !got.TrustDrift() {
+		t.Fatal("artifact url change must be trust drift")
+	}
+}
+
+func TestCompareSourceKindDrift(t *testing.T) {
+	locked := lockfile.Document{Artifacts: []lockfile.Artifact{
+		{
+			Subject: lockfile.Subject{Ecosystem: "pypi", Name: "foo"},
+			Version: "1.0.0",
+			Source:  lockfile.ArtifactSource{Resolver: "uv", Kind: "registry", Registry: "https://pypi.org"},
+		},
+	}}
+	current := lockfile.Document{Artifacts: []lockfile.Artifact{
+		{
+			Subject: lockfile.Subject{Ecosystem: "pypi", Name: "foo"},
+			Version: "1.0.0",
+			Source:  lockfile.ArtifactSource{Resolver: "uv", Kind: "git", Artifact: "https://github.com/example/foo"},
+		},
+	}}
+	got := diff.Compare(locked, current)
+	if !got.TrustDrift() {
+		t.Fatal("source kind change must be trust drift")
+	}
+}

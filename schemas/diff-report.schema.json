@@ -54,7 +54,10 @@
         "trust": { "type": "string" },
         "reasons": { "type": "array", "items": { "type": "string" } },
         "requested": { "type": "array", "items": { "type": "string" } },
-        "resolved": { "type": "array", "items": { "type": "string" } }
+        "resolved": { "type": "array", "items": { "type": "string" } },
+        "kinds": { "type": "array", "items": { "type": "string" } },
+        "registries": { "type": "array", "items": { "type": "string" } },
+        "artifacts": { "type": "array", "items": { "type": "string" } }
       }
     }
   }

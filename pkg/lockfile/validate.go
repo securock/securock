@@ -6,11 +6,12 @@ import (
 )
 
 var (
-	ecosystems = []string{"npm", "jsr", "url", "cargo", "go", "pypi", "packagist", "rubygems", "nuget", "swift", "pub", "hex", "maven"}
-	resolvers  = []string{"npm", "pnpm", "yarn", "bun", "deno", "cargo", "go", "uv", "poetry", "pdm", "composer", "bundler", "nuget", "swiftpm", "pub", "mix", "gradle"}
-	statuses   = []Status{StatusTrusted, StatusUntrusted, StatusUnknown}
-	evidence   = []EvidenceState{EvidenceUnknown, EvidenceMissing, EvidencePresent, EvidenceVerified}
-	vulnStates = []VulnState{VulnUnknown, VulnChecked}
+	ecosystems  = []string{"npm", "jsr", "url", "cargo", "go", "pypi", "packagist", "rubygems", "nuget", "swift", "pub", "hex", "maven"}
+	resolvers   = []string{"npm", "pnpm", "yarn", "bun", "deno", "cargo", "go", "uv", "poetry", "pdm", "composer", "bundler", "nuget", "swiftpm", "pub", "mix", "gradle"}
+	statuses    = []Status{StatusTrusted, StatusUntrusted, StatusUnknown}
+	evidence    = []EvidenceState{EvidenceUnknown, EvidenceMissing, EvidencePresent, EvidenceVerified}
+	vulnStates  = []VulnState{VulnUnknown, VulnChecked}
+	sourceKinds = []string{"", "registry", "workspace", "git", "file", "url"}
 )
 
 func Validate(doc Document) error {
@@ -47,6 +48,9 @@ func validateArtifact(art Artifact) error {
 	}
 	if art.Source.Resolver != "" && !slices.Contains(resolvers, art.Source.Resolver) {
 		return fmt.Errorf("unknown resolver %q", art.Source.Resolver)
+	}
+	if !slices.Contains(sourceKinds, art.Source.Kind) {
+		return fmt.Errorf("unknown source kind %q", art.Source.Kind)
 	}
 	if !slices.Contains(evidence, art.Evidence.Provenance) {
 		return fmt.Errorf("unknown provenance state %q", art.Evidence.Provenance)
