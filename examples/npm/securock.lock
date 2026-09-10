@@ -14,6 +14,7 @@ artifacts:
     digest: sha512-6FlzubTLZG3J2a/NVCAleEhjzq5oxgHyaCU9yYXvcLsvoVaHJq/s5xXI6/RXPrVu2FIqT1V6kELbXjI/NcLf4VQ==
     source:
       resolver: npm
+      kind: registry
       registry: https://registry.npmjs.org
     evidence:
       provenance: unknown

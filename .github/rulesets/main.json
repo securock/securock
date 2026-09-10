@@ -28,7 +28,8 @@
         "required_status_checks": [
           { "context": "test" },
           { "context": "govulncheck" },
-          { "context": "analyze" }
+          { "context": "analyze" },
+          { "context": "npm-example" }
         ]
       }
     }

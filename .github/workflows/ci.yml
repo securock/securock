@@ -24,6 +24,8 @@ jobs:
         run: go vet ./...
       - name: Tidy
         run: go mod tidy && git diff --exit-code
+      - name: Example
+        run: go run ./cmd/securock verify --offline examples/npm
 
   govulncheck:
     runs-on: ubuntu-latest
@@ -55,6 +57,8 @@ jobs:
         run: go run ./cmd/securock version
       - name: Scan example
         run: go run ./cmd/securock scan --offline --no-fail examples/npm
+      - name: Verify example
+        run: go run ./cmd/securock verify --offline examples/npm
 
   release-snapshot:
     runs-on: ubuntu-latest

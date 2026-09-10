@@ -49,3 +49,21 @@ func TestLockAndVerify(t *testing.T) {
 		t.Fatalf("verify: %v\n%s", err, out.String())
 	}
 }
+
+func TestExampleNPM(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	t.Setenv("npm_config_registry", "")
+	t.Setenv("NPM_CONFIG_REGISTRY", "")
+
+	dir := filepath.Join("..", "..", "examples", "npm")
+	root := cli.NewRoot("test", "none", "unknown")
+	out := &bytes.Buffer{}
+	root.SetOut(out)
+	root.SetErr(out)
+	root.SetArgs([]string{"verify", dir, "--offline"})
+	if err := root.Execute(); err != nil {
+		t.Fatalf("examples/npm verify: %v\n%s", err, out.String())
+	}
+}

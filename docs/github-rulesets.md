@@ -19,6 +19,7 @@ Enable **Require actions to be pinned to a full-length commit SHA**.
   - `test`
   - `govulncheck`
   - `analyze` (CodeQL)
+  - `npm-example`
 - Do not allow bypass except for repository admins during an incident
 
 Example payload: `.github/rulesets/main.json`.
