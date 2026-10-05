@@ -18,3 +18,17 @@ func TestNormalizeDigest(t *testing.T) {
 		t.Fatalf("h1 digest = %q", h1)
 	}
 }
+
+func TestMatchDigest(t *testing.T) {
+	data := []byte("test")
+	normalized := core.NormalizeDigest("sha256-n4bQgYhMfWWaL+qgxVrQFaO/TxsrC4Is0V1sFbDwCgg=")
+	if err := core.MatchDigest(normalized, data); err != nil {
+		t.Fatalf("MatchDigest: %v", err)
+	}
+	if err := core.MatchDigest(normalized, []byte("other")); err == nil {
+		t.Fatal("expected mismatch")
+	}
+	if err := core.MatchDigest("", data); err == nil {
+		t.Fatal("expected missing digest error")
+	}
+}

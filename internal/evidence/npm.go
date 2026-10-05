@@ -14,6 +14,7 @@ import (
 
 	"github.com/securock/securock/internal/capability"
 	"github.com/securock/securock/internal/ecosystem"
+	"github.com/securock/securock/internal/ecosystem/core"
 	"github.com/securock/securock/internal/httpx"
 	"github.com/securock/securock/pkg/lockfile"
 )
@@ -113,15 +114,27 @@ func (c *NPM) lookup(ctx context.Context, dep ecosystem.Dependency) Record {
 	rec.Ownership = meta.Ownership
 
 	findings := capability.FromMetadata(meta.Capability)
-	if !c.SkipTarball && meta.Tarball != "" {
-		_ = c.scanTarball(ctx, c.registryFor(dep), meta.Tarball, &findings)
-	}
 	// Install scripts imply shell at install time even without a source scan.
 	if findings.InstallScripts {
 		findings.Shell = true
 	}
-	rec.Capabilities = capability.Evidence(findings)
-	rec.Behavior = capability.Behavior(findings)
+
+	switch {
+	case c.SkipTarball:
+		// Explicit metadata-only mode (tests / callers that opt out of
+		// downloading package sources).
+		rec.Capabilities = capability.Evidence(findings)
+		rec.Behavior = capability.Behavior(findings)
+	case meta.Tarball == "":
+		// No source URL: keep CapUnknown rather than claiming checked.
+	default:
+		if err := c.scanTarball(ctx, dep, meta.Tarball, &findings); err != nil {
+			// Fail closed: a scan or digest error must not become CapChecked.
+			return rec
+		}
+		rec.Capabilities = capability.Evidence(findings)
+		rec.Behavior = capability.Behavior(findings)
+	}
 	return rec
 }
 
@@ -193,7 +206,12 @@ func (c *NPM) versionMeta(ctx context.Context, dep ecosystem.Dependency) (versio
 	}, true
 }
 
-func (c *NPM) scanTarball(ctx context.Context, registry, tarball string, findings *capability.Findings) error {
+func (c *NPM) scanTarball(ctx context.Context, dep ecosystem.Dependency, tarball string, findings *capability.Findings) error {
+	if dep.Digest == "" {
+		return fmt.Errorf("missing lockfile digest for %s@%s", dep.Name, dep.Version)
+	}
+
+	registry := c.registryFor(dep)
 	u, err := url.Parse(tarball)
 	if err != nil {
 		return err
@@ -239,7 +257,18 @@ func (c *NPM) scanTarball(ctx context.Context, registry, tarball string, finding
 	if res.StatusCode != http.StatusOK {
 		return io.ErrUnexpectedEOF
 	}
-	return capability.ScanSource(io.LimitReader(res.Body, maxTarballBytes), findings)
+
+	raw, err := io.ReadAll(io.LimitReader(res.Body, maxTarballBytes+1))
+	if err != nil {
+		return err
+	}
+	if len(raw) > maxTarballBytes {
+		return fmt.Errorf("tarball exceeds %d byte limit", maxTarballBytes)
+	}
+	if err := core.MatchDigest(dep.Digest, raw); err != nil {
+		return err
+	}
+	return capability.ScanSource(bytes.NewReader(raw), findings)
 }
 
 func sameRegistryHost(registryHost, targetHost string) bool {

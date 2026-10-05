@@ -1,8 +1,12 @@
 package core
 
 import (
+	"crypto/sha1"
+	"crypto/sha256"
+	"crypto/sha512"
 	"encoding/base64"
 	"encoding/hex"
+	"fmt"
 	"strings"
 )
 
@@ -42,6 +46,47 @@ func fromBase64(alg, payload string) string {
 		return alg + "-" + payload
 	}
 	return alg + ":" + hex.EncodeToString(raw)
+}
+
+// MatchDigest reports whether data hashes to the normalized digest
+// (algorithm:hex). Unsupported algorithms return an error.
+func MatchDigest(normalized string, data []byte) error {
+	normalized = strings.TrimSpace(normalized)
+	if normalized == "" {
+		return fmt.Errorf("missing digest")
+	}
+	alg, payload, ok := strings.Cut(normalized, ":")
+	if !ok || alg == "" || payload == "" {
+		return fmt.Errorf("unrecognized digest %q", normalized)
+	}
+	sum, err := hashSum(alg, data)
+	if err != nil {
+		return err
+	}
+	got := hex.EncodeToString(sum)
+	if !strings.EqualFold(got, payload) {
+		return fmt.Errorf("digest mismatch: want %s, got %s:%s", normalized, strings.ToLower(alg), got)
+	}
+	return nil
+}
+
+func hashSum(alg string, data []byte) ([]byte, error) {
+	switch strings.ToLower(alg) {
+	case "sha1":
+		sum := sha1.Sum(data)
+		return sum[:], nil
+	case "sha256":
+		sum := sha256.Sum256(data)
+		return sum[:], nil
+	case "sha384":
+		sum := sha512.Sum384(data)
+		return sum[:], nil
+	case "sha512":
+		sum := sha512.Sum512(data)
+		return sum[:], nil
+	default:
+		return nil, fmt.Errorf("unsupported digest algorithm %q", alg)
+	}
 }
 
 func isHashAlg(alg string) bool {

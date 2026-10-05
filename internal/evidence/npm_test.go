@@ -1,7 +1,12 @@
 package evidence_test
 
 import (
+	"archive/tar"
+	"bytes"
+	"compress/gzip"
 	"context"
+	"crypto/sha512"
+	"encoding/hex"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -99,4 +104,121 @@ func TestNPMEvidence(t *testing.T) {
 	if left.Capabilities.Shell == nil || !*left.Capabilities.Shell {
 		t.Fatalf("leftpad install scripts should imply shell: %+v", left.Capabilities)
 	}
+}
+
+func TestNPMTarballScanDigestBound(t *testing.T) {
+	tarball := mustTestTarball(t, "package/index.js", []byte("require('child_process').exec('id');\n"))
+	sum := sha512.Sum512(tarball)
+	digest := "sha512:" + hex.EncodeToString(sum[:])
+
+	var srvURL string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/-/npm/v1/attestations/evil@1.0.0":
+			http.NotFound(w, r)
+		case "/evil/1.0.0":
+			w.Write([]byte(`{
+				"dist":{"tarball":"` + srvURL + `/evil-1.0.0.tgz"},
+				"hasInstallScript": false
+			}`))
+		case "/evil-1.0.0.tgz":
+			w.Write(tarball)
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	t.Cleanup(srv.Close)
+	srvURL = srv.URL
+
+	c := &evidence.NPM{HTTP: srv.Client(), Registry: srv.URL, Limit: 1}
+
+	ok := gotNPM(t, c, ecosystem.Dependency{
+		Ecosystem: "npm", Name: "evil", Version: "1.0.0", Digest: digest,
+	})
+	if ok.Capabilities.State != lockfile.CapChecked {
+		t.Fatalf("matched digest should be checked: %+v", ok.Capabilities)
+	}
+	if ok.Capabilities.Shell == nil || !*ok.Capabilities.Shell {
+		t.Fatalf("source shell use not detected: %+v", ok.Capabilities)
+	}
+
+	mismatch := gotNPM(t, c, ecosystem.Dependency{
+		Ecosystem: "npm", Name: "evil", Version: "1.0.0",
+		Digest: "sha512:" + hex.EncodeToString(bytes.Repeat([]byte{0}, 64)),
+	})
+	if mismatch.Capabilities.State != lockfile.CapUnknown {
+		t.Fatalf("digest mismatch must stay unknown: %+v", mismatch.Capabilities)
+	}
+
+	missing := gotNPM(t, c, ecosystem.Dependency{
+		Ecosystem: "npm", Name: "evil", Version: "1.0.0",
+	})
+	if missing.Capabilities.State != lockfile.CapUnknown {
+		t.Fatalf("missing digest must stay unknown: %+v", missing.Capabilities)
+	}
+}
+
+func TestNPMTarballScanFailClosed(t *testing.T) {
+	var srvURL string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/-/npm/v1/attestations/broken@1.0.0":
+			http.NotFound(w, r)
+		case "/broken/1.0.0":
+			w.Write([]byte(`{
+				"dist":{"tarball":"` + srvURL + `/broken.tgz"},
+				"hasInstallScript": false
+			}`))
+		case "/broken.tgz":
+			w.Write([]byte("not-a-tarball"))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	t.Cleanup(srv.Close)
+	srvURL = srv.URL
+
+	sum := sha512.Sum512([]byte("not-a-tarball"))
+	c := &evidence.NPM{HTTP: srv.Client(), Registry: srv.URL, Limit: 1}
+	got := gotNPM(t, c, ecosystem.Dependency{
+		Ecosystem: "npm", Name: "broken", Version: "1.0.0",
+		Digest: "sha512:" + hex.EncodeToString(sum[:]),
+	})
+	if got.Capabilities.State != lockfile.CapUnknown || got.Behavior.State != lockfile.CapUnknown {
+		t.Fatalf("scan failure must stay unknown: caps=%+v beh=%+v", got.Capabilities, got.Behavior)
+	}
+}
+
+func gotNPM(t *testing.T, c *evidence.NPM, dep ecosystem.Dependency) evidence.Record {
+	t.Helper()
+	got, err := c.Collect(context.Background(), []ecosystem.Dependency{dep})
+	if err != nil {
+		t.Fatal(err)
+	}
+	rec, ok := got[evidence.Key(dep)]
+	if !ok {
+		t.Fatal("missing record")
+	}
+	return rec
+}
+
+func mustTestTarball(t *testing.T, name string, body []byte) []byte {
+	t.Helper()
+	var buf bytes.Buffer
+	gz := gzip.NewWriter(&buf)
+	tw := tar.NewWriter(gz)
+	hdr := &tar.Header{Name: name, Mode: 0o644, Size: int64(len(body))}
+	if err := tw.WriteHeader(hdr); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := tw.Write(body); err != nil {
+		t.Fatal(err)
+	}
+	if err := tw.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := gz.Close(); err != nil {
+		t.Fatal(err)
+	}
+	return buf.Bytes()
 }
