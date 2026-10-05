@@ -28,9 +28,12 @@ func newVerifyCommand(opts *options) *cobra.Command {
 			}
 
 			lockPath := lock.Path(path, opts.lockPath)
-			locked, err := lock.Read(lockPath)
+			locked, migrated, err := lock.Read(lockPath)
 			if err != nil {
 				return opErr(err)
+			}
+			if migrated {
+				fmt.Fprintln(cmd.ErrOrStderr(), lock.MigrationWarning)
 			}
 
 			result, err := scanner.Scan(cmd.Context(), scanner.Options{

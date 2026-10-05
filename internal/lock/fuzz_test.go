@@ -20,6 +20,6 @@ func FuzzRead(f *testing.F) {
 		if err := os.WriteFile(path, data, 0o644); err != nil {
 			t.Fatal(err)
 		}
-		_, _ = lock.Read(path)
+		_, _, _ = lock.Read(path)
 	})
 }

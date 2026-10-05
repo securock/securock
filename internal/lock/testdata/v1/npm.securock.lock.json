@@ -1,0 +1,42 @@
+{
+  "version": 1,
+  "source": {
+    "ecosystems": [
+      "npm"
+    ],
+    "resolvers": [
+      "npm"
+    ]
+  },
+  "policy": {
+    "digest": "sha256:10bba8f8a88487c52d211613a3ff89ee600a779e89ca20d8a009e055374f6c4d"
+  },
+  "artifacts": [
+    {
+      "subject": {
+        "ecosystem": "npm",
+        "name": "ms"
+      },
+      "version": "2.1.3",
+      "digest": "sha512-6FlzubTLZG3J2a/NVCAleEhjzq5oxgHyaCU9yYXvcLsvoVaHJq/s5xXI6/RXPrVu2FIqT1V6kELbXjI/NcLf4VQ==",
+      "source": {
+        "resolver": "npm",
+        "kind": "registry",
+        "registry": "https://registry.npmjs.org"
+      },
+      "evidence": {
+        "provenance": "unknown",
+        "signature": "unknown",
+        "vulnerabilities": {
+          "state": "unknown"
+        }
+      },
+      "trust": {
+        "status": "unknown",
+        "reasons": [
+          "vulnerabilities not checked"
+        ]
+      }
+    }
+  ]
+}
