@@ -59,3 +59,9 @@ changelog:
       - "^docs:"
       - "^test:"
       - "^chore:"
+
+release:
+  # Created as a draft; the Release workflow publishes it once every
+  # attestation has succeeded, so /releases/latest never points at an
+  # unattested release.
+  draft: true
