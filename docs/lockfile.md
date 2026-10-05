@@ -2,7 +2,9 @@
 
 `securock.lock` is the canonical trust snapshot for a project.
 
-See [specification.md](specification.md) for the v2 format.
+See [specification.md](specification.md) for the v2 format. Older
+`version: 1` files are migrated in memory on read; run `securock lock`
+to persist a refreshed v2 snapshot.
 
 ## Commands
 

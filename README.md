@@ -18,6 +18,10 @@ when their package source can be proven public. Otherwise vulnerability
 and malicious-package evidence remain `unknown`, and their npm-only
 evidence stays `unknown`.
 
+**Compatibility:** `version: 1` lockfiles are migrated to `version: 2` in
+memory on `diff` / `verify`. Run `securock lock` to write a refreshed v2
+file.
+
 ## Why
 
 A dependency bump can change more than a version string: the artifact

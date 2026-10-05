@@ -141,8 +141,12 @@ distinguishes PyPI files.
 Unknown lockfile fields, schema versions, ecosystems, evidence
 states, and trust statuses are errors.
 
-`version: 1` lockfiles from Securock v0.1.x are not accepted. Run
-`securock lock` to regenerate them as `version: 2`.
+`version: 1` lockfiles from Securock v0.1.x are migrated to `version: 2`
+in memory on read. Kept fields are digest, source, provenance, signature,
+and vulnerabilities. New evidence axes (`malicious`, `capabilities`,
+`behavior`, `ownership`, `chain`) and trust are set to `unknown` — a v1
+`trusted` status is not carried forward. Read-only commands do not rewrite
+the file; run `securock lock` to persist a fully refreshed v2 snapshot.
 
 ## Canonical encoding
 
