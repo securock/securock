@@ -1,0 +1,10 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "securock-docs",
+  "compatibility_date": "2026-10-01",
+  "assets": {
+    "directory": ".vitepress/dist",
+    "not_found_handling": "404-page"
+  },
+  "routes": [{ "pattern": "securock.dev", "custom_domain": true }]
+}
