@@ -50,8 +50,8 @@ func TestFingerprintIgnoresEmptyEvidenceRules(t *testing.T) {
 		Network: policy.Network{Mode: policy.ModePublicOnly},
 		Rules: policy.Rules{
 			RequireNoVulnerabilities: true,
-			Provenance:              policy.EvidenceRule{},
-			Signature:               policy.EvidenceRule{},
+			Provenance:               policy.EvidenceRule{},
+			Signature:                policy.EvidenceRule{},
 		},
 	})
 	if err != nil {

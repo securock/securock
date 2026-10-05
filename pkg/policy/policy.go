@@ -70,7 +70,7 @@ func Fingerprint(doc Document) (string, error) {
 type canonicalDocument struct {
 	Version int              `json:"version"`
 	Network canonicalNetwork `json:"network"`
-	Rules   canonicalRules    `json:"rules"`
+	Rules   canonicalRules   `json:"rules"`
 }
 
 type canonicalNetwork struct {
