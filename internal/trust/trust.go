@@ -22,6 +22,16 @@ func Evaluate(art *lockfile.Artifact, pol policy.Document) {
 			unknown = append(unknown, "vulnerabilities not checked")
 		}
 	}
+	if pol.Rules.DenyMalicious() {
+		switch art.Evidence.Malicious.State {
+		case lockfile.VulnChecked:
+			if len(art.Evidence.Malicious.Reports) > 0 {
+				untrusted = append(untrusted, "malicious package")
+			}
+		default:
+			unknown = append(unknown, "malicious reports not checked")
+		}
+	}
 	if pol.Rules.RequireDigest && art.Digest == "" {
 		untrusted = append(untrusted, "missing digest")
 	}

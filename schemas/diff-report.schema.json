@@ -51,6 +51,8 @@
         "signature": { "type": "string" },
         "vuln_state": { "type": "string" },
         "vulnerabilities": { "type": "array", "items": { "type": "string" } },
+        "malicious_state": { "type": "string" },
+        "malicious": { "type": "array", "items": { "type": "string" } },
         "trust": { "type": "string" },
         "reasons": { "type": "array", "items": { "type": "string" } },
         "requested": { "type": "array", "items": { "type": "string" } },

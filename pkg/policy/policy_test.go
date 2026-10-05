@@ -6,7 +6,7 @@ import (
 	"github.com/securock/securock/pkg/policy"
 )
 
-const defaultFingerprint = "sha256:10bba8f8a88487c52d211613a3ff89ee600a779e89ca20d8a009e055374f6c4d"
+const defaultFingerprint = "sha256:a7b760ed4719640b3b9c63f1441e3fda7a2d511fec8f731edbd4ac280367e5c1"
 
 func TestFingerprintDefaultGolden(t *testing.T) {
 	got, err := policy.Fingerprint(policy.Default())
@@ -27,6 +27,7 @@ func TestFingerprintStable(t *testing.T) {
 		Version: 1,
 		Rules: policy.Rules{
 			RequireNoVulnerabilities: true,
+			RequireNoMalicious:       true,
 		},
 	})
 	if err != nil {
@@ -50,6 +51,7 @@ func TestFingerprintIgnoresEmptyEvidenceRules(t *testing.T) {
 		Network: policy.Network{Mode: policy.ModePublicOnly},
 		Rules: policy.Rules{
 			RequireNoVulnerabilities: true,
+			RequireNoMalicious:       true,
 			Provenance:               policy.EvidenceRule{},
 			Signature:                policy.EvidenceRule{},
 		},
@@ -72,6 +74,7 @@ func TestFingerprintEvidenceMinimum(t *testing.T) {
 		Network: policy.Network{Mode: policy.ModePublicOnly},
 		Rules: policy.Rules{
 			RequireNoVulnerabilities: true,
+			RequireNoMalicious:       true,
 			Provenance:               policy.EvidenceRule{Minimum: "present"},
 		},
 	})
@@ -93,6 +96,7 @@ func TestFingerprintCapabilities(t *testing.T) {
 		Network: policy.Network{Mode: policy.ModePublicOnly},
 		Rules: policy.Rules{
 			RequireNoVulnerabilities: true,
+			RequireNoMalicious:       true,
 			Capabilities: policy.CapabilityRule{
 				Deny: []string{"shell", "native_code"},
 			},

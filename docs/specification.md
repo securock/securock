@@ -50,6 +50,8 @@ artifacts:
       signature: unknown
       vulnerabilities:
         state: unknown
+      malicious:
+        state: unknown
       capabilities:
         state: unknown
       ownership:
@@ -57,6 +59,7 @@ artifacts:
     trust:
       status: unknown
       reasons:
+        - malicious reports not checked
         - vulnerabilities not checked
 ```
 
@@ -136,6 +139,7 @@ states, and trust statuses are errors.
 - YAML 1.2, 2-space indentation
 - artifacts sorted by subject `ecosystem`, then `name`, then `version`, then resolver
 - vulnerability ids sorted lexicographically
+- malicious report ids sorted lexicographically
 - ownership maintainers sorted lexicographically
 - trust reasons sorted lexicographically
 - empty optional collections omitted

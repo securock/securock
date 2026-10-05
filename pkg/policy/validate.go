@@ -31,6 +31,11 @@ func Validate(doc Document) error {
 	default:
 		return fmt.Errorf("unknown vulnerabilities allow %q", doc.Rules.Vulnerabilities.Allow)
 	}
+	switch doc.Rules.Malicious.Allow {
+	case "", "none":
+	default:
+		return fmt.Errorf("unknown malicious allow %q", doc.Rules.Malicious.Allow)
+	}
 	if err := validateCapabilityRule(doc.Rules.Capabilities); err != nil {
 		return err
 	}

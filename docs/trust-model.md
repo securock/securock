@@ -45,6 +45,7 @@ drift. When any ownership action is set, unset actions default to
 The artifact failed at least one enabled policy rule. Typical reasons:
 
 - known vulnerabilities
+- malicious package reports (`MAL-*`)
 - missing digest, when required
 - provenance not verified, when required
 - signature not verified, when required
@@ -79,8 +80,9 @@ rules:
 v0.1 npm collection can emit `present`, never `verified`. `verified`
 is reserved for Sigstore and registry-key verification.
 
-Offline scans leave provenance, signature, capability, ownership, and
-vulnerability state as `unknown`. That is not a clean bill of health.
+Offline scans leave provenance, signature, capability, ownership,
+vulnerability, and malicious-report state as `unknown`. That is not a
+clean bill of health.
 
 Private registries are not queried in the default `public-only`
 network mode. See [Privacy](privacy.md).
@@ -90,11 +92,15 @@ network mode. See [Privacy](privacy.md).
 | Evidence | npm / pnpm / yarn / bun / deno npm | all other ecosystems |
 | --- | --- | --- |
 | digest | from the language lockfile | from the language lockfile |
-| vulnerabilities | OSV ids | OSV ids when the source is proven public |
+| vulnerabilities | OSV ids (non-`MAL-`) | OSV ids when the source is proven public |
+| malicious | OpenSSF Malicious Packages via OSV `MAL-*` | same, when OSV is queried |
 | provenance | npm provenance attestation present | `unknown` |
 | signature | npm `dist.signatures` present | `unknown` |
 | capabilities | registry metadata + package source heuristics | `unknown` |
 | ownership | npm publisher (`_npmUser`) and maintainers | `unknown` |
+
+Malicious package reports are not vulnerabilities. A package with no
+CVEs can still be malware. The default policy denies both.
 
 Capability detection for npm uses install-script and native-build
 metadata, then a deterministic scan of published JS/TS sources for

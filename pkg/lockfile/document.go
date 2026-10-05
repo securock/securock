@@ -71,11 +71,12 @@ type Artifact struct {
 }
 
 type Evidence struct {
-	Provenance      EvidenceState        `json:"provenance" yaml:"provenance"`
-	Signature       EvidenceState        `json:"signature" yaml:"signature"`
-	Vulnerabilities VulnEvidence         `json:"vulnerabilities" yaml:"vulnerabilities"`
-	Capabilities    CapabilityEvidence   `json:"capabilities" yaml:"capabilities"`
-	Ownership       OwnershipEvidence    `json:"ownership" yaml:"ownership"`
+	Provenance      EvidenceState      `json:"provenance" yaml:"provenance"`
+	Signature       EvidenceState      `json:"signature" yaml:"signature"`
+	Vulnerabilities VulnEvidence       `json:"vulnerabilities" yaml:"vulnerabilities"`
+	Malicious       MaliciousEvidence  `json:"malicious" yaml:"malicious"`
+	Capabilities    CapabilityEvidence `json:"capabilities" yaml:"capabilities"`
+	Ownership       OwnershipEvidence  `json:"ownership" yaml:"ownership"`
 }
 
 type VulnEvidence struct {
@@ -84,6 +85,17 @@ type VulnEvidence struct {
 }
 
 type Vulnerability struct {
+	ID string `json:"id" yaml:"id"`
+}
+
+// MaliciousEvidence records OpenSSF Malicious Packages / OSV MAL-* reports.
+// It is separate from VulnerabilityEvidence: malware is not a CVE.
+type MaliciousEvidence struct {
+	State   VulnState          `json:"state" yaml:"state"`
+	Reports []MaliciousReport  `json:"reports,omitempty" yaml:"reports,omitempty"`
+}
+
+type MaliciousReport struct {
 	ID string `json:"id" yaml:"id"`
 }
 

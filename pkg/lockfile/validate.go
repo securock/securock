@@ -68,6 +68,17 @@ func validateArtifact(art Artifact) error {
 			return fmt.Errorf("missing vulnerability id")
 		}
 	}
+	if art.Evidence.Malicious.State == "" {
+		return fmt.Errorf("missing malicious state")
+	}
+	if !slices.Contains(vulnStates, art.Evidence.Malicious.State) {
+		return fmt.Errorf("unknown malicious state %q", art.Evidence.Malicious.State)
+	}
+	for _, r := range art.Evidence.Malicious.Reports {
+		if r.ID == "" {
+			return fmt.Errorf("missing malicious report id")
+		}
+	}
 	if art.Evidence.Capabilities.State == "" {
 		return fmt.Errorf("missing capabilities state")
 	}

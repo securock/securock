@@ -131,6 +131,9 @@ func Scan(ctx context.Context, opts Options) (*Result, error) {
 				Vulnerabilities: lockfile.VulnEvidence{
 					State: lockfile.VulnUnknown,
 				},
+				Malicious: lockfile.MaliciousEvidence{
+					State: lockfile.VulnUnknown,
+				},
 				Capabilities: lockfile.CapabilityEvidence{
 					State: lockfile.CapUnknown,
 				},
@@ -152,8 +155,11 @@ func Scan(ctx context.Context, opts Options) (*Result, error) {
 		}
 		if allowed[key] {
 			art.Evidence.Vulnerabilities.State = lockfile.VulnChecked
+			art.Evidence.Malicious.State = lockfile.VulnChecked
 			if vulns != nil {
-				art.Evidence.Vulnerabilities.Items = vulns[key]
+				cves, malware := osv.Partition(vulns[key])
+				art.Evidence.Vulnerabilities.Items = cves
+				art.Evidence.Malicious.Reports = malware
 			}
 		}
 		trust.Evaluate(&art, opts.Policy)

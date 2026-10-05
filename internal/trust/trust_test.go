@@ -17,6 +17,9 @@ func TestEvaluateTrusted(t *testing.T) {
 			Vulnerabilities: lockfile.VulnEvidence{
 				State: lockfile.VulnChecked,
 			},
+			Malicious: lockfile.MaliciousEvidence{
+				State: lockfile.VulnChecked,
+			},
 		},
 	}
 	trust.Evaluate(&art, policy.Default())
@@ -58,6 +61,7 @@ func TestEvaluateRequireProvenancePresent(t *testing.T) {
 			Vulnerabilities: lockfile.VulnEvidence{
 				State: lockfile.VulnChecked,
 			},
+			Malicious: lockfile.MaliciousEvidence{State: lockfile.VulnChecked},
 		},
 	}
 	trust.Evaluate(&present, pol)
@@ -70,11 +74,31 @@ func TestEvaluateOfflineUnknown(t *testing.T) {
 	art := lockfile.Artifact{
 		Evidence: lockfile.Evidence{
 			Vulnerabilities: lockfile.VulnEvidence{State: lockfile.VulnUnknown},
+			Malicious:       lockfile.MaliciousEvidence{State: lockfile.VulnUnknown},
 		},
 	}
 	trust.Evaluate(&art, policy.Default())
 	if art.Trust.Status != lockfile.StatusUnknown {
 		t.Fatalf("status = %s, want unknown", art.Trust.Status)
+	}
+}
+
+func TestEvaluateMaliciousPackage(t *testing.T) {
+	art := lockfile.Artifact{
+		Evidence: lockfile.Evidence{
+			Vulnerabilities: lockfile.VulnEvidence{State: lockfile.VulnChecked},
+			Malicious: lockfile.MaliciousEvidence{
+				State:   lockfile.VulnChecked,
+				Reports: []lockfile.MaliciousReport{{ID: "MAL-2026-2307"}},
+			},
+		},
+	}
+	trust.Evaluate(&art, policy.Default())
+	if art.Trust.Status != lockfile.StatusUntrusted {
+		t.Fatalf("status = %s", art.Trust.Status)
+	}
+	if !strings.Contains(strings.Join(art.Trust.Reasons, ","), "malicious package") {
+		t.Fatalf("reasons = %v", art.Trust.Reasons)
 	}
 }
 
@@ -88,6 +112,7 @@ func TestEvaluateRequireVerifiedProvenance(t *testing.T) {
 			Vulnerabilities: lockfile.VulnEvidence{
 				State: lockfile.VulnChecked,
 			},
+			Malicious: lockfile.MaliciousEvidence{State: lockfile.VulnChecked},
 		},
 	}
 	trust.Evaluate(&present, pol)
@@ -101,6 +126,7 @@ func TestEvaluateRequireVerifiedProvenance(t *testing.T) {
 			Vulnerabilities: lockfile.VulnEvidence{
 				State: lockfile.VulnChecked,
 			},
+			Malicious: lockfile.MaliciousEvidence{State: lockfile.VulnChecked},
 		},
 	}
 	trust.Evaluate(&verified, pol)
@@ -113,6 +139,7 @@ func TestEvaluateRequireDigest(t *testing.T) {
 	art := lockfile.Artifact{
 		Evidence: lockfile.Evidence{
 			Vulnerabilities: lockfile.VulnEvidence{State: lockfile.VulnChecked},
+			Malicious:       lockfile.MaliciousEvidence{State: lockfile.VulnChecked},
 		},
 	}
 	pol := policy.Default()
@@ -130,6 +157,7 @@ func TestEvaluateDeniedCapability(t *testing.T) {
 	art := lockfile.Artifact{
 		Evidence: lockfile.Evidence{
 			Vulnerabilities: lockfile.VulnEvidence{State: lockfile.VulnChecked},
+			Malicious:       lockfile.MaliciousEvidence{State: lockfile.VulnChecked},
 			Capabilities: lockfile.CapabilityEvidence{
 				State:          lockfile.CapChecked,
 				Shell:          lockfile.Bool(true),
@@ -155,6 +183,7 @@ func TestEvaluateFilesystemMaximum(t *testing.T) {
 	art := lockfile.Artifact{
 		Evidence: lockfile.Evidence{
 			Vulnerabilities: lockfile.VulnEvidence{State: lockfile.VulnChecked},
+			Malicious:       lockfile.MaliciousEvidence{State: lockfile.VulnChecked},
 			Capabilities: lockfile.CapabilityEvidence{
 				State:      lockfile.CapChecked,
 				Filesystem: lockfile.FilesystemWrite,
@@ -173,6 +202,7 @@ func TestEvaluateCapabilitiesUnknown(t *testing.T) {
 	art := lockfile.Artifact{
 		Evidence: lockfile.Evidence{
 			Vulnerabilities: lockfile.VulnEvidence{State: lockfile.VulnChecked},
+			Malicious:       lockfile.MaliciousEvidence{State: lockfile.VulnChecked},
 			Capabilities:    lockfile.CapabilityEvidence{State: lockfile.CapUnknown},
 		},
 	}
@@ -195,6 +225,7 @@ func TestEvaluateVulnerabilitiesAllowNone(t *testing.T) {
 				State: lockfile.VulnChecked,
 				Items: []lockfile.Vulnerability{{ID: "GHSA-x"}},
 			},
+			Malicious: lockfile.MaliciousEvidence{State: lockfile.VulnChecked},
 		},
 	}
 	trust.Evaluate(&art, pol)

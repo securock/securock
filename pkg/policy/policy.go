@@ -38,15 +38,17 @@ type Network struct {
 }
 
 type Rules struct {
-	RequireNoVulnerabilities bool             `json:"require_no_vulnerabilities" yaml:"require_no_vulnerabilities"`
-	RequireDigest            bool             `json:"require_digest" yaml:"require_digest"`
-	RequireProvenance        bool             `json:"require_provenance" yaml:"require_provenance"`
-	RequireSignature         bool             `json:"require_signature" yaml:"require_signature"`
-	Provenance               EvidenceRule     `json:"provenance,omitempty" yaml:"provenance,omitempty"`
-	Signature                EvidenceRule     `json:"signature,omitempty" yaml:"signature,omitempty"`
+	RequireNoVulnerabilities bool              `json:"require_no_vulnerabilities" yaml:"require_no_vulnerabilities"`
+	RequireNoMalicious       bool              `json:"require_no_malicious" yaml:"require_no_malicious"`
+	RequireDigest            bool              `json:"require_digest" yaml:"require_digest"`
+	RequireProvenance        bool              `json:"require_provenance" yaml:"require_provenance"`
+	RequireSignature         bool              `json:"require_signature" yaml:"require_signature"`
+	Provenance               EvidenceRule      `json:"provenance,omitempty" yaml:"provenance,omitempty"`
+	Signature                EvidenceRule      `json:"signature,omitempty" yaml:"signature,omitempty"`
 	Vulnerabilities          VulnerabilityRule `json:"vulnerabilities,omitempty" yaml:"vulnerabilities,omitempty"`
-	Capabilities             CapabilityRule   `json:"capabilities,omitempty" yaml:"capabilities,omitempty"`
-	Ownership                OwnershipRule    `json:"ownership,omitempty" yaml:"ownership,omitempty"`
+	Malicious                MaliciousRule     `json:"malicious,omitempty" yaml:"malicious,omitempty"`
+	Capabilities             CapabilityRule    `json:"capabilities,omitempty" yaml:"capabilities,omitempty"`
+	Ownership                OwnershipRule     `json:"ownership,omitempty" yaml:"ownership,omitempty"`
 }
 
 type EvidenceRule struct {
@@ -56,6 +58,12 @@ type EvidenceRule struct {
 // VulnerabilityRule is an optional structured form of vulnerability policy.
 // allow: "none" is equivalent to require_no_vulnerabilities: true.
 type VulnerabilityRule struct {
+	Allow string `json:"allow,omitempty" yaml:"allow,omitempty"`
+}
+
+// MaliciousRule is an optional structured form of malware policy.
+// allow: "none" is equivalent to require_no_malicious: true.
+type MaliciousRule struct {
 	Allow string `json:"allow,omitempty" yaml:"allow,omitempty"`
 }
 
@@ -80,6 +88,7 @@ func Default() Document {
 		Network: Network{Mode: ModePublicOnly},
 		Rules: Rules{
 			RequireNoVulnerabilities: true,
+			RequireNoMalicious:       true,
 		},
 	}
 }
@@ -96,6 +105,13 @@ func (r Rules) DenyVulnerabilities() bool {
 		return true
 	}
 	return r.Vulnerabilities.Allow == "none"
+}
+
+func (r Rules) DenyMalicious() bool {
+	if r.RequireNoMalicious {
+		return true
+	}
+	return r.Malicious.Allow == "none"
 }
 
 func (a ChangeAction) Fails() bool {
@@ -135,15 +151,17 @@ type canonicalNetwork struct {
 }
 
 type canonicalRules struct {
-	RequireNoVulnerabilities bool                 `json:"require_no_vulnerabilities,omitempty"`
-	RequireDigest            bool                 `json:"require_digest,omitempty"`
-	RequireProvenance        bool                 `json:"require_provenance,omitempty"`
-	RequireSignature         bool                 `json:"require_signature,omitempty"`
-	Provenance               *canonicalEvidence   `json:"provenance,omitempty"`
-	Signature                *canonicalEvidence   `json:"signature,omitempty"`
-	Vulnerabilities          *canonicalVulnRule   `json:"vulnerabilities,omitempty"`
-	Capabilities             *canonicalCapRule    `json:"capabilities,omitempty"`
-	Ownership                *canonicalOwnerRule  `json:"ownership,omitempty"`
+	RequireNoVulnerabilities bool                `json:"require_no_vulnerabilities,omitempty"`
+	RequireNoMalicious       bool                `json:"require_no_malicious,omitempty"`
+	RequireDigest            bool                `json:"require_digest,omitempty"`
+	RequireProvenance        bool                `json:"require_provenance,omitempty"`
+	RequireSignature         bool                `json:"require_signature,omitempty"`
+	Provenance               *canonicalEvidence  `json:"provenance,omitempty"`
+	Signature                *canonicalEvidence  `json:"signature,omitempty"`
+	Vulnerabilities          *canonicalVulnRule  `json:"vulnerabilities,omitempty"`
+	Malicious                *canonicalVulnRule  `json:"malicious,omitempty"`
+	Capabilities             *canonicalCapRule   `json:"capabilities,omitempty"`
+	Ownership                *canonicalOwnerRule `json:"ownership,omitempty"`
 }
 
 type canonicalEvidence struct {
@@ -177,12 +195,14 @@ func canonical(doc Document) canonicalDocument {
 		},
 		Rules: canonicalRules{
 			RequireNoVulnerabilities: doc.Rules.RequireNoVulnerabilities,
+			RequireNoMalicious:       doc.Rules.RequireNoMalicious,
 			RequireDigest:            doc.Rules.RequireDigest,
 			RequireProvenance:        doc.Rules.RequireProvenance,
 			RequireSignature:         doc.Rules.RequireSignature,
 			Provenance:               canonicalEvidenceRule(doc.Rules.Provenance),
 			Signature:                canonicalEvidenceRule(doc.Rules.Signature),
 			Vulnerabilities:          canonicalVuln(doc.Rules.Vulnerabilities),
+			Malicious:                canonicalMalicious(doc.Rules.Malicious),
 			Capabilities:             canonicalCapabilities(doc.Rules.Capabilities),
 			Ownership:                canonicalOwnership(doc.Rules.Ownership),
 		},
@@ -197,6 +217,13 @@ func canonicalEvidenceRule(rule EvidenceRule) *canonicalEvidence {
 }
 
 func canonicalVuln(rule VulnerabilityRule) *canonicalVulnRule {
+	if rule.Allow == "" {
+		return nil
+	}
+	return &canonicalVulnRule{Allow: rule.Allow}
+}
+
+func canonicalMalicious(rule MaliciousRule) *canonicalVulnRule {
 	if rule.Allow == "" {
 		return nil
 	}

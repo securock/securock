@@ -22,6 +22,9 @@ func TestExplainTrustedPackage(t *testing.T) {
 				Vulnerabilities: lockfile.VulnEvidence{
 					State: lockfile.VulnChecked,
 				},
+				Malicious: lockfile.MaliciousEvidence{
+					State: lockfile.VulnChecked,
+				},
 				Capabilities: lockfile.CapabilityEvidence{
 					State:   lockfile.CapChecked,
 					Network: lockfile.Bool(false),
@@ -49,6 +52,7 @@ func TestExplainTrustedPackage(t *testing.T) {
 		"✓ publisher recorded",
 		"✓ capabilities locked",
 		"✓ no known vulnerabilities",
+		"✓ no malicious package reports",
 		"verdict  trusted",
 	} {
 		if !strings.Contains(out, want) {

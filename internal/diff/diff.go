@@ -19,6 +19,8 @@ type Side struct {
 	Signature      lockfile.EvidenceState      `json:"signature,omitempty"`
 	VulnState      lockfile.VulnState          `json:"vuln_state,omitempty"`
 	Vulns          []string                    `json:"vulnerabilities,omitempty"`
+	MaliciousState lockfile.VulnState          `json:"malicious_state,omitempty"`
+	Malicious      []string                    `json:"malicious,omitempty"`
 	Trust          lockfile.Status             `json:"trust,omitempty"`
 	TrustReason    []string                    `json:"reasons,omitempty"`
 	Kinds          []string                    `json:"kinds,omitempty"`
@@ -152,6 +154,8 @@ func Write(w io.Writer, r Result) {
 		writeState(w, "signature", c.Before.Signature, c.After.Signature)
 		writeField(w, "vuln state", string(c.Before.VulnState), string(c.After.VulnState), false)
 		writeField(w, "vulnerabilities", ids(c.Before.Vulns), ids(c.After.Vulns), false)
+		writeField(w, "malicious state", string(c.Before.MaliciousState), string(c.After.MaliciousState), false)
+		writeField(w, "malicious", ids(c.Before.Malicious), ids(c.After.Malicious), false)
 		writeField(w, "trust", string(c.Before.Trust), string(c.After.Trust), false)
 		writeField(w, "reason", join(c.Before.TrustReason), join(c.After.TrustReason), false)
 		writeField(w, "kind", join(c.Before.Kinds), join(c.After.Kinds), false)
@@ -213,7 +217,11 @@ func sideOf(arts []lockfile.Artifact) Side {
 		for _, v := range art.Evidence.Vulnerabilities.Items {
 			s.Vulns = append(s.Vulns, v.ID)
 		}
+		for _, r := range art.Evidence.Malicious.Reports {
+			s.Malicious = append(s.Malicious, r.ID)
+		}
 		s.VulnState = worstVuln(s.VulnState, art.Evidence.Vulnerabilities.State)
+		s.MaliciousState = worstVuln(s.MaliciousState, art.Evidence.Malicious.State)
 		s.Provenance = worstEvidence(s.Provenance, art.Evidence.Provenance)
 		s.Signature = worstEvidence(s.Signature, art.Evidence.Signature)
 		s.Trust = worstTrust(s.Trust, art.Trust.Status)
@@ -249,6 +257,8 @@ func sideOf(arts []lockfile.Artifact) Side {
 	s.Digests = slices.Compact(s.Digests)
 	slices.Sort(s.Vulns)
 	s.Vulns = slices.Compact(s.Vulns)
+	slices.Sort(s.Malicious)
+	s.Malicious = slices.Compact(s.Malicious)
 	slices.Sort(s.TrustReason)
 	s.TrustReason = slices.Compact(s.TrustReason)
 	slices.Sort(s.Maintainers)
@@ -277,6 +287,8 @@ func nonOwnershipChanged(a, b Side) bool {
 		a.Signature != b.Signature ||
 		a.VulnState != b.VulnState ||
 		join(a.Vulns) != join(b.Vulns) ||
+		a.MaliciousState != b.MaliciousState ||
+		join(a.Malicious) != join(b.Malicious) ||
 		a.Trust != b.Trust ||
 		join(a.TrustReason) != join(b.TrustReason) ||
 		sourceChanged(a, b) ||

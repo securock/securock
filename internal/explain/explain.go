@@ -60,6 +60,7 @@ func writeChecks(w io.Writer, art lockfile.Artifact) {
 	writeOwnership(w, art.Evidence.Ownership)
 	writeCapabilities(w, art.Evidence.Capabilities)
 	writeVulns(w, art.Evidence.Vulnerabilities)
+	writeMalicious(w, art.Evidence.Malicious)
 	writeTrust(w, art.Trust)
 }
 
@@ -130,6 +131,27 @@ func writeVulns(w io.Writer, vulns lockfile.VulnEvidence) {
 		}
 	default:
 		fmt.Fprintln(w, "? vulnerabilities not checked")
+	}
+}
+
+func writeMalicious(w io.Writer, mal lockfile.MaliciousEvidence) {
+	switch mal.State {
+	case lockfile.VulnChecked:
+		if len(mal.Reports) == 0 {
+			fmt.Fprintln(w, "✓ no malicious package reports")
+		} else {
+			ids := make([]string, 0, len(mal.Reports))
+			for _, r := range mal.Reports {
+				ids = append(ids, r.ID)
+			}
+			fmt.Fprintf(w, "✗ malicious package\n")
+			fmt.Fprintln(w, "  OpenSSF Malicious Packages")
+			for _, id := range ids {
+				fmt.Fprintf(w, "    %s\n", id)
+			}
+		}
+	default:
+		fmt.Fprintln(w, "? malicious reports not checked")
 	}
 }
 

@@ -99,12 +99,13 @@
     },
     "evidence": {
       "type": "object",
-      "required": ["provenance", "signature", "vulnerabilities", "capabilities", "ownership"],
+      "required": ["provenance", "signature", "vulnerabilities", "malicious", "capabilities", "ownership"],
       "additionalProperties": false,
       "properties": {
         "provenance": { "$ref": "#/$defs/evidenceState" },
         "signature": { "$ref": "#/$defs/evidenceState" },
         "vulnerabilities": { "$ref": "#/$defs/vulnEvidence" },
+        "malicious": { "$ref": "#/$defs/maliciousEvidence" },
         "capabilities": { "$ref": "#/$defs/capabilities" },
         "ownership": { "$ref": "#/$defs/ownership" }
       }
@@ -119,6 +120,26 @@
           "type": "array",
           "items": { "$ref": "#/$defs/vulnerability" }
         }
+      }
+    },
+    "maliciousEvidence": {
+      "type": "object",
+      "required": ["state"],
+      "additionalProperties": false,
+      "properties": {
+        "state": { "type": "string", "enum": ["unknown", "checked"] },
+        "reports": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/maliciousReport" }
+        }
+      }
+    },
+    "maliciousReport": {
+      "type": "object",
+      "required": ["id"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "minLength": 1 }
       }
     },
     "vulnerability": {
