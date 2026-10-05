@@ -32,7 +32,7 @@ func (Ecosystem) Detect(path string) bool {
 }
 
 func (Ecosystem) Dependencies(path string) ([]core.Dependency, error) {
-	raw, err := os.ReadFile(core.Join(path, modName))
+	raw, err := core.ReadFile(core.Join(path, modName))
 	if err != nil {
 		if os.IsNotExist(err) {
 			return nil, fmt.Errorf("missing go.mod")
@@ -125,7 +125,7 @@ func replacement(replaces []*modfile.Replace, path, version string) *modfile.Rep
 
 func parseSum(path string) map[string]string {
 	out := map[string]string{}
-	raw, err := os.ReadFile(path)
+	raw, err := core.ReadFile(path)
 	if err != nil {
 		return out
 	}

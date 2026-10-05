@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"os"
 	"strings"
 
 	"github.com/securock/securock/internal/ecosystem/core"
@@ -34,7 +33,7 @@ func (Ecosystem) Dependencies(path string) ([]core.Dependency, error) {
 	if !core.FileExists(core.Join(path, lockfileName)) {
 		return nil, fmt.Errorf("bun.lockb is unsupported; migrate to bun.lock first")
 	}
-	raw, err := os.ReadFile(core.Join(path, lockfileName))
+	raw, err := core.ReadFile(core.Join(path, lockfileName))
 	if err != nil {
 		return nil, err
 	}

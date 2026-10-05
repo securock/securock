@@ -2,7 +2,6 @@ package composer
 
 import (
 	"encoding/json"
-	"os"
 
 	"github.com/securock/securock/internal/ecosystem/core"
 	"github.com/securock/securock/internal/network"
@@ -25,7 +24,7 @@ func (Ecosystem) Detect(path string) bool {
 }
 
 func (Ecosystem) Dependencies(path string) ([]core.Dependency, error) {
-	raw, err := os.ReadFile(core.Join(path, lockfileName))
+	raw, err := core.ReadFile(core.Join(path, lockfileName))
 	if err != nil {
 		return nil, err
 	}

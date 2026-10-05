@@ -1,7 +1,9 @@
 package capability_test
 
 import (
+	"archive/tar"
 	"bytes"
+	"compress/gzip"
 	"testing"
 
 	"github.com/securock/securock/internal/capability"
@@ -83,5 +85,29 @@ func TestScanSourceReader(t *testing.T) {
 	err := capability.ScanSource(bytes.NewReader([]byte("not-a-tarball")), &capability.Findings{})
 	if err == nil {
 		t.Fatal("expected error for invalid gzip")
+	}
+}
+
+func TestScanSourceRejectsOversizedJS(t *testing.T) {
+	var buf bytes.Buffer
+	gz := gzip.NewWriter(&buf)
+	tw := tar.NewWriter(gz)
+	body := bytes.Repeat([]byte("a"), 512<<10+1)
+	hdr := &tar.Header{Name: "package/big.js", Mode: 0o644, Size: int64(len(body))}
+	if err := tw.WriteHeader(hdr); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := tw.Write(body); err != nil {
+		t.Fatal(err)
+	}
+	if err := tw.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := gz.Close(); err != nil {
+		t.Fatal(err)
+	}
+	err := capability.ScanSource(bytes.NewReader(buf.Bytes()), &capability.Findings{})
+	if err == nil {
+		t.Fatal("expected oversized source file error")
 	}
 }

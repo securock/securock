@@ -2,11 +2,11 @@ package policy
 
 import (
 	"fmt"
-	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/securock/securock/internal/decode"
+	"github.com/securock/securock/internal/ecosystem/core"
 	"github.com/securock/securock/pkg/policy"
 )
 
@@ -31,7 +31,7 @@ func LoadWithProfile(path, profile string) (policy.Document, error) {
 		return doc, nil
 	}
 
-	raw, err := os.ReadFile(path)
+	raw, err := core.ReadFileLimit(path, 1<<20)
 	if err != nil {
 		return policy.Document{}, err
 	}

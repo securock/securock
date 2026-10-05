@@ -1,7 +1,6 @@
 package poetry
 
 import (
-	"os"
 	"strings"
 
 	"github.com/pelletier/go-toml/v2"
@@ -26,7 +25,7 @@ func (Ecosystem) Detect(path string) bool {
 }
 
 func (Ecosystem) Dependencies(path string) ([]core.Dependency, error) {
-	raw, err := os.ReadFile(core.Join(path, lockfileName))
+	raw, err := core.ReadFile(core.Join(path, lockfileName))
 	if err != nil {
 		return nil, err
 	}

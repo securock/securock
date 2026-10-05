@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/securock/securock/internal/decode"
+	"github.com/securock/securock/internal/ecosystem/core"
 	"github.com/securock/securock/pkg/lockfile"
 	"gopkg.in/yaml.v3"
 )
@@ -67,7 +68,7 @@ func Encode(path string, doc lockfile.Document) ([]byte, error) {
 // memory only; the file on disk is never rewritten. migrated is true when
 // a v1→v2 migration was applied.
 func Read(path string) (doc lockfile.Document, migrated bool, err error) {
-	raw, err := os.ReadFile(path)
+	raw, err := core.ReadFile(path)
 	if err != nil {
 		return lockfile.Document{}, false, err
 	}

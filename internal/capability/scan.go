@@ -3,6 +3,7 @@ package capability
 import (
 	"archive/tar"
 	"compress/gzip"
+	"fmt"
 	"io"
 	"net/url"
 	"regexp"
@@ -12,7 +13,12 @@ import (
 	"github.com/securock/securock/pkg/lockfile"
 )
 
-const maxBehaviorEntries = 64
+const (
+	maxBehaviorEntries   = 64
+	maxScanFileBytes     = 512 << 10
+	maxTarEntries        = 1 << 16
+	maxUncompressedBytes = 64 << 20
+)
 
 var (
 	reNetwork = regexp.MustCompile(`(?i)(?:require\s*\(\s*['"](?:node:)?(?:http|https|net|dns|tls|dgram|undici)['"]\s*\)|from\s+['"](?:node:)?(?:http|https|net|dns|tls|dgram|undici)['"]|\bfetch\s*\(|\bXMLHttpRequest\b|\bWebSocket\b)`)
@@ -99,8 +105,10 @@ func ScanSource(r io.Reader, f *Findings) error {
 	}
 	defer gz.Close()
 
-	tr := tar.NewReader(gz)
+	limited := &countingReader{r: io.LimitReader(gz, maxUncompressedBytes+1), max: maxUncompressedBytes}
+	tr := tar.NewReader(limited)
 	f.ScannedSource = true
+	entries := 0
 	for {
 		hdr, err := tr.Next()
 		if err == io.EOF {
@@ -108,6 +116,13 @@ func ScanSource(r io.Reader, f *Findings) error {
 		}
 		if err != nil {
 			return err
+		}
+		entries++
+		if entries > maxTarEntries {
+			return fmt.Errorf("tarball exceeds %d entry limit", maxTarEntries)
+		}
+		if limited.exceeded() {
+			return fmt.Errorf("tarball exceeds %d uncompressed byte limit", maxUncompressedBytes)
 		}
 		if hdr.Typeflag != tar.TypeReg {
 			continue
@@ -121,18 +136,36 @@ func ScanSource(r io.Reader, f *Findings) error {
 		case strings.HasSuffix(base, ".node"), base == "binding.gyp":
 			f.NativeCode = true
 		case isScannableJS(base):
-			const maxFile = 512 << 10
-			limited := io.LimitReader(tr, maxFile+1)
-			raw, err := io.ReadAll(limited)
+			fileLimited := io.LimitReader(tr, maxScanFileBytes+1)
+			raw, err := io.ReadAll(fileLimited)
 			if err != nil {
 				return err
 			}
-			if len(raw) > maxFile {
-				continue
+			if len(raw) > maxScanFileBytes {
+				return fmt.Errorf("source file %q exceeds %d byte limit", hdr.Name, maxScanFileBytes)
 			}
 			scanText(f, string(raw))
 		}
+		if limited.exceeded() {
+			return fmt.Errorf("tarball exceeds %d uncompressed byte limit", maxUncompressedBytes)
+		}
 	}
+}
+
+type countingReader struct {
+	r   io.Reader
+	n   int64
+	max int64
+}
+
+func (c *countingReader) Read(p []byte) (int, error) {
+	n, err := c.r.Read(p)
+	c.n += int64(n)
+	return n, err
+}
+
+func (c *countingReader) exceeded() bool {
+	return c.n > c.max
 }
 
 func Evidence(f Findings) lockfile.CapabilityEvidence {
