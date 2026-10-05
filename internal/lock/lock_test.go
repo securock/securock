@@ -17,6 +17,7 @@ func validEvidence() lockfile.Evidence {
 		Vulnerabilities: lockfile.VulnEvidence{
 			State: lockfile.VulnUnknown,
 		},
+		Capabilities: lockfile.CapabilityEvidence{State: lockfile.CapUnknown},
 	}
 }
 
@@ -64,7 +65,8 @@ func TestEncodeDeterministic(t *testing.T) {
 							{ID: "GHSA-a"},
 						},
 					},
-				},
+					Capabilities: lockfile.CapabilityEvidence{State: lockfile.CapUnknown},
+							},
 				Trust: lockfile.Trust{Status: lockfile.StatusTrusted},
 			},
 			{

@@ -21,6 +21,8 @@ artifacts:
       signature: unknown
       vulnerabilities:
         state: unknown
+      capabilities:
+        state: unknown
     trust:
       status: unknown
       reasons:

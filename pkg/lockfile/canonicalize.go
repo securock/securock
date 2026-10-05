@@ -32,6 +32,9 @@ func Canonicalize(doc *Document) {
 
 	for i := range doc.Artifacts {
 		art := &doc.Artifacts[i]
+		if art.Evidence.Capabilities.State == "" {
+			art.Evidence.Capabilities.State = CapUnknown
+		}
 		slices.SortFunc(art.Evidence.Vulnerabilities.Items, func(a, b Vulnerability) int {
 			return cmp.Compare(a.ID, b.ID)
 		})

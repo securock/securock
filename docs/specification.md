@@ -50,6 +50,8 @@ artifacts:
       signature: unknown
       vulnerabilities:
         state: unknown
+      capabilities:
+        state: unknown
     trust:
       status: unknown
       reasons:
@@ -75,6 +77,11 @@ or a Git revision.
 A change to `source.kind`, `source.registry`, `source.artifact`,
 `source.requested`, or `source.resolved` is trust drift even when the
 name, version, and digest stay the same.
+
+`capabilities` records observed package abilities (network, filesystem,
+environment, shell, native code, install scripts). Use `state: checked`
+when collected and `unknown` when skipped (offline or non-npm). A change
+to capabilities is trust drift.
 
 URL artifacts may omit `version`. Their identity is `subject.name`
 (the requested URL). Do not encode a URL into `version`; that makes
@@ -131,3 +138,5 @@ states, and trust statuses are errors.
 Evidence states are `unknown`, `missing`, `present`, and `verified`.
 `present` means the evidence was observed. `verified` is reserved for
 cryptographic verification.
+
+Capability states are `unknown` and `checked`.

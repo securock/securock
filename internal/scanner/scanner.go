@@ -131,12 +131,18 @@ func Scan(ctx context.Context, opts Options) (*Result, error) {
 				Vulnerabilities: lockfile.VulnEvidence{
 					State: lockfile.VulnUnknown,
 				},
+				Capabilities: lockfile.CapabilityEvidence{
+					State: lockfile.CapUnknown,
+				},
 			},
 		}
 		key := ecosystem.Identity(dep)
 		if rec, ok := ev[evidence.Key(dep)]; ok {
 			art.Evidence.Provenance = rec.Provenance
 			art.Evidence.Signature = rec.Signature
+			if rec.Capabilities.State != "" {
+				art.Evidence.Capabilities = rec.Capabilities
+			}
 		}
 		if allowed[key] {
 			art.Evidence.Vulnerabilities.State = lockfile.VulnChecked

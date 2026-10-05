@@ -71,9 +71,10 @@ type Artifact struct {
 }
 
 type Evidence struct {
-	Provenance      EvidenceState `json:"provenance" yaml:"provenance"`
-	Signature       EvidenceState `json:"signature" yaml:"signature"`
-	Vulnerabilities VulnEvidence  `json:"vulnerabilities" yaml:"vulnerabilities"`
+	Provenance      EvidenceState      `json:"provenance" yaml:"provenance"`
+	Signature       EvidenceState      `json:"signature" yaml:"signature"`
+	Vulnerabilities VulnEvidence       `json:"vulnerabilities" yaml:"vulnerabilities"`
+	Capabilities    CapabilityEvidence `json:"capabilities" yaml:"capabilities"`
 }
 
 type VulnEvidence struct {
@@ -85,10 +86,40 @@ type Vulnerability struct {
 	ID string `json:"id" yaml:"id"`
 }
 
+type CapState string
+
+const (
+	CapUnknown CapState = "unknown"
+	CapChecked CapState = "checked"
+)
+
+type FilesystemAccess string
+
+const (
+	FilesystemNone  FilesystemAccess = "none"
+	FilesystemRead  FilesystemAccess = "read"
+	FilesystemWrite FilesystemAccess = "write"
+)
+
+// CapabilityEvidence records observed package capabilities.
+// When State is CapUnknown, capability fields are omitted.
+// Boolean fields use pointers so false is distinct from unchecked.
+type CapabilityEvidence struct {
+	State          CapState         `json:"state" yaml:"state"`
+	Network        *bool            `json:"network,omitempty" yaml:"network,omitempty"`
+	Filesystem     FilesystemAccess `json:"filesystem,omitempty" yaml:"filesystem,omitempty"`
+	Environment    *bool            `json:"environment,omitempty" yaml:"environment,omitempty"`
+	Shell          *bool            `json:"shell,omitempty" yaml:"shell,omitempty"`
+	NativeCode     *bool            `json:"native_code,omitempty" yaml:"native_code,omitempty"`
+	InstallScripts *bool            `json:"install_scripts,omitempty" yaml:"install_scripts,omitempty"`
+}
+
 type Trust struct {
 	Status  Status   `json:"status" yaml:"status"`
 	Reasons []string `json:"reasons,omitempty" yaml:"reasons,omitempty"`
 }
+
+func Bool(v bool) *bool { return &v }
 
 func (s Subject) ID() string {
 	return s.Ecosystem + ":" + s.Name

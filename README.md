@@ -5,9 +5,9 @@ A lockfile for trust, not just versions.
 Language lockfiles pin versions. `securock.lock` pins the _trust
 decision_ you accepted for those versions.
 
-Securock records digest, provenance, signature, and vulnerability
-evidence for each artifact, then fails CI when that trust state
-drifts.
+Securock records digest, provenance, signature, vulnerability, and
+capability evidence for each artifact, then fails CI when that trust
+state drifts.
 
 **Docs:** [securock.dev](https://securock.dev)
 
@@ -129,6 +129,14 @@ artifacts:
       signature: unknown
       vulnerabilities:
         state: unknown
+      capabilities:
+        state: checked
+        network: false
+        filesystem: none
+        environment: false
+        shell: false
+        native_code: false
+        install_scripts: false
     trust:
       status: unknown
 ```

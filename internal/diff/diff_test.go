@@ -57,15 +57,15 @@ func TestCompareTrustDrift(t *testing.T) {
 	if !got.TrustDrift() {
 		t.Fatal("expected trust drift")
 	}
-	if got.TrustChanges() != 4 {
+	if got.TrustChanges() != 2 {
 		t.Fatalf("trust changes = %d", got.TrustChanges())
 	}
 
 	var buf bytes.Buffer
 	diff.Write(&buf, got)
 	out := buf.String()
-	if !strings.Contains(out, "react@19.1.0") || !strings.Contains(out, "react@19.2.0") {
-		t.Fatalf("missing react artifact drift:\n%s", out)
+	if !strings.Contains(out, "react") || !strings.Contains(out, "19.1.0 → 19.2.0") {
+		t.Fatalf("missing react version drift:\n%s", out)
 	}
 	if !strings.Contains(out, "Trust drift detected.") {
 		t.Fatalf("missing drift footer:\n%s", out)
@@ -314,6 +314,47 @@ func TestCompareArtifactURLDrift(t *testing.T) {
 		t.Fatal("artifact url change must be trust drift")
 	}
 }
+
+func TestCompareCapabilityDrift(t *testing.T) {
+	locked := lockfile.Document{Artifacts: []lockfile.Artifact{
+		{
+			Subject: lockfile.Subject{Ecosystem: "npm", Name: "react"},
+			Version: "19.2.0",
+			Evidence: lockfile.Evidence{
+				Capabilities: lockfile.CapabilityEvidence{
+					State:   lockfile.CapChecked,
+					Network: lockfile.Bool(false),
+					Shell:   lockfile.Bool(false),
+				},
+			},
+		},
+	}}
+	current := lockfile.Document{Artifacts: []lockfile.Artifact{
+		{
+			Subject: lockfile.Subject{Ecosystem: "npm", Name: "react"},
+			Version: "19.2.1",
+			Evidence: lockfile.Evidence{
+				Capabilities: lockfile.CapabilityEvidence{
+					State:       lockfile.CapChecked,
+					Network:     lockfile.Bool(true),
+					Environment: lockfile.Bool(true),
+					Shell:       lockfile.Bool(false),
+				},
+			},
+		},
+	}}
+	got := diff.Compare(locked, current)
+	if !got.TrustDrift() {
+		t.Fatal("capability drift must be trust drift")
+	}
+	var buf bytes.Buffer
+	diff.Write(&buf, got)
+	out := buf.String()
+	if !strings.Contains(out, "+ network") || !strings.Contains(out, "+ environment") {
+		t.Fatalf("missing capability markers:\n%s", out)
+	}
+}
+
 
 func TestCompareSourceKindDrift(t *testing.T) {
 	locked := lockfile.Document{Artifacts: []lockfile.Artifact{

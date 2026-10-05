@@ -8,8 +8,9 @@ import (
 )
 
 type Record struct {
-	Provenance lockfile.EvidenceState
-	Signature  lockfile.EvidenceState
+	Provenance   lockfile.EvidenceState
+	Signature    lockfile.EvidenceState
+	Capabilities lockfile.CapabilityEvidence
 }
 
 type Collector interface {

@@ -52,8 +52,8 @@ rules:
 v0.1 npm collection can emit `present`, never `verified`. `verified`
 is reserved for Sigstore and registry-key verification.
 
-Offline scans leave provenance, signature, and vulnerability state
-as `unknown`. That is not a clean bill of health.
+Offline scans leave provenance, signature, capability, and
+vulnerability state as `unknown`. That is not a clean bill of health.
 
 Private registries are not queried in the default `public-only`
 network mode. See [Privacy](privacy.md).
@@ -66,6 +66,12 @@ network mode. See [Privacy](privacy.md).
 | vulnerabilities | OSV ids | OSV ids when the source is proven public |
 | provenance | npm provenance attestation present | `unknown` |
 | signature | npm `dist.signatures` present | `unknown` |
+| capabilities | registry metadata + package source heuristics | `unknown` |
+
+Capability detection for npm uses install-script and native-build
+metadata, then a deterministic scan of published JS/TS sources for
+network, filesystem, environment, and shell indicators. It is not a
+full behavioral sandbox and may under-report obfuscated code.
 
 Deno JSR and HTTPS URL artifacts record integrity from `deno.lock`.
 OSV does not cover those ecosystems yet, so vulnerability state stays
@@ -82,3 +88,4 @@ registry-key cryptographic verification, so it will not emit
 - that transitive behavior is reachable or exploitable
 - that GitHub, npm, or OSV are uncompromised
 - that non-npm ecosystems collect provenance or signature evidence
+- that capability heuristics catch every malicious behavior

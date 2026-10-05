@@ -17,11 +17,18 @@ func TestNPMEvidence(t *testing.T) {
 		case "/-/npm/v1/attestations/react@19.2.0":
 			w.Write([]byte(`{"attestations":[{"predicateType":"https://slsa.dev/provenance/v1"}]}`))
 		case "/react/19.2.0":
-			w.Write([]byte(`{"dist":{"signatures":[{"keyid":"abc","sig":"def"}]}}`))
+			w.Write([]byte(`{
+				"dist":{"signatures":[{"keyid":"abc","sig":"def"}],"tarball":"http://example.invalid/react.tgz"},
+				"hasInstallScript": false
+			}`))
 		case "/-/npm/v1/attestations/leftpad@1.0.0":
 			http.NotFound(w, r)
 		case "/leftpad/1.0.0":
-			w.Write([]byte(`{"dist":{}}`))
+			w.Write([]byte(`{
+				"dist":{},
+				"hasInstallScript": true,
+				"scripts":{"postinstall":"node install.js"}
+			}`))
 		default:
 			http.NotFound(w, r)
 		}
@@ -29,9 +36,10 @@ func TestNPMEvidence(t *testing.T) {
 	t.Cleanup(srv.Close)
 
 	c := &evidence.NPM{
-		HTTP:     srv.Client(),
-		Registry: srv.URL,
-		Limit:    2,
+		HTTP:        srv.Client(),
+		Registry:    srv.URL,
+		Limit:       2,
+		SkipTarball: true,
 	}
 	got, err := c.Collect(context.Background(), []ecosystem.Dependency{
 		{Ecosystem: "npm", Name: "react", Version: "19.2.0"},
@@ -46,8 +54,18 @@ func TestNPMEvidence(t *testing.T) {
 	if react.Provenance != lockfile.EvidencePresent || react.Signature != lockfile.EvidencePresent {
 		t.Fatalf("react = %+v", react)
 	}
+	if react.Capabilities.State != lockfile.CapChecked || react.Capabilities.InstallScripts == nil || *react.Capabilities.InstallScripts {
+		t.Fatalf("react capabilities = %+v", react.Capabilities)
+	}
+
 	left := got[evidence.Key(ecosystem.Dependency{Ecosystem: "npm", Name: "leftpad", Version: "1.0.0"})]
 	if left.Provenance != lockfile.EvidenceMissing || left.Signature != lockfile.EvidenceMissing {
 		t.Fatalf("leftpad = %+v", left)
+	}
+	if left.Capabilities.InstallScripts == nil || !*left.Capabilities.InstallScripts {
+		t.Fatalf("leftpad should have install scripts: %+v", left.Capabilities)
+	}
+	if left.Capabilities.Shell == nil || !*left.Capabilities.Shell {
+		t.Fatalf("leftpad install scripts should imply shell: %+v", left.Capabilities)
 	}
 }

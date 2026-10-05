@@ -11,6 +11,8 @@ var (
 	statuses    = []Status{StatusTrusted, StatusUntrusted, StatusUnknown}
 	evidence    = []EvidenceState{EvidenceUnknown, EvidenceMissing, EvidencePresent, EvidenceVerified}
 	vulnStates  = []VulnState{VulnUnknown, VulnChecked}
+	capStates   = []CapState{CapUnknown, CapChecked}
+	filesystems = []FilesystemAccess{"", FilesystemNone, FilesystemRead, FilesystemWrite}
 	sourceKinds = []string{"", "registry", "workspace", "git", "file", "url"}
 )
 
@@ -65,6 +67,15 @@ func validateArtifact(art Artifact) error {
 		if v.ID == "" {
 			return fmt.Errorf("missing vulnerability id")
 		}
+	}
+	if art.Evidence.Capabilities.State == "" {
+		return fmt.Errorf("missing capabilities state")
+	}
+	if !slices.Contains(capStates, art.Evidence.Capabilities.State) {
+		return fmt.Errorf("unknown capabilities state %q", art.Evidence.Capabilities.State)
+	}
+	if !slices.Contains(filesystems, art.Evidence.Capabilities.Filesystem) {
+		return fmt.Errorf("unknown filesystem capability %q", art.Evidence.Capabilities.Filesystem)
 	}
 	if !slices.Contains(statuses, art.Trust.Status) {
 		return fmt.Errorf("unknown trust status %q", art.Trust.Status)

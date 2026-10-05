@@ -3,7 +3,10 @@
   "$id": "https://securock.dev/schema/securock-lock.schema.json",
   "title": "securock.lock",
   "type": "object",
-  "required": ["version", "artifacts"],
+  "required": [
+    "version",
+    "artifacts"
+  ],
   "additionalProperties": false,
   "properties": {
     "version": {
@@ -16,12 +19,50 @@
       "properties": {
         "ecosystems": {
           "type": "array",
-          "items": { "type": "string", "enum": ["npm", "jsr", "url", "cargo", "go", "pypi", "packagist", "rubygems", "nuget", "swift", "pub", "hex", "maven"] },
+          "items": {
+            "type": "string",
+            "enum": [
+              "npm",
+              "jsr",
+              "url",
+              "cargo",
+              "go",
+              "pypi",
+              "packagist",
+              "rubygems",
+              "nuget",
+              "swift",
+              "pub",
+              "hex",
+              "maven"
+            ]
+          },
           "uniqueItems": true
         },
         "resolvers": {
           "type": "array",
-          "items": { "type": "string", "enum": ["npm", "pnpm", "yarn", "bun", "deno", "cargo", "go", "uv", "poetry", "pdm", "composer", "bundler", "nuget", "swiftpm", "pub", "mix", "gradle"] },
+          "items": {
+            "type": "string",
+            "enum": [
+              "npm",
+              "pnpm",
+              "yarn",
+              "bun",
+              "deno",
+              "cargo",
+              "go",
+              "uv",
+              "poetry",
+              "pdm",
+              "composer",
+              "bundler",
+              "nuget",
+              "swiftpm",
+              "pub",
+              "mix",
+              "gradle"
+            ]
+          },
           "uniqueItems": true
         }
       }
@@ -30,53 +71,104 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "digest": { "type": "string" }
+        "digest": {
+          "type": "string"
+        }
       }
     },
     "artifacts": {
       "type": "array",
-      "items": { "$ref": "#/$defs/artifact" }
+      "items": {
+        "$ref": "#/$defs/artifact"
+      }
     }
   },
   "$defs": {
     "artifact": {
       "type": "object",
-      "required": ["subject", "evidence", "trust"],
+      "required": [
+        "subject",
+        "evidence",
+        "trust"
+      ],
       "additionalProperties": false,
       "properties": {
-        "subject": { "$ref": "#/$defs/subject" },
-        "version": { "type": "string", "minLength": 1 },
-        "filename": { "type": "string" },
-        "digest": { "type": "string" },
-        "source": { "$ref": "#/$defs/artifactSource" },
-        "evidence": { "$ref": "#/$defs/evidence" },
-        "trust": { "$ref": "#/$defs/trust" }
+        "subject": {
+          "$ref": "#/$defs/subject"
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "filename": {
+          "type": "string"
+        },
+        "digest": {
+          "type": "string"
+        },
+        "source": {
+          "$ref": "#/$defs/artifactSource"
+        },
+        "evidence": {
+          "$ref": "#/$defs/evidence"
+        },
+        "trust": {
+          "$ref": "#/$defs/trust"
+        }
       },
       "if": {
         "properties": {
           "subject": {
             "properties": {
-              "ecosystem": { "const": "url" }
+              "ecosystem": {
+                "const": "url"
+              }
             },
-            "required": ["ecosystem"]
+            "required": [
+              "ecosystem"
+            ]
           }
         },
-        "required": ["subject"]
+        "required": [
+          "subject"
+        ]
       },
       "else": {
-        "required": ["version"]
+        "required": [
+          "version"
+        ]
       }
     },
     "subject": {
       "type": "object",
-      "required": ["ecosystem", "name"],
+      "required": [
+        "ecosystem",
+        "name"
+      ],
       "additionalProperties": false,
       "properties": {
         "ecosystem": {
           "type": "string",
-          "enum": ["npm", "jsr", "url", "cargo", "go", "pypi", "packagist", "rubygems", "nuget", "swift", "pub", "hex", "maven"]
+          "enum": [
+            "npm",
+            "jsr",
+            "url",
+            "cargo",
+            "go",
+            "pypi",
+            "packagist",
+            "rubygems",
+            "nuget",
+            "swift",
+            "pub",
+            "hex",
+            "maven"
+          ]
         },
-        "name": { "type": "string", "minLength": 1 }
+        "name": {
+          "type": "string",
+          "minLength": 1
+        }
       }
     },
     "artifactSource": {
@@ -85,66 +177,179 @@
       "properties": {
         "resolver": {
           "type": "string",
-          "enum": ["npm", "pnpm", "yarn", "bun", "deno", "cargo", "go", "uv", "poetry", "pdm", "composer", "bundler", "nuget", "swiftpm", "pub", "mix", "gradle"]
+          "enum": [
+            "npm",
+            "pnpm",
+            "yarn",
+            "bun",
+            "deno",
+            "cargo",
+            "go",
+            "uv",
+            "poetry",
+            "pdm",
+            "composer",
+            "bundler",
+            "nuget",
+            "swiftpm",
+            "pub",
+            "mix",
+            "gradle"
+          ]
         },
         "kind": {
           "type": "string",
-          "enum": ["registry", "workspace", "git", "file", "url"]
+          "enum": [
+            "registry",
+            "workspace",
+            "git",
+            "file",
+            "url"
+          ]
         },
-        "registry": { "type": "string" },
-        "artifact": { "type": "string" },
-        "requested": { "type": "string" },
-        "resolved": { "type": "string" }
+        "registry": {
+          "type": "string"
+        },
+        "artifact": {
+          "type": "string"
+        },
+        "requested": {
+          "type": "string"
+        },
+        "resolved": {
+          "type": "string"
+        }
       }
     },
     "evidence": {
       "type": "object",
-      "required": ["provenance", "signature", "vulnerabilities"],
+      "required": [
+        "provenance",
+        "signature",
+        "vulnerabilities",
+        "capabilities"
+      ],
       "additionalProperties": false,
       "properties": {
-        "provenance": { "$ref": "#/$defs/evidenceState" },
-        "signature": { "$ref": "#/$defs/evidenceState" },
-        "vulnerabilities": { "$ref": "#/$defs/vulnEvidence" }
+        "provenance": {
+          "$ref": "#/$defs/evidenceState"
+        },
+        "signature": {
+          "$ref": "#/$defs/evidenceState"
+        },
+        "vulnerabilities": {
+          "$ref": "#/$defs/vulnEvidence"
+        },
+        "capabilities": {
+          "$ref": "#/$defs/capabilities"
+        }
       }
     },
     "vulnEvidence": {
       "type": "object",
-      "required": ["state"],
+      "required": [
+        "state"
+      ],
       "additionalProperties": false,
       "properties": {
-        "state": { "type": "string", "enum": ["unknown", "checked"] },
+        "state": {
+          "type": "string",
+          "enum": [
+            "unknown",
+            "checked"
+          ]
+        },
         "items": {
           "type": "array",
-          "items": { "$ref": "#/$defs/vulnerability" }
+          "items": {
+            "$ref": "#/$defs/vulnerability"
+          }
         }
       }
     },
     "vulnerability": {
       "type": "object",
-      "required": ["id"],
+      "required": [
+        "id"
+      ],
       "additionalProperties": false,
       "properties": {
-        "id": { "type": "string", "minLength": 1 }
+        "id": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "capabilities": {
+      "type": "object",
+      "required": [
+        "state"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "state": {
+          "type": "string",
+          "enum": [
+            "unknown",
+            "checked"
+          ]
+        },
+        "network": {
+          "type": "boolean"
+        },
+        "filesystem": {
+          "type": "string",
+          "enum": [
+            "none",
+            "read",
+            "write"
+          ]
+        },
+        "environment": {
+          "type": "boolean"
+        },
+        "shell": {
+          "type": "boolean"
+        },
+        "native_code": {
+          "type": "boolean"
+        },
+        "install_scripts": {
+          "type": "boolean"
+        }
       }
     },
     "trust": {
       "type": "object",
-      "required": ["status"],
+      "required": [
+        "status"
+      ],
       "additionalProperties": false,
       "properties": {
         "status": {
           "type": "string",
-          "enum": ["trusted", "untrusted", "unknown"]
+          "enum": [
+            "trusted",
+            "untrusted",
+            "unknown"
+          ]
         },
         "reasons": {
           "type": "array",
-          "items": { "type": "string" }
+          "items": {
+            "type": "string"
+          }
         }
       }
     },
     "evidenceState": {
       "type": "string",
-      "enum": ["unknown", "missing", "present", "verified"]
+      "enum": [
+        "unknown",
+        "missing",
+        "present",
+        "verified"
+      ]
     }
   }
 }

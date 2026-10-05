@@ -12,19 +12,20 @@ import (
 )
 
 type Side struct {
-	Versions    []string               `json:"versions,omitempty"`
-	Digests     []string               `json:"digests,omitempty"`
-	Provenance  lockfile.EvidenceState `json:"provenance,omitempty"`
-	Signature   lockfile.EvidenceState `json:"signature,omitempty"`
-	VulnState   lockfile.VulnState     `json:"vuln_state,omitempty"`
-	Vulns       []string               `json:"vulnerabilities,omitempty"`
-	Trust       lockfile.Status        `json:"trust,omitempty"`
-	TrustReason []string               `json:"reasons,omitempty"`
-	Kinds       []string               `json:"kinds,omitempty"`
-	Registries  []string               `json:"registries,omitempty"`
-	Artifacts   []string               `json:"artifacts,omitempty"`
-	Requested   []string               `json:"requested,omitempty"`
-	Resolved    []string               `json:"resolved,omitempty"`
+	Versions       []string                    `json:"versions,omitempty"`
+	Digests        []string                    `json:"digests,omitempty"`
+	Provenance     lockfile.EvidenceState      `json:"provenance,omitempty"`
+	Signature      lockfile.EvidenceState      `json:"signature,omitempty"`
+	VulnState      lockfile.VulnState          `json:"vuln_state,omitempty"`
+	Vulns          []string                    `json:"vulnerabilities,omitempty"`
+	Trust          lockfile.Status             `json:"trust,omitempty"`
+	TrustReason    []string                    `json:"reasons,omitempty"`
+	Kinds          []string                    `json:"kinds,omitempty"`
+	Registries     []string                    `json:"registries,omitempty"`
+	Artifacts      []string                    `json:"artifacts,omitempty"`
+	Requested      []string                    `json:"requested,omitempty"`
+	Resolved       []string                    `json:"resolved,omitempty"`
+	Capabilities lockfile.CapabilityEvidence `json:"capabilities,omitempty"`
 }
 
 type Change struct {
@@ -148,6 +149,7 @@ func Write(w io.Writer, r Result) {
 		writeField(w, "artifact", join(c.Before.Artifacts), join(c.After.Artifacts), false)
 		writeField(w, "requested", join(c.Before.Requested), join(c.After.Requested), false)
 		writeField(w, "resolved", join(c.Before.Resolved), join(c.After.Resolved), false)
+		writeCapabilities(w, c.Before.Capabilities, c.After.Capabilities)
 	}
 
 	if r.TrustDrift() {
@@ -175,6 +177,9 @@ func sideOf(arts []lockfile.Artifact) Side {
 		Trust:      lockfile.StatusTrusted,
 		Provenance: lockfile.EvidenceUnknown,
 		Signature:  lockfile.EvidenceUnknown,
+		Capabilities: lockfile.CapabilityEvidence{
+			State: lockfile.CapUnknown,
+		},
 	}
 	if len(arts) == 0 {
 		return s
@@ -182,6 +187,7 @@ func sideOf(arts []lockfile.Artifact) Side {
 	s.Provenance = arts[0].Evidence.Provenance
 	s.Signature = arts[0].Evidence.Signature
 	s.Trust = arts[0].Trust.Status
+	s.Capabilities = arts[0].Evidence.Capabilities
 	for _, art := range arts {
 		if art.Version != "" {
 			s.Versions = append(s.Versions, art.Version)
@@ -197,6 +203,7 @@ func sideOf(arts []lockfile.Artifact) Side {
 		s.Signature = worstEvidence(s.Signature, art.Evidence.Signature)
 		s.Trust = worstTrust(s.Trust, art.Trust.Status)
 		s.TrustReason = append(s.TrustReason, art.Trust.Reasons...)
+		s.Capabilities = mergeCapabilities(s.Capabilities, art.Evidence.Capabilities)
 		if art.Source.Kind != "" {
 			s.Kinds = append(s.Kinds, art.Source.Kind)
 		}
@@ -243,7 +250,8 @@ func changed(a, b Side) bool {
 		join(a.Vulns) != join(b.Vulns) ||
 		a.Trust != b.Trust ||
 		join(a.TrustReason) != join(b.TrustReason) ||
-		sourceChanged(a, b)
+		sourceChanged(a, b) ||
+		!capabilitiesEqual(a.Capabilities, b.Capabilities)
 }
 
 func trustRelevant(a, b Side) bool {
@@ -256,6 +264,71 @@ func sourceChanged(a, b Side) bool {
 		join(a.Artifacts) != join(b.Artifacts) ||
 		join(a.Requested) != join(b.Requested) ||
 		join(a.Resolved) != join(b.Resolved)
+}
+
+func capabilitiesEqual(a, b lockfile.CapabilityEvidence) bool {
+	return a.State == b.State &&
+		boolPtrEqual(a.Network, b.Network) &&
+		a.Filesystem == b.Filesystem &&
+		boolPtrEqual(a.Environment, b.Environment) &&
+		boolPtrEqual(a.Shell, b.Shell) &&
+		boolPtrEqual(a.NativeCode, b.NativeCode) &&
+		boolPtrEqual(a.InstallScripts, b.InstallScripts)
+}
+
+func boolPtrEqual(a, b *bool) bool {
+	if a == nil && b == nil {
+		return true
+	}
+	if a == nil || b == nil {
+		return false
+	}
+	return *a == *b
+}
+
+func mergeCapabilities(a, b lockfile.CapabilityEvidence) lockfile.CapabilityEvidence {
+	out := a
+	out.State = worstCap(a.State, b.State)
+	out.Network = orBool(a.Network, b.Network)
+	out.Environment = orBool(a.Environment, b.Environment)
+	out.Shell = orBool(a.Shell, b.Shell)
+	out.NativeCode = orBool(a.NativeCode, b.NativeCode)
+	out.InstallScripts = orBool(a.InstallScripts, b.InstallScripts)
+	out.Filesystem = worstFilesystem(a.Filesystem, b.Filesystem)
+	return out
+}
+
+func orBool(a, b *bool) *bool {
+	if a == nil {
+		return b
+	}
+	if b == nil {
+		return a
+	}
+	return lockfile.Bool(*a || *b)
+}
+
+func worstFilesystem(a, b lockfile.FilesystemAccess) lockfile.FilesystemAccess {
+	order := map[lockfile.FilesystemAccess]int{
+		"":                        0,
+		lockfile.FilesystemNone:   1,
+		lockfile.FilesystemRead:   2,
+		lockfile.FilesystemWrite:  3,
+	}
+	if order[b] > order[a] {
+		return b
+	}
+	return a
+}
+
+func worstCap(a, b lockfile.CapState) lockfile.CapState {
+	if a == "" {
+		return b
+	}
+	if a == lockfile.CapUnknown || b == lockfile.CapUnknown {
+		return lockfile.CapUnknown
+	}
+	return lockfile.CapChecked
 }
 
 func worstVuln(a, b lockfile.VulnState) lockfile.VulnState {
@@ -321,18 +394,92 @@ func writeState(w io.Writer, name string, before, after lockfile.EvidenceState) 
 	fmt.Fprintf(w, "  %-14s%s → %s\n", name, before, after)
 }
 
+func writeCapabilities(w io.Writer, before, after lockfile.CapabilityEvidence) {
+	if capabilitiesEqual(before, after) {
+		return
+	}
+	fmt.Fprintln(w, "  capabilities changed:")
+	writeCapBool(w, "network", before.Network, after.Network)
+	writeCapFS(w, before.Filesystem, after.Filesystem)
+	writeCapBool(w, "environment", before.Environment, after.Environment)
+	writeCapBool(w, "shell", before.Shell, after.Shell)
+	writeCapBool(w, "native_code", before.NativeCode, after.NativeCode)
+	writeCapBool(w, "install_scripts", before.InstallScripts, after.InstallScripts)
+	if before.State != after.State {
+		fmt.Fprintf(w, "    state          %s → %s\n", before.State, after.State)
+	}
+}
+
+func writeCapBool(w io.Writer, name string, before, after *bool) {
+	b, bOK := boolLabel(before)
+	a, aOK := boolLabel(after)
+	if b == a && bOK == aOK {
+		return
+	}
+	beforeOn := bOK && before != nil && *before
+	afterOn := aOK && after != nil && *after
+	switch {
+	case !beforeOn && afterOn:
+		fmt.Fprintf(w, "    + %s\n", name)
+	case beforeOn && !afterOn:
+		fmt.Fprintf(w, "    - %s\n", name)
+	default:
+		fmt.Fprintf(w, "    %-14s%s → %s\n", name, b, a)
+	}
+}
+
+func writeCapFS(w io.Writer, before, after lockfile.FilesystemAccess) {
+	if before == after {
+		return
+	}
+	b := fsLabel(before)
+	a := fsLabel(after)
+	if before == "" && after != "" && after != lockfile.FilesystemNone {
+		fmt.Fprintf(w, "    + filesystem (%s)\n", after)
+		return
+	}
+	if after == "" && before != "" && before != lockfile.FilesystemNone {
+		fmt.Fprintf(w, "    - filesystem (%s)\n", before)
+		return
+	}
+	fmt.Fprintf(w, "    %-14s%s → %s\n", "filesystem", b, a)
+}
+
+
+func boolLabel(v *bool) (string, bool) {
+	if v == nil {
+		return "unknown", false
+	}
+	if *v {
+		return "true", true
+	}
+	return "false", true
+}
+
+func fsLabel(v lockfile.FilesystemAccess) string {
+	if v == "" {
+		return "unknown"
+	}
+	return string(v)
+}
+
+
 func displayName(artifactID string) string {
 	_, name, ok := strings.Cut(artifactID, ":")
 	if !ok || name == "" {
 		return artifactID
 	}
+	if i := strings.Index(name, "#"); i >= 0 {
+		return name[:i]
+	}
 	return name
 }
 
+// artifactKey identifies a subject (and optional filename) without version,
+// so a version bump is a change to one subject rather than remove+add.
 type artifactKey struct {
 	Ecosystem string
 	Name      string
-	Version   string
 	Filename  string
 }
 
@@ -340,16 +487,12 @@ func keyOf(art lockfile.Artifact) artifactKey {
 	return artifactKey{
 		Ecosystem: art.Subject.Ecosystem,
 		Name:      art.Subject.Name,
-		Version:   art.Version,
 		Filename:  art.Filename,
 	}
 }
 
 func (k artifactKey) id() string {
 	id := k.subject()
-	if k.Version != "" {
-		id += "@" + k.Version
-	}
 	if k.Filename != "" {
 		id += "#" + k.Filename
 	}
