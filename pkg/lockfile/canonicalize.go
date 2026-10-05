@@ -38,6 +38,9 @@ func Canonicalize(doc *Document) {
 		if art.Evidence.Capabilities.State == "" {
 			art.Evidence.Capabilities.State = CapUnknown
 		}
+		if art.Evidence.Behavior.State == "" {
+			art.Evidence.Behavior.State = CapUnknown
+		}
 		if art.Evidence.Ownership.State == "" {
 			art.Evidence.Ownership.State = CapUnknown
 		}
@@ -47,6 +50,21 @@ func Canonicalize(doc *Document) {
 		slices.SortFunc(art.Evidence.Malicious.Reports, func(a, b MaliciousReport) int {
 			return cmp.Compare(a.ID, b.ID)
 		})
+		slices.Sort(art.Evidence.Behavior.Network)
+		art.Evidence.Behavior.Network = compactSorted(art.Evidence.Behavior.Network)
+		if art.Evidence.Behavior.Files != nil {
+			slices.Sort(art.Evidence.Behavior.Files.Read)
+			art.Evidence.Behavior.Files.Read = compactSorted(art.Evidence.Behavior.Files.Read)
+			slices.Sort(art.Evidence.Behavior.Files.Write)
+			art.Evidence.Behavior.Files.Write = compactSorted(art.Evidence.Behavior.Files.Write)
+			if len(art.Evidence.Behavior.Files.Read) == 0 && len(art.Evidence.Behavior.Files.Write) == 0 {
+				art.Evidence.Behavior.Files = nil
+			}
+		}
+		slices.Sort(art.Evidence.Behavior.Commands)
+		art.Evidence.Behavior.Commands = compactSorted(art.Evidence.Behavior.Commands)
+		slices.Sort(art.Evidence.Behavior.Environment)
+		art.Evidence.Behavior.Environment = compactSorted(art.Evidence.Behavior.Environment)
 		slices.Sort(art.Evidence.Ownership.Maintainers)
 		art.Evidence.Ownership.Maintainers = compactSorted(art.Evidence.Ownership.Maintainers)
 		slices.Sort(art.Trust.Reasons)

@@ -61,9 +61,28 @@
         "registries": { "type": "array", "items": { "type": "string" } },
         "artifacts": { "type": "array", "items": { "type": "string" } },
         "capabilities": { "$ref": "#/$defs/capabilities" },
+        "behavior": { "$ref": "#/$defs/behavior" },
         "publisher": { "type": "string" },
         "maintainers": { "type": "array", "items": { "type": "string" } },
         "ownership_state": { "type": "string", "enum": ["unknown", "checked"] }
+      }
+    },
+    "behavior": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "state": { "type": "string", "enum": ["unknown", "checked"] },
+        "network": { "type": "array", "items": { "type": "string" } },
+        "files": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "read": { "type": "array", "items": { "type": "string" } },
+            "write": { "type": "array", "items": { "type": "string" } }
+          }
+        },
+        "commands": { "type": "array", "items": { "type": "string" } },
+        "environment": { "type": "array", "items": { "type": "string" } }
       }
     },
     "capabilities": {

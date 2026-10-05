@@ -137,6 +137,9 @@ func Scan(ctx context.Context, opts Options) (*Result, error) {
 				Capabilities: lockfile.CapabilityEvidence{
 					State: lockfile.CapUnknown,
 				},
+				Behavior: lockfile.BehaviorEvidence{
+					State: lockfile.CapUnknown,
+				},
 				Ownership: lockfile.OwnershipEvidence{
 					State: lockfile.CapUnknown,
 				},
@@ -148,6 +151,9 @@ func Scan(ctx context.Context, opts Options) (*Result, error) {
 			art.Evidence.Signature = rec.Signature
 			if rec.Capabilities.State != "" {
 				art.Evidence.Capabilities = rec.Capabilities
+			}
+			if rec.Behavior.State != "" {
+				art.Evidence.Behavior = rec.Behavior
 			}
 			if rec.Ownership.State != "" {
 				art.Evidence.Ownership = rec.Ownership

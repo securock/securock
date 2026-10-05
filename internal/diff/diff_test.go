@@ -395,6 +395,45 @@ func TestCompareOwnershipDrift(t *testing.T) {
 	}
 }
 
+func TestBehaviorDrift(t *testing.T) {
+	locked := lockfile.Document{Artifacts: []lockfile.Artifact{
+		{
+			Subject: lockfile.Subject{Ecosystem: "npm", Name: "axios"},
+			Version: "1.12.0",
+			Evidence: lockfile.Evidence{
+				Behavior: lockfile.BehaviorEvidence{
+					State:   lockfile.CapChecked,
+					Network: []string{"api.example.com"},
+				},
+			},
+		},
+	}}
+	current := lockfile.Document{Artifacts: []lockfile.Artifact{
+		{
+			Subject: lockfile.Subject{Ecosystem: "npm", Name: "axios"},
+			Version: "1.13.0",
+			Evidence: lockfile.Evidence{
+				Behavior: lockfile.BehaviorEvidence{
+					State:       lockfile.CapChecked,
+					Network:     []string{"api.example.com", "telemetry.example.com"},
+					Environment: []string{"AWS_ACCESS_KEY_ID"},
+					Files:       &lockfile.BehaviorFiles{Write: []string{"~/.ssh"}},
+				},
+			},
+		},
+	}}
+	got := diff.Compare(locked, current)
+	if !got.TrustDrift() {
+		t.Fatal("behavior drift must be trust drift")
+	}
+	var buf bytes.Buffer
+	diff.Write(&buf, got)
+	out := buf.String()
+	if !strings.Contains(out, "behavior drift") || !strings.Contains(out, "+ telemetry.example.com") {
+		t.Fatalf("missing behavior markers:\n%s", out)
+	}
+}
+
 func TestOwnershipPolicyWarnDoesNotFail(t *testing.T) {
 	locked := lockfile.Document{Artifacts: []lockfile.Artifact{
 		{

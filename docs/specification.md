@@ -54,6 +54,8 @@ artifacts:
         state: unknown
       capabilities:
         state: unknown
+      behavior:
+        state: unknown
       ownership:
         state: unknown
     trust:

@@ -76,6 +76,7 @@ type Evidence struct {
 	Vulnerabilities VulnEvidence       `json:"vulnerabilities" yaml:"vulnerabilities"`
 	Malicious       MaliciousEvidence  `json:"malicious" yaml:"malicious"`
 	Capabilities    CapabilityEvidence `json:"capabilities" yaml:"capabilities"`
+	Behavior        BehaviorEvidence   `json:"behavior" yaml:"behavior"`
 	Ownership       OwnershipEvidence  `json:"ownership" yaml:"ownership"`
 }
 
@@ -125,6 +126,20 @@ type CapabilityEvidence struct {
 	Shell          *bool            `json:"shell,omitempty" yaml:"shell,omitempty"`
 	NativeCode     *bool            `json:"native_code,omitempty" yaml:"native_code,omitempty"`
 	InstallScripts *bool            `json:"install_scripts,omitempty" yaml:"install_scripts,omitempty"`
+}
+
+// BehaviorEvidence records finer-grained observed behavior for drift detection.
+type BehaviorEvidence struct {
+	State       CapState       `json:"state" yaml:"state"`
+	Network     []string       `json:"network,omitempty" yaml:"network,omitempty"`
+	Files       *BehaviorFiles `json:"files,omitempty" yaml:"files,omitempty"`
+	Commands    []string       `json:"commands,omitempty" yaml:"commands,omitempty"`
+	Environment []string       `json:"environment,omitempty" yaml:"environment,omitempty"`
+}
+
+type BehaviorFiles struct {
+	Read  []string `json:"read,omitempty" yaml:"read,omitempty"`
+	Write []string `json:"write,omitempty" yaml:"write,omitempty"`
 }
 
 type OwnershipEvidence struct {

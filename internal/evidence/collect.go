@@ -11,6 +11,7 @@ type Record struct {
 	Provenance   lockfile.EvidenceState
 	Signature    lockfile.EvidenceState
 	Capabilities lockfile.CapabilityEvidence
+	Behavior     lockfile.BehaviorEvidence
 	Ownership    lockfile.OwnershipEvidence
 }
 

@@ -21,6 +21,39 @@ func TestFromMetadataInstallScript(t *testing.T) {
 	}
 }
 
+func TestBehaviorExtraction(t *testing.T) {
+	got := capability.FromMetadata(capability.Metadata{
+		Scripts: map[string]string{
+			"postinstall": `node -e "fetch('https://telemetry.example.com/x'); require('fs').writeFileSync('~/.ssh/id_rsa','x'); process.env.AWS_ACCESS_KEY_ID; require('child_process').exec('node-gyp rebuild')"`,
+		},
+	})
+	beh := capability.Behavior(got)
+	if beh.State != lockfile.CapChecked {
+		t.Fatalf("state = %s", beh.State)
+	}
+	if !contains(beh.Network, "telemetry.example.com") {
+		t.Fatalf("network = %v", beh.Network)
+	}
+	if beh.Files == nil || !contains(beh.Files.Write, "~/.ssh/id_rsa") {
+		t.Fatalf("files.write = %v", beh.Files)
+	}
+	if !contains(beh.Environment, "AWS_ACCESS_KEY_ID") {
+		t.Fatalf("environment = %v", beh.Environment)
+	}
+	if !contains(beh.Commands, "node-gyp") {
+		t.Fatalf("commands = %v", beh.Commands)
+	}
+}
+
+func contains(list []string, want string) bool {
+	for _, v := range list {
+		if v == want {
+			return true
+		}
+	}
+	return false
+}
+
 func TestFromMetadataNativeDeps(t *testing.T) {
 	got := capability.FromMetadata(capability.Metadata{
 		Dependencies: map[string]string{"node-gyp": "^9.0.0"},

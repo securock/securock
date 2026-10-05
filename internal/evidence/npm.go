@@ -95,6 +95,9 @@ func (c *NPM) lookup(ctx context.Context, dep ecosystem.Dependency) Record {
 		Capabilities: lockfile.CapabilityEvidence{
 			State: lockfile.CapUnknown,
 		},
+		Behavior: lockfile.BehaviorEvidence{
+			State: lockfile.CapUnknown,
+		},
 		Ownership: lockfile.OwnershipEvidence{
 			State: lockfile.CapUnknown,
 		},
@@ -116,6 +119,7 @@ func (c *NPM) lookup(ctx context.Context, dep ecosystem.Dependency) Record {
 		findings.Shell = true
 	}
 	rec.Capabilities = capability.Evidence(findings)
+	rec.Behavior = capability.Behavior(findings)
 	return rec
 }
 

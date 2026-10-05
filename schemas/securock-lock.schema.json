@@ -99,7 +99,7 @@
     },
     "evidence": {
       "type": "object",
-      "required": ["provenance", "signature", "vulnerabilities", "malicious", "capabilities", "ownership"],
+      "required": ["provenance", "signature", "vulnerabilities", "malicious", "capabilities", "behavior", "ownership"],
       "additionalProperties": false,
       "properties": {
         "provenance": { "$ref": "#/$defs/evidenceState" },
@@ -107,6 +107,7 @@
         "vulnerabilities": { "$ref": "#/$defs/vulnEvidence" },
         "malicious": { "$ref": "#/$defs/maliciousEvidence" },
         "capabilities": { "$ref": "#/$defs/capabilities" },
+        "behavior": { "$ref": "#/$defs/behavior" },
         "ownership": { "$ref": "#/$defs/ownership" }
       }
     },
@@ -148,6 +149,25 @@
       "additionalProperties": false,
       "properties": {
         "id": { "type": "string", "minLength": 1 }
+      }
+    },
+    "behavior": {
+      "type": "object",
+      "required": ["state"],
+      "additionalProperties": false,
+      "properties": {
+        "state": { "type": "string", "enum": ["unknown", "checked"] },
+        "network": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+        "files": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "read": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+            "write": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true }
+          }
+        },
+        "commands": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+        "environment": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true }
       }
     },
     "capabilities": {

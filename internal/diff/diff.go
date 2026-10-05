@@ -29,6 +29,7 @@ type Side struct {
 	Requested      []string                    `json:"requested,omitempty"`
 	Resolved       []string                    `json:"resolved,omitempty"`
 	Capabilities   lockfile.CapabilityEvidence `json:"capabilities,omitempty"`
+	Behavior       lockfile.BehaviorEvidence   `json:"behavior,omitempty"`
 	Publisher      string                      `json:"publisher,omitempty"`
 	Maintainers    []string                    `json:"maintainers,omitempty"`
 	OwnershipState lockfile.CapState           `json:"ownership_state,omitempty"`
@@ -164,6 +165,7 @@ func Write(w io.Writer, r Result) {
 		writeField(w, "requested", join(c.Before.Requested), join(c.After.Requested), false)
 		writeField(w, "resolved", join(c.Before.Resolved), join(c.After.Resolved), false)
 		writeCapabilities(w, c.Before.Capabilities, c.After.Capabilities)
+		writeBehavior(w, c.Before.Behavior, c.After.Behavior)
 		writeOwnership(w, c.Before, c.After)
 		writeOwnershipPolicy(w, c.Before, c.After, r.Policy.Rules.Ownership)
 	}
@@ -196,6 +198,9 @@ func sideOf(arts []lockfile.Artifact) Side {
 		Capabilities: lockfile.CapabilityEvidence{
 			State: lockfile.CapUnknown,
 		},
+		Behavior: lockfile.BehaviorEvidence{
+			State: lockfile.CapUnknown,
+		},
 		OwnershipState: lockfile.CapUnknown,
 	}
 	if len(arts) == 0 {
@@ -205,6 +210,7 @@ func sideOf(arts []lockfile.Artifact) Side {
 	s.Signature = arts[0].Evidence.Signature
 	s.Trust = arts[0].Trust.Status
 	s.Capabilities = arts[0].Evidence.Capabilities
+	s.Behavior = arts[0].Evidence.Behavior
 	s.OwnershipState = arts[0].Evidence.Ownership.State
 	var publishers []string
 	for _, art := range arts {
@@ -227,6 +233,7 @@ func sideOf(arts []lockfile.Artifact) Side {
 		s.Trust = worstTrust(s.Trust, art.Trust.Status)
 		s.TrustReason = append(s.TrustReason, art.Trust.Reasons...)
 		s.Capabilities = mergeCapabilities(s.Capabilities, art.Evidence.Capabilities)
+		s.Behavior = mergeBehavior(s.Behavior, art.Evidence.Behavior)
 		s.OwnershipState = worstCap(s.OwnershipState, art.Evidence.Ownership.State)
 		if art.Evidence.Ownership.Publisher != "" {
 			publishers = append(publishers, art.Evidence.Ownership.Publisher)
@@ -292,7 +299,8 @@ func nonOwnershipChanged(a, b Side) bool {
 		a.Trust != b.Trust ||
 		join(a.TrustReason) != join(b.TrustReason) ||
 		sourceChanged(a, b) ||
-		!capabilitiesEqual(a.Capabilities, b.Capabilities)
+		!capabilitiesEqual(a.Capabilities, b.Capabilities) ||
+		!behaviorEqual(a.Behavior, b.Behavior)
 }
 
 func ownershipChanged(a, b Side) bool {
@@ -389,6 +397,77 @@ func sourceChanged(a, b Side) bool {
 		join(a.Artifacts) != join(b.Artifacts) ||
 		join(a.Requested) != join(b.Requested) ||
 		join(a.Resolved) != join(b.Resolved)
+}
+
+func behaviorEqual(a, b lockfile.BehaviorEvidence) bool {
+	return a.State == b.State &&
+		join(a.Network) == join(b.Network) &&
+		join(behaviorFiles(a).Read) == join(behaviorFiles(b).Read) &&
+		join(behaviorFiles(a).Write) == join(behaviorFiles(b).Write) &&
+		join(a.Commands) == join(b.Commands) &&
+		join(a.Environment) == join(b.Environment)
+}
+
+func behaviorFiles(b lockfile.BehaviorEvidence) lockfile.BehaviorFiles {
+	if b.Files == nil {
+		return lockfile.BehaviorFiles{}
+	}
+	return *b.Files
+}
+
+func mergeBehavior(a, b lockfile.BehaviorEvidence) lockfile.BehaviorEvidence {
+	out := a
+	out.State = worstCap(a.State, b.State)
+	out.Network = append(slices.Clone(out.Network), b.Network...)
+	read := append(slices.Clone(behaviorFiles(a).Read), behaviorFiles(b).Read...)
+	write := append(slices.Clone(behaviorFiles(a).Write), behaviorFiles(b).Write...)
+	out.Commands = append(slices.Clone(out.Commands), b.Commands...)
+	out.Environment = append(slices.Clone(out.Environment), b.Environment...)
+	slices.Sort(out.Network)
+	out.Network = slices.Compact(out.Network)
+	slices.Sort(read)
+	read = slices.Compact(read)
+	slices.Sort(write)
+	write = slices.Compact(write)
+	slices.Sort(out.Commands)
+	out.Commands = slices.Compact(out.Commands)
+	slices.Sort(out.Environment)
+	out.Environment = slices.Compact(out.Environment)
+	if len(read) > 0 || len(write) > 0 {
+		out.Files = &lockfile.BehaviorFiles{Read: read, Write: write}
+	} else {
+		out.Files = nil
+	}
+	return out
+}
+
+func writeBehavior(w io.Writer, before, after lockfile.BehaviorEvidence) {
+	if behaviorEqual(before, after) {
+		return
+	}
+	fmt.Fprintln(w, "  behavior drift")
+	writeListDelta(w, "network", before.Network, after.Network)
+	writeListDelta(w, "filesystem read", behaviorFiles(before).Read, behaviorFiles(after).Read)
+	writeListDelta(w, "filesystem write", behaviorFiles(before).Write, behaviorFiles(after).Write)
+	writeListDelta(w, "commands", before.Commands, after.Commands)
+	writeListDelta(w, "environment", before.Environment, after.Environment)
+	if before.State != after.State {
+		fmt.Fprintf(w, "    state          %s → %s\n", before.State, after.State)
+	}
+}
+
+func writeListDelta(w io.Writer, name string, before, after []string) {
+	removed, added := listDelta(before, after)
+	if len(removed) == 0 && len(added) == 0 {
+		return
+	}
+	fmt.Fprintf(w, "    %s:\n", name)
+	for _, v := range removed {
+		fmt.Fprintf(w, "      - %s\n", v)
+	}
+	for _, v := range added {
+		fmt.Fprintf(w, "      + %s\n", v)
+	}
 }
 
 func capabilitiesEqual(a, b lockfile.CapabilityEvidence) bool {

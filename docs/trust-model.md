@@ -97,6 +97,7 @@ network mode. See [Privacy](privacy.md).
 | provenance | npm provenance attestation present | `unknown` |
 | signature | npm `dist.signatures` present | `unknown` |
 | capabilities | registry metadata + package source heuristics | `unknown` |
+| behavior | hosts, file paths, commands, env vars from source heuristics | `unknown` |
 | ownership | npm publisher (`_npmUser`) and maintainers | `unknown` |
 
 Malicious package reports are not vulnerabilities. A package with no

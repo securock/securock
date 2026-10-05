@@ -88,6 +88,12 @@ func validateArtifact(art Artifact) error {
 	if !slices.Contains(filesystems, art.Evidence.Capabilities.Filesystem) {
 		return fmt.Errorf("unknown filesystem capability %q", art.Evidence.Capabilities.Filesystem)
 	}
+	if art.Evidence.Behavior.State == "" {
+		return fmt.Errorf("missing behavior state")
+	}
+	if !slices.Contains(capStates, art.Evidence.Behavior.State) {
+		return fmt.Errorf("unknown behavior state %q", art.Evidence.Behavior.State)
+	}
 	if art.Evidence.Ownership.State == "" {
 		return fmt.Errorf("missing ownership state")
 	}
