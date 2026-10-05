@@ -5,10 +5,11 @@
 | `unknown` | Lookup skipped or failed. |
 | `missing` | Lookup succeeded and found nothing. |
 | `present` | Registry returned provenance, signatures, or a trust chain. Not cryptographically verified. |
-| `verified` | Reserved for future Sigstore / registry-key verification. |
+| `verified` | Cryptographic verification succeeded (registry ECDSA signature or Sigstore provenance) and the subject digest matches the lockfile. |
 
-Provenance, signature, and chain use these states. v0.2 records presence
-only. It will not emit `verified`.
+Provenance, signature, and chain use these states. npm evidence can
+reach `verified` when registry keys / Sigstore roots are available and
+the locked digest binds to the signed artifact.
 
 Vulnerability and malicious-package lookups have their own state:
 

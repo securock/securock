@@ -31,6 +31,9 @@ type NPM struct {
 	Limit     int
 	// SkipTarball disables package source capability scanning.
 	SkipTarball bool
+
+	keysOnce sync.Once
+	keys     *keyCache
 }
 
 func NewNPM() *NPM {
@@ -110,7 +113,7 @@ func (c *NPM) lookup(ctx context.Context, dep ecosystem.Dependency) Record {
 	if !ok {
 		return rec
 	}
-	rec.Signature = meta.Signature
+	rec.Signature = c.verifySignature(ctx, c.registryFor(dep), dep.Name, dep.Version, meta.Integrity, dep.Digest, meta.Signatures)
 	rec.Ownership = meta.Ownership
 
 	findings := capability.FromMetadata(meta.Capability)
@@ -139,7 +142,8 @@ func (c *NPM) lookup(ctx context.Context, dep ecosystem.Dependency) Record {
 }
 
 type versionMeta struct {
-	Signature  lockfile.EvidenceState
+	Signatures []npmSignature
+	Integrity  string
 	Ownership  lockfile.OwnershipEvidence
 	Capability capability.Metadata
 	Tarball    string
@@ -156,7 +160,6 @@ func (c *NPM) versionMeta(ctx context.Context, dep ecosystem.Dependency) (versio
 	switch res.StatusCode {
 	case http.StatusNotFound:
 		return versionMeta{
-			Signature: lockfile.EvidenceMissing,
 			Ownership: lockfile.OwnershipEvidence{State: lockfile.CapChecked},
 		}, true
 	case http.StatusOK:
@@ -167,11 +170,6 @@ func (c *NPM) versionMeta(ctx context.Context, dep ecosystem.Dependency) (versio
 	var parsed npmVersionDoc
 	if err := json.NewDecoder(res.Body).Decode(&parsed); err != nil {
 		return versionMeta{}, false
-	}
-
-	sig := lockfile.EvidenceMissing
-	if len(parsed.Dist.Signatures) > 0 {
-		sig = lockfile.EvidencePresent
 	}
 
 	owner := lockfile.OwnershipEvidence{State: lockfile.CapChecked}
@@ -199,7 +197,8 @@ func (c *NPM) versionMeta(ctx context.Context, dep ecosystem.Dependency) (versio
 	}
 
 	return versionMeta{
-		Signature:  sig,
+		Signatures: parsed.Dist.Signatures,
+		Integrity:  parsed.Dist.Integrity,
 		Ownership:  owner,
 		Capability: capMeta,
 		Tarball:    parsed.Dist.Tarball,
@@ -304,7 +303,7 @@ func (c *NPM) attestations(ctx context.Context, dep ecosystem.Dependency) (lockf
 	if err != nil {
 		return lockfile.EvidenceUnknown, lockfile.ChainEvidence{State: lockfile.EvidenceUnknown}
 	}
-	return extractChain(raw)
+	return extractChainVerified(raw, dep.Digest)
 }
 
 func (c *NPM) registryFor(dep ecosystem.Dependency) string {
@@ -345,8 +344,9 @@ type npmVersionDoc struct {
 	Author               softPerson        `json:"author"`
 	NPMUser              *npmPerson        `json:"_npmUser"`
 	Dist                 struct {
-		Signatures []json.RawMessage `json:"signatures"`
-		Tarball    string            `json:"tarball"`
+		Signatures []npmSignature `json:"signatures"`
+		Integrity  string         `json:"integrity"`
+		Tarball    string         `json:"tarball"`
 	} `json:"dist"`
 }
 

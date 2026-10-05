@@ -159,9 +159,9 @@ the file; run `securock lock` to persist a fully refreshed v2 snapshot.
 - empty optional collections omitted
 
 Evidence states are `unknown`, `missing`, `present`, and `verified`.
-`present` means the evidence was observed. `verified` is reserved for
-cryptographic verification. Provenance, signature, and chain use these
-states.
+`present` means the evidence was observed. `verified` means
+cryptographic verification succeeded and the subject was bound to the
+lockfile digest. Provenance, signature, and chain use these states.
 
 Vulnerability and malicious-report states are `unknown` and `checked`.
 Capability, behavior, and ownership states are also `unknown` and

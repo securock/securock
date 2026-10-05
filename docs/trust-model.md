@@ -77,8 +77,10 @@ rules:
     minimum: verified
 ```
 
-v0.2 npm collection can emit `present`, never `verified`. `verified`
-is reserved for Sigstore and registry-key verification.
+npm collection verifies registry ECDSA signatures against
+`/-/npm/v1/keys` and Sigstore provenance bundles against the public-good
+trusted root. Both require the lockfile digest to match the signed
+artifact before emitting `verified`.
 
 Offline scans leave provenance, signature, capability, ownership,
 behavior, chain, vulnerability, and malicious-report state as
@@ -94,8 +96,8 @@ network mode. See [Privacy](privacy.md).
 | digest | from the language lockfile | from the language lockfile |
 | vulnerabilities | OSV ids (non-`MAL-`) | OSV ids when the source is proven public |
 | malicious | OpenSSF Malicious Packages via OSV `MAL-*` | same, when OSV is queried |
-| provenance | npm provenance attestation present | `unknown` |
-| signature | npm `dist.signatures` present | `unknown` |
+| provenance | npm provenance attestation present; `verified` after Sigstore check + digest bind | `unknown` |
+| signature | npm `dist.signatures` present; `verified` after ECDSA check + digest bind | `unknown` |
 | capabilities | registry metadata + package source heuristics | `unknown` |
 | behavior | hosts, file paths, commands, env vars from source heuristics | `unknown` |
 | ownership | npm publisher (`_npmUser`) and maintainers | `unknown` |
@@ -111,17 +113,14 @@ full behavioral sandbox and may under-report obfuscated code.
 
 Trust chain evidence is extracted from npm provenance attestations
 (SLSA predicates). It records the claimed source repository, commit,
-builder identity, and workflow path when present. v0.2 records these
-fields for lock and drift; it does not cryptographically verify the
-attestation signature or rebuild the artifact from source.
+builder identity, and workflow path when present. When the Sigstore
+bundle verifies and the subject digest matches the lockfile digest,
+provenance and chain are recorded as `verified`. Securock does not
+rebuild the artifact from source.
 
 Deno JSR and HTTPS URL artifacts record integrity from `deno.lock`.
 OSV does not cover those ecosystems yet, so vulnerability state stays
 `unknown`.
-
-v0.2 records presence only. It does not perform full Sigstore or
-registry-key cryptographic verification, so it will not emit
-`verified`.
 
 ## What Securock does not guarantee
 

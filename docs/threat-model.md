@@ -31,12 +31,13 @@ why a subject is trusted under the active scan.
   an existing lockfile
 - runtime integrity after install (memory, disk, or container attacks)
 - malicious build systems that produce a matching digest for bad code
-- full cryptographic verification of npm provenance/signatures in v0.2
 - supply-chain attacks in ecosystems whose provenance and signature
   evidence Securock does not collect
 - installer compromise if `checksums.txt` and GitHub attestations are
   both attacker-controlled
 - obfuscated capability use that the package source heuristics miss
+- provenance signed by an OIDC issuer outside the trusted GitHub Actions
+  / GitLab patterns Securock accepts for `verified`
 
 ## Trust boundary
 
@@ -44,7 +45,8 @@ Securock trusts, as inputs:
 
 - the project's language lockfiles on disk
 - OSV, for vulnerability ids
-- the npm registry, for attestation and signature presence
+- the npm registry, for attestation and signature material (verified
+  cryptographically when keys / Sigstore roots are available)
 - GitHub, for Securock's own release attestations
 
 A compromise of those services can produce a `trusted` result that is
