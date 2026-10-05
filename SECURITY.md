@@ -24,6 +24,7 @@ Release artifacts are published with:
 - `checksums.txt`
 - SPDX SBOMs
 - GitHub artifact attestations
+- Immutable releases (tag and assets locked after publish)
 
 Consumers can verify either the release archive or the extracted binary:
 

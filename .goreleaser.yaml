@@ -63,5 +63,6 @@ changelog:
 release:
   # Created as a draft; the Release workflow publishes it once every
   # attestation has succeeded, so /releases/latest never points at an
-  # unattested release.
+  # unattested release. Draft-then-publish also matches GitHub Immutable
+  # Releases: assets must be attached before the release becomes immutable.
   draft: true

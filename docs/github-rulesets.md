@@ -31,3 +31,19 @@ Example payload: `.github/rulesets/main.json`.
 - Block force-pushes that rewrite a release tag
 
 Example payload: `.github/rulesets/tags.json`.
+
+## Immutable releases
+
+Enable **Immutable releases** on `securock/securock` (repository Settings →
+Releases, or `PUT /repos/securock/securock/immutable-releases`).
+
+Once enabled, published releases lock their Git tag and assets. The Release
+workflow already creates a draft, attaches artifacts and attestations, then
+publishes — the pattern GitHub recommends for immutable releases.
+
+Immutability applies to releases published after the setting is enabled.
+Verify with:
+
+```bash
+gh api repos/securock/securock/immutable-releases --jq .enabled
+```
