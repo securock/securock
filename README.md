@@ -101,6 +101,7 @@ The committed `securock.lock` in that directory is that snapshot.
 | `securock lock`    | Write `securock.lock`                             |
 | `securock diff`    | Show trust drift vs the lockfile                  |
 | `securock verify`  | Fail on trust-relevant drift                      |
+| `securock explain` | Explain why a package is trusted                  |
 | `securock version` | Print the build version                           |
 
 | Flag / exit | Meaning |

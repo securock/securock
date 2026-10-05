@@ -10,10 +10,12 @@ See [specification.md](specification.md) for the v1 format.
 securock lock
 securock diff
 securock verify
+securock explain <package>
 ```
 
 `lock` writes the file. `diff` shows what changed. `verify` uses the
 same comparison and fails when there is trust-relevant drift.
+`explain` prints a trust checklist for one package.
 
 Exit codes:
 

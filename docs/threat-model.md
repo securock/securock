@@ -17,7 +17,8 @@ fail CI:
   subject identity, because resolver is separate from ecosystem
 
 `securock diff` is the operator-facing view of those changes.
-`securock verify` is the CI gate.
+`securock verify` is the CI gate. `securock explain <package>` shows
+why a subject is trusted under the active scan.
 
 ## Does not protect against
 

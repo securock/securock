@@ -5,6 +5,7 @@ securock scan
 securock lock
 securock diff
 securock verify
+securock explain <package>
 securock version
 ```
 
@@ -16,6 +17,8 @@ verified.
 
 `diff` shows what changed. `verify` uses the same comparison and exits
 non-zero on trust-relevant drift unless `--no-fail` is set.
+`explain` shows digest, source, provenance, signature, ownership,
+capabilities, and vulnerability checks for one package.
 
 ```sh
 securock diff --format json
