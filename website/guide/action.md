@@ -17,7 +17,7 @@ jobs:
       - uses: securock/securock@<commit-sha>
         with:
           command: both
-          version: v0.1.0-alpha.1
+          version: v0.1.0
 ```
 
 After a tagged release exists, set `version` to that tag so the action
