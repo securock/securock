@@ -37,7 +37,10 @@ func (Ecosystem) Dependencies(path string) ([]core.Dependency, error) {
 		return nil, err
 	}
 
-	registry := network.Provenance("nuget", nugetconfig.Sources(path))
+	registry := ""
+	if !nugetconfig.Overridden(path) {
+		registry = network.Provenance("nuget", nugetconfig.Sources(path))
+	}
 	seen := map[string]struct{}{}
 	var deps []core.Dependency
 	for _, framework := range lock.Dependencies {

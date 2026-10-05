@@ -124,15 +124,19 @@ func classify(pkg pdmPackage, sources []string) (kind, registry string) {
 
 func registryOf(pkg pdmPackage, sources []string) string {
 	var urls []string
+	unlocated := len(pkg.Files) == 0
 	for _, file := range pkg.Files {
-		if file.URL != "" {
-			urls = append(urls, file.URL)
+		if file.URL == "" {
+			unlocated = true
+			continue
 		}
+		urls = append(urls, file.URL)
 	}
-	if len(urls) > 0 {
-		return network.Provenance("pypi", urls)
+	if unlocated {
+		// Files without a recorded URL could come from any configured index.
+		urls = append(urls, sources...)
 	}
-	return network.Provenance("pypi", sources)
+	return network.Provenance("pypi", urls)
 }
 
 func configuredSources(project string) []string {

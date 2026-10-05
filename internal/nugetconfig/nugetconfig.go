@@ -7,8 +7,11 @@ import (
 	"strings"
 )
 
+// Sources returns the package sources NuGet would restore from. Sources turned
+// off in disabledPackageSources are dropped.
 func Sources(project string) []string {
-	var sources []string
+	var sources []source
+	disabled := map[string]bool{}
 	var applied []os.FileInfo
 	applyFile := func(path string) {
 		info, err := os.Stat(path)
@@ -21,7 +24,7 @@ func Sources(project string) []string {
 			}
 		}
 		applied = append(applied, info)
-		sources = apply(sources, path)
+		sources = apply(sources, disabled, path)
 	}
 
 	for _, path := range machineConfigs() {
@@ -35,7 +38,70 @@ func Sources(project string) []string {
 			applyFile(path)
 		}
 	}
-	return sources
+	var out []string
+	for _, src := range sources {
+		if !disabled[strings.ToLower(src.key)] {
+			out = append(out, src.value)
+		}
+	}
+	return out
+}
+
+type source struct {
+	key   string
+	value string
+}
+
+// Overridden reports whether MSBuild properties near the project replace the
+// configured sources, in which case the NuGet config no longer proves origin.
+func Overridden(project string) bool {
+	for _, dir := range dirsFromRoot(project) {
+		entries, err := os.ReadDir(dir)
+		if err != nil {
+			continue
+		}
+		for _, e := range entries {
+			if e.IsDir() || !msbuildFile(e.Name(), dir == filepath.Clean(projectAbs(project))) {
+				continue
+			}
+			raw, err := os.ReadFile(filepath.Join(dir, e.Name()))
+			if err != nil {
+				continue
+			}
+			text := strings.ToLower(string(raw))
+			for _, prop := range []string{"restoresources", "restoreadditionalprojectsources", "restorefallbackfolders"} {
+				if strings.Contains(text, prop) {
+					return true
+				}
+			}
+		}
+	}
+	return false
+}
+
+func projectAbs(project string) string {
+	abs, err := filepath.Abs(project)
+	if err != nil {
+		return project
+	}
+	return abs
+}
+
+func msbuildFile(name string, inProject bool) bool {
+	lower := strings.ToLower(name)
+	switch lower {
+	case "directory.build.props", "directory.build.targets", "directory.packages.props":
+		return true
+	}
+	if !inProject {
+		return false
+	}
+	for _, ext := range []string{".csproj", ".fsproj", ".vbproj", ".props", ".targets"} {
+		if strings.HasSuffix(lower, ext) {
+			return true
+		}
+	}
+	return false
 }
 
 func machineConfigs() []string {
@@ -121,7 +187,7 @@ func configIn(dir string) string {
 	return first
 }
 
-func apply(sources []string, path string) []string {
+func apply(sources []source, disabled map[string]bool, path string) []source {
 	raw, err := os.ReadFile(path)
 	if err != nil {
 		return sources
@@ -138,7 +204,14 @@ func apply(sources []string, path string) []string {
 		if value == "" {
 			continue
 		}
-		sources = append(sources, value)
+		sources = append(sources, source{key: strings.TrimSpace(add.Key), value: value})
+	}
+	for _, add := range cfg.Disabled.Add {
+		key := strings.ToLower(strings.TrimSpace(add.Key))
+		if key == "" {
+			continue
+		}
+		disabled[key] = strings.EqualFold(strings.TrimSpace(add.Value), "true")
 	}
 	return sources
 }
@@ -147,7 +220,14 @@ type nugetFile struct {
 	PackageSources struct {
 		Clear *struct{} `xml:"clear"`
 		Add   []struct {
+			Key   string `xml:"key,attr"`
 			Value string `xml:"value,attr"`
 		} `xml:"add"`
 	} `xml:"packageSources"`
+	Disabled struct {
+		Add []struct {
+			Key   string `xml:"key,attr"`
+			Value string `xml:"value,attr"`
+		} `xml:"add"`
+	} `xml:"disabledPackageSources"`
 }

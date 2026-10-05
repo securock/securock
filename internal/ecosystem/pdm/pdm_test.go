@@ -253,3 +253,65 @@ files = [
 		t.Fatalf("user pdm config = %#v", deps)
 	}
 }
+
+func TestPartialFileURLsFallBackToSources(t *testing.T) {
+	isolate(t)
+	dir := t.TempDir()
+	raw := `[[package]]
+name = "requests"
+version = "2.32.3"
+files = [
+    {file = "requests-2.32.3.tar.gz", url = "https://pypi.org/packages/requests-2.32.3.tar.gz", hash = "sha256:9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"},
+    {file = "requests-2.32.3-py3-none-any.whl", hash = "sha256:9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"},
+]
+`
+	if err := os.WriteFile(filepath.Join(dir, "pdm.lock"), []byte(raw), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	pyproject := `[[tool.pdm.source]]
+name = "company"
+url = "https://pypi.company.example/simple"
+`
+	if err := os.WriteFile(filepath.Join(dir, "pyproject.toml"), []byte(pyproject), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	deps, err := pdm.New().Dependencies(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(deps) == 0 {
+		t.Fatal("no deps")
+	}
+	for _, dep := range deps {
+		if dep.Registry != "" {
+			t.Fatalf("files without a url must not be assumed public: %#v", dep)
+		}
+	}
+}
+
+func TestLocalIndexUnknown(t *testing.T) {
+	isolate(t)
+	dir := t.TempDir()
+	raw := `[[package]]
+name = "requests"
+version = "2.32.3"
+files = [{file = "requests-2.32.3.tar.gz", hash = "sha256:9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"}]
+`
+	if err := os.WriteFile(filepath.Join(dir, "pdm.lock"), []byte(raw), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	pyproject := `[[tool.pdm.source]]
+name = "local"
+url = "/srv/wheelhouse"
+`
+	if err := os.WriteFile(filepath.Join(dir, "pyproject.toml"), []byte(pyproject), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	deps, err := pdm.New().Dependencies(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(deps) != 1 || deps[0].Registry != "" {
+		t.Fatalf("local index next to pypi must be unknown: %#v", deps)
+	}
+}

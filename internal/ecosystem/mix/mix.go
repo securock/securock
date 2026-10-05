@@ -2,6 +2,7 @@ package mix
 
 import (
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/securock/securock/internal/ecosystem/core"
@@ -47,7 +48,7 @@ func (Ecosystem) Dependencies(path string) ([]core.Dependency, error) {
 				continue
 			}
 			registry := ""
-			if repo == "hexpm" {
+			if repo == "hexpm" && !hexRedirected() {
 				registry = "https://repo.hex.pm"
 			}
 			deps = append(deps, core.Dependency{
@@ -152,25 +153,111 @@ func closeTuple(s string) int {
 	return -1
 }
 
+// hexFields reads the positional hex tuple:
+// :hex, :name, "version", "inner checksum", [managers], [deps], "repo", "outer checksum".
+// The repo is only trusted at its position; older locks that omit it, or
+// requirement strings inside the dependency list, never count as a repo.
 func hexFields(payload string) (version, digest, repo string) {
-	quoted := quotedStrings(payload)
-	if len(quoted) == 0 {
+	// payload starts at the comma after the :hex tag, so elems[0] is empty.
+	elems := topLevel(payload)
+	if len(elems) < 4 {
 		return "", "", ""
 	}
-	version = quoted[0]
-	for i := len(quoted) - 1; i >= 1; i-- {
-		if len(quoted[i]) == 64 && isHex(quoted[i]) {
-			if digest == "" {
-				digest = quoted[i]
+	version = unquote(elems[2])
+	if version == "" {
+		return "", "", ""
+	}
+	if len(elems) >= 8 {
+		if outer := unquote(elems[7]); len(outer) == 64 && isHex(outer) {
+			digest = outer
+		}
+	}
+	if digest == "" {
+		if inner := unquote(elems[3]); len(inner) == 64 && isHex(inner) {
+			digest = inner
+		}
+	}
+	if len(elems) >= 7 {
+		repo = unquote(elems[6])
+	}
+	return version, digest, repo
+}
+
+func topLevel(s string) []string {
+	var out []string
+	depth := 0
+	inString := false
+	start := 0
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		if inString {
+			if c == '\\' && i+1 < len(s) {
+				i++
+			} else if c == '"' {
+				inString = false
 			}
 			continue
 		}
-		if quoted[i] != "" {
-			repo = quoted[i]
-			break
+		switch c {
+		case '"':
+			inString = true
+		case '{', '[':
+			depth++
+		case '}', ']':
+			depth--
+		case ',':
+			if depth == 0 {
+				out = append(out, strings.TrimSpace(s[start:i]))
+				start = i + 1
+			}
 		}
 	}
-	return version, digest, repo
+	return append(out, strings.TrimSpace(s[start:]))
+}
+
+func unquote(s string) string {
+	if len(s) >= 2 && s[0] == '"' && s[len(s)-1] == '"' {
+		return s[1 : len(s)-1]
+	}
+	return ""
+}
+
+// hexRedirected reports whether hex is configured to fetch from somewhere other
+// than repo.hex.pm, so a "hexpm" lock entry no longer proves a public origin.
+func hexRedirected() bool {
+	for _, env := range []string{"HEX_MIRROR", "HEX_REPO_URL", "HEX_API_URL"} {
+		if strings.TrimSpace(os.Getenv(env)) != "" {
+			return true
+		}
+	}
+	for _, path := range hexConfigFiles() {
+		raw, err := os.ReadFile(path)
+		if err != nil {
+			continue
+		}
+		text := string(raw)
+		if strings.Contains(text, "mirror_url") || strings.Contains(text, "repo_url") || strings.Contains(text, "repos_key") {
+			return true
+		}
+	}
+	return false
+}
+
+func hexConfigFiles() []string {
+	var paths []string
+	if v := os.Getenv("HEX_HOME"); v != "" {
+		paths = append(paths, filepath.Join(v, "hex.config"))
+	}
+	if v := os.Getenv("XDG_CONFIG_HOME"); v != "" {
+		paths = append(paths, filepath.Join(v, "hex", "hex.config"))
+	}
+	if home, err := os.UserHomeDir(); err == nil && home != "" {
+		paths = append(paths,
+			filepath.Join(home, ".hex", "hex.config"),
+			filepath.Join(home, ".config", "hex", "hex.config"),
+		)
+	}
+	return paths
 }
 
 func firstQuoted(payload string) string {

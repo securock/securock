@@ -134,3 +134,70 @@ func TestParentConfigMustNotLookPublic(t *testing.T) {
 		t.Fatalf("parent private feed with user nuget.org must be unknown: %#v", deps)
 	}
 }
+
+func writeProject(t *testing.T, dir, config string) {
+	t.Helper()
+	raw, err := os.ReadFile(filepath.Join("testdata", "packages.lock.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "packages.lock.json"), raw, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if config != "" {
+		if err := os.WriteFile(filepath.Join(dir, "nuget.config"), []byte(config), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
+func TestUnreadableSourceUnknown(t *testing.T) {
+	isolate(t)
+	dir := t.TempDir()
+	writeProject(t, dir, `<?xml version="1.0"?><configuration><packageSources>
+  <add key="nuget.org" value="https://api.nuget.org/v3/index.json" />
+  <add key="local" value="./local-feed" />
+</packageSources></configuration>`)
+	deps, err := nuget.New().Dependencies(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(deps) != 1 || deps[0].Registry != "" {
+		t.Fatalf("local feed next to nuget.org must be unknown: %#v", deps)
+	}
+}
+
+func TestDisabledPrivateSourceIgnored(t *testing.T) {
+	isolate(t)
+	dir := t.TempDir()
+	writeProject(t, dir, `<?xml version="1.0"?><configuration><packageSources>
+  <add key="nuget.org" value="https://api.nuget.org/v3/index.json" />
+  <add key="company" value="https://nuget.company.example/v3/index.json" />
+</packageSources><disabledPackageSources><add key="company" value="true" /></disabledPackageSources></configuration>`)
+	deps, err := nuget.New().Dependencies(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(deps) != 1 || deps[0].Registry != "https://api.nuget.org" {
+		t.Fatalf("disabled feed must not taint provenance: %#v", deps)
+	}
+}
+
+func TestMSBuildRestoreSourcesUnknown(t *testing.T) {
+	isolate(t)
+	dir := t.TempDir()
+	writeProject(t, dir, `<?xml version="1.0"?><configuration><packageSources>
+  <add key="nuget.org" value="https://api.nuget.org/v3/index.json" />
+</packageSources></configuration>`)
+	props := `<Project><PropertyGroup><RestoreSources>https://nuget.company.example/v3/index.json</RestoreSources></PropertyGroup></Project>`
+	if err := os.WriteFile(filepath.Join(dir, "Directory.Build.props"), []byte(props), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	deps, err := nuget.New().Dependencies(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(deps) != 1 || deps[0].Registry != "" {
+		t.Fatalf("msbuild source override must be unknown: %#v", deps)
+	}
+}

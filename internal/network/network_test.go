@@ -318,3 +318,9 @@ func TestProvenance(t *testing.T) {
 		t.Fatalf("single private = %q", got)
 	}
 }
+
+func TestProvenanceUnreadableSourceUnknown(t *testing.T) {
+	if got := network.Provenance("nuget", []string{"https://api.nuget.org/v3/index.json", "./local-feed"}); got != "" {
+		t.Fatalf("unreadable source = %q", got)
+	}
+}
