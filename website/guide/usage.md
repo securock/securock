@@ -18,6 +18,7 @@ verified.
 | `--network` | `public-only` (default), `offline`, or `allow-all` |
 | `--offline` | Skip remote lookups; remote evidence stays `unknown` |
 | `--policy` | Path to a policy file |
+| `--profile` | Built-in policy: `default` or `strict` (not with `--policy`) |
 | `--lock` | Path to `securock.lock` (for `lock` / `diff` / `verify`) |
 | `--format` | `text` (default) or `json` |
 | `--no-fail` | Always exit `0` |

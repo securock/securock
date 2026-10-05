@@ -16,7 +16,7 @@ func newLockCommand(opts *options) *cobra.Command {
 		Args:  cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			path := projectPath(args)
-			pol, err := policy.Load(opts.policy)
+			pol, err := policy.LoadWithProfile(opts.policy, opts.profile)
 			if err != nil {
 				return opErr(err)
 			}

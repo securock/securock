@@ -23,7 +23,7 @@ func newExplainCommand(opts *options) *cobra.Command {
 				path = args[1]
 			}
 
-			pol, err := policy.Load(opts.policy)
+			pol, err := policy.LoadWithProfile(opts.policy, opts.profile)
 			if err != nil {
 				return opErr(err)
 			}

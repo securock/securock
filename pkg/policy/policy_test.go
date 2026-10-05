@@ -18,6 +18,39 @@ func TestFingerprintDefaultGolden(t *testing.T) {
 	}
 }
 
+func TestStrictProfile(t *testing.T) {
+	doc, err := policy.Profile("strict")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := policy.Validate(doc); err != nil {
+		t.Fatal(err)
+	}
+	if !doc.Rules.RequireDigest {
+		t.Fatal("strict must require digest")
+	}
+	if doc.Rules.Provenance.Minimum != "verified" || doc.Rules.Signature.Minimum != "verified" {
+		t.Fatalf("strict evidence floors = %+v", doc.Rules)
+	}
+	fp, err := policy.Fingerprint(doc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	def, err := policy.Fingerprint(policy.Default())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if fp == def {
+		t.Fatal("strict fingerprint must differ from default")
+	}
+}
+
+func TestProfileUnknown(t *testing.T) {
+	if _, err := policy.Profile("paranoid"); err == nil {
+		t.Fatal("expected unknown profile error")
+	}
+}
+
 func TestFingerprintStable(t *testing.T) {
 	a, err := policy.Fingerprint(policy.Default())
 	if err != nil {

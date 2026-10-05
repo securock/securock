@@ -93,6 +93,34 @@ func Default() Document {
 	}
 }
 
+// Strict is a built-in profile that requires lockfile digests and
+// cryptographically verified provenance and signatures.
+func Strict() Document {
+	return Document{
+		Version: SchemaVersion,
+		Network: Network{Mode: ModePublicOnly},
+		Rules: Rules{
+			RequireNoVulnerabilities: true,
+			RequireNoMalicious:       true,
+			RequireDigest:            true,
+			Provenance:               EvidenceRule{Minimum: "verified"},
+			Signature:                EvidenceRule{Minimum: "verified"},
+		},
+	}
+}
+
+// Profile returns a built-in policy by name.
+func Profile(name string) (Document, error) {
+	switch name {
+	case "", "default":
+		return Default(), nil
+	case "strict":
+		return Strict(), nil
+	default:
+		return Document{}, fmt.Errorf("unknown policy profile %q", name)
+	}
+}
+
 func (n Network) ResolvedMode() Mode {
 	if n.Mode == "" {
 		return ModePublicOnly

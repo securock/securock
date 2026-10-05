@@ -14,6 +14,7 @@ type options struct {
 	format   string
 	lockPath string
 	policy   string
+	profile  string
 	noFail   bool
 }
 
@@ -35,6 +36,7 @@ func NewRoot(version, commit, date string) *cobra.Command {
 	root.PersistentFlags().StringVar(&opts.format, "format", "text", "output format: text or json")
 	root.PersistentFlags().StringVar(&opts.lockPath, "lock", "", "path to securock.lock")
 	root.PersistentFlags().StringVar(&opts.policy, "policy", "", "path to a policy file")
+	root.PersistentFlags().StringVar(&opts.profile, "profile", "", "built-in policy profile: default or strict")
 	root.PersistentFlags().BoolVar(&opts.noFail, "no-fail", false, "always exit 0")
 
 	root.AddCommand(newScanCommand(opts))

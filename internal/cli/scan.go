@@ -25,7 +25,7 @@ func newScanCommand(opts *options) *cobra.Command {
 }
 
 func runScan(cmd *cobra.Command, opts *options, path string) error {
-	pol, err := policy.Load(opts.policy)
+	pol, err := policy.LoadWithProfile(opts.policy, opts.profile)
 	if err != nil {
 		return opErr(err)
 	}

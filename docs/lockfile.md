@@ -24,7 +24,7 @@ checklist for one package: digest, source, provenance, signature, trust
 chain, ownership, capabilities, vulnerabilities, and malicious-package
 reports.
 
-Shared flags: `--offline`, `--network`, `--policy`, `--lock`,
+Shared flags: `--offline`, `--network`, `--policy`, `--profile`, `--lock`,
 `--format`, `--no-fail`.
 
 Exit codes:

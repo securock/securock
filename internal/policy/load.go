@@ -11,8 +11,24 @@ import (
 )
 
 func Load(path string) (policy.Document, error) {
+	return LoadWithProfile(path, "")
+}
+
+// LoadWithProfile loads a policy file or a built-in profile.
+// path and profile are mutually exclusive when both are non-empty.
+func LoadWithProfile(path, profile string) (policy.Document, error) {
+	if path != "" && profile != "" {
+		return policy.Document{}, fmt.Errorf("--policy and --profile are mutually exclusive")
+	}
 	if path == "" {
-		return policy.Default(), nil
+		doc, err := policy.Profile(profile)
+		if err != nil {
+			return policy.Document{}, err
+		}
+		if err := policy.Validate(doc); err != nil {
+			return policy.Document{}, fmt.Errorf("validate policy: %w", err)
+		}
+		return doc, nil
 	}
 
 	raw, err := os.ReadFile(path)

@@ -77,6 +77,15 @@ rules:
     minimum: verified
 ```
 
+Or use the built-in strict profile:
+
+```bash
+securock verify --profile strict
+```
+
+`strict` requires digests plus `provenance` / `signature` minimum
+`verified`. It is mutually exclusive with `--policy`.
+
 npm collection verifies registry ECDSA signatures against
 `/-/npm/v1/keys` and Sigstore provenance bundles against the public-good
 trusted root. Both require the lockfile digest to match the signed

@@ -119,6 +119,7 @@ directory is that snapshot.
 | `--network public-only` | Default. Public registries only (`offline`, `allow-all` also valid) |
 | `--offline` | Skip remote lookups; remote evidence stays `unknown` |
 | `--policy` | Path to a policy file |
+| `--profile` | Built-in policy profile: `default` or `strict` (not with `--policy`) |
 | `--lock` | Path to `securock.lock` (for `lock` / `diff` / `verify`) |
 | `--format json` | Stable JSON on `scan`, `diff`, `verify`, and `explain` |
 | `--no-fail` | Always exit `0` |
