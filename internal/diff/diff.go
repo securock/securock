@@ -25,7 +25,10 @@ type Side struct {
 	Artifacts      []string                    `json:"artifacts,omitempty"`
 	Requested      []string                    `json:"requested,omitempty"`
 	Resolved       []string                    `json:"resolved,omitempty"`
-	Capabilities lockfile.CapabilityEvidence `json:"capabilities,omitempty"`
+	Capabilities   lockfile.CapabilityEvidence `json:"capabilities,omitempty"`
+	Publisher      string                      `json:"publisher,omitempty"`
+	Maintainers    []string                    `json:"maintainers,omitempty"`
+	OwnershipState lockfile.CapState           `json:"ownership_state,omitempty"`
 }
 
 type Change struct {
@@ -150,6 +153,7 @@ func Write(w io.Writer, r Result) {
 		writeField(w, "requested", join(c.Before.Requested), join(c.After.Requested), false)
 		writeField(w, "resolved", join(c.Before.Resolved), join(c.After.Resolved), false)
 		writeCapabilities(w, c.Before.Capabilities, c.After.Capabilities)
+		writeOwnership(w, c.Before, c.After)
 	}
 
 	if r.TrustDrift() {
@@ -180,6 +184,7 @@ func sideOf(arts []lockfile.Artifact) Side {
 		Capabilities: lockfile.CapabilityEvidence{
 			State: lockfile.CapUnknown,
 		},
+		OwnershipState: lockfile.CapUnknown,
 	}
 	if len(arts) == 0 {
 		return s
@@ -188,6 +193,8 @@ func sideOf(arts []lockfile.Artifact) Side {
 	s.Signature = arts[0].Evidence.Signature
 	s.Trust = arts[0].Trust.Status
 	s.Capabilities = arts[0].Evidence.Capabilities
+	s.OwnershipState = arts[0].Evidence.Ownership.State
+	var publishers []string
 	for _, art := range arts {
 		if art.Version != "" {
 			s.Versions = append(s.Versions, art.Version)
@@ -204,6 +211,11 @@ func sideOf(arts []lockfile.Artifact) Side {
 		s.Trust = worstTrust(s.Trust, art.Trust.Status)
 		s.TrustReason = append(s.TrustReason, art.Trust.Reasons...)
 		s.Capabilities = mergeCapabilities(s.Capabilities, art.Evidence.Capabilities)
+		s.OwnershipState = worstCap(s.OwnershipState, art.Evidence.Ownership.State)
+		if art.Evidence.Ownership.Publisher != "" {
+			publishers = append(publishers, art.Evidence.Ownership.Publisher)
+		}
+		s.Maintainers = append(s.Maintainers, art.Evidence.Ownership.Maintainers...)
 		if art.Source.Kind != "" {
 			s.Kinds = append(s.Kinds, art.Source.Kind)
 		}
@@ -220,6 +232,9 @@ func sideOf(arts []lockfile.Artifact) Side {
 			s.Resolved = append(s.Resolved, art.Source.Resolved)
 		}
 	}
+	slices.Sort(publishers)
+	publishers = slices.Compact(publishers)
+	s.Publisher = strings.Join(publishers, ", ")
 	slices.Sort(s.Versions)
 	s.Versions = slices.Compact(s.Versions)
 	slices.Sort(s.Digests)
@@ -228,6 +243,8 @@ func sideOf(arts []lockfile.Artifact) Side {
 	s.Vulns = slices.Compact(s.Vulns)
 	slices.Sort(s.TrustReason)
 	s.TrustReason = slices.Compact(s.TrustReason)
+	slices.Sort(s.Maintainers)
+	s.Maintainers = slices.Compact(s.Maintainers)
 	slices.Sort(s.Requested)
 	s.Requested = slices.Compact(s.Requested)
 	slices.Sort(s.Resolved)
@@ -251,7 +268,10 @@ func changed(a, b Side) bool {
 		a.Trust != b.Trust ||
 		join(a.TrustReason) != join(b.TrustReason) ||
 		sourceChanged(a, b) ||
-		!capabilitiesEqual(a.Capabilities, b.Capabilities)
+		!capabilitiesEqual(a.Capabilities, b.Capabilities) ||
+		a.OwnershipState != b.OwnershipState ||
+		a.Publisher != b.Publisher ||
+		join(a.Maintainers) != join(b.Maintainers)
 }
 
 func trustRelevant(a, b Side) bool {
@@ -445,6 +465,34 @@ func writeCapFS(w io.Writer, before, after lockfile.FilesystemAccess) {
 	fmt.Fprintf(w, "    %-14s%s → %s\n", "filesystem", b, a)
 }
 
+func writeOwnership(w io.Writer, before, after Side) {
+	if before.OwnershipState == after.OwnershipState &&
+		before.Publisher == after.Publisher &&
+		join(before.Maintainers) == join(after.Maintainers) {
+		return
+	}
+	if before.Publisher != after.Publisher {
+		bp := before.Publisher
+		ap := after.Publisher
+		if bp == "" {
+			bp = "(none)"
+		}
+		if ap == "" {
+			ap = "(none)"
+		}
+		fmt.Fprintf(w, "  publisher     %s → %s\n", bp, ap)
+	}
+	removed, added := listDelta(before.Maintainers, after.Maintainers)
+	for _, name := range removed {
+		fmt.Fprintf(w, "  maintainer removed: %s\n", name)
+	}
+	for _, name := range added {
+		fmt.Fprintf(w, "  maintainer added: %s\n", name)
+	}
+	if before.OwnershipState != after.OwnershipState {
+		fmt.Fprintf(w, "  ownership     %s → %s\n", before.OwnershipState, after.OwnershipState)
+	}
+}
 
 func boolLabel(v *bool) (string, bool) {
 	if v == nil {
@@ -463,6 +511,27 @@ func fsLabel(v lockfile.FilesystemAccess) string {
 	return string(v)
 }
 
+func listDelta(before, after []string) (removed, added []string) {
+	bset := make(map[string]struct{}, len(before))
+	aset := make(map[string]struct{}, len(after))
+	for _, v := range before {
+		bset[v] = struct{}{}
+	}
+	for _, v := range after {
+		aset[v] = struct{}{}
+	}
+	for _, v := range before {
+		if _, ok := aset[v]; !ok {
+			removed = append(removed, v)
+		}
+	}
+	for _, v := range after {
+		if _, ok := bset[v]; !ok {
+			added = append(added, v)
+		}
+	}
+	return removed, added
+}
 
 func displayName(artifactID string) string {
 	_, name, ok := strings.Cut(artifactID, ":")

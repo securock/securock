@@ -77,6 +77,17 @@ func validateArtifact(art Artifact) error {
 	if !slices.Contains(filesystems, art.Evidence.Capabilities.Filesystem) {
 		return fmt.Errorf("unknown filesystem capability %q", art.Evidence.Capabilities.Filesystem)
 	}
+	if art.Evidence.Ownership.State == "" {
+		return fmt.Errorf("missing ownership state")
+	}
+	if !slices.Contains(capStates, art.Evidence.Ownership.State) {
+		return fmt.Errorf("unknown ownership state %q", art.Evidence.Ownership.State)
+	}
+	for _, name := range art.Evidence.Ownership.Maintainers {
+		if name == "" {
+			return fmt.Errorf("missing maintainer name")
+		}
+	}
 	if !slices.Contains(statuses, art.Trust.Status) {
 		return fmt.Errorf("unknown trust status %q", art.Trust.Status)
 	}

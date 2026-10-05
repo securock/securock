@@ -19,7 +19,9 @@ func TestNPMEvidence(t *testing.T) {
 		case "/react/19.2.0":
 			w.Write([]byte(`{
 				"dist":{"signatures":[{"keyid":"abc","sig":"def"}],"tarball":"http://example.invalid/react.tgz"},
-				"hasInstallScript": false
+				"hasInstallScript": false,
+				"_npmUser":{"name":"alice","email":"alice@example.com"},
+				"maintainers":[{"name":"alice"},{"name":"bob"}]
 			}`))
 		case "/-/npm/v1/attestations/leftpad@1.0.0":
 			http.NotFound(w, r)
@@ -27,7 +29,8 @@ func TestNPMEvidence(t *testing.T) {
 			w.Write([]byte(`{
 				"dist":{},
 				"hasInstallScript": true,
-				"scripts":{"postinstall":"node install.js"}
+				"scripts":{"postinstall":"node install.js"},
+				"maintainers":[{"name":"leftpad-owner"}]
 			}`))
 		default:
 			http.NotFound(w, r)
@@ -53,6 +56,9 @@ func TestNPMEvidence(t *testing.T) {
 	react := got[evidence.Key(ecosystem.Dependency{Ecosystem: "npm", Name: "react", Version: "19.2.0"})]
 	if react.Provenance != lockfile.EvidencePresent || react.Signature != lockfile.EvidencePresent {
 		t.Fatalf("react = %+v", react)
+	}
+	if react.Ownership.State != lockfile.CapChecked || react.Ownership.Publisher != "alice <alice@example.com>" {
+		t.Fatalf("react ownership = %+v", react.Ownership)
 	}
 	if react.Capabilities.State != lockfile.CapChecked || react.Capabilities.InstallScripts == nil || *react.Capabilities.InstallScripts {
 		t.Fatalf("react capabilities = %+v", react.Capabilities)

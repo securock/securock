@@ -134,6 +134,9 @@ func Scan(ctx context.Context, opts Options) (*Result, error) {
 				Capabilities: lockfile.CapabilityEvidence{
 					State: lockfile.CapUnknown,
 				},
+				Ownership: lockfile.OwnershipEvidence{
+					State: lockfile.CapUnknown,
+				},
 			},
 		}
 		key := ecosystem.Identity(dep)
@@ -142,6 +145,9 @@ func Scan(ctx context.Context, opts Options) (*Result, error) {
 			art.Evidence.Signature = rec.Signature
 			if rec.Capabilities.State != "" {
 				art.Evidence.Capabilities = rec.Capabilities
+			}
+			if rec.Ownership.State != "" {
+				art.Evidence.Ownership = rec.Ownership
 			}
 		}
 		if allowed[key] {

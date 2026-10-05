@@ -9,8 +9,8 @@ fail CI:
   in `securock.lock`
 - **Artifact modification** — the digest for a subject changes
 - **Trust-state changes** — provenance, signature, vulnerability IDs,
-  capabilities, trust status, or trust reasons drift between lock and
-  the current tree
+  capabilities, ownership (publisher/maintainers), trust status, or
+  trust reasons drift between lock and the current tree
 - **Known vulnerable dependency changes** — OSV reports an advisory for
   a locked or updated artifact when the default policy is enabled
 - **Package-manager disguise** — switching npm ↔ pnpm does not rewrite
@@ -24,6 +24,7 @@ fail CI:
 - zero-day or undisclosed malicious code in a package that OSV does not
   list
 - compromised maintainer accounts that publish a new "trusted" version
+  without a detectable ownership change in registry metadata
 - typosquatting unless the new subject is caught as an addition against
   an existing lockfile
 - runtime integrity after install (memory, disk, or container attacks)

@@ -95,6 +95,9 @@ func (c *NPM) lookup(ctx context.Context, dep ecosystem.Dependency) Record {
 		Capabilities: lockfile.CapabilityEvidence{
 			State: lockfile.CapUnknown,
 		},
+		Ownership: lockfile.OwnershipEvidence{
+			State: lockfile.CapUnknown,
+		},
 	}
 
 	meta, ok := c.versionMeta(ctx, dep)
@@ -102,6 +105,7 @@ func (c *NPM) lookup(ctx context.Context, dep ecosystem.Dependency) Record {
 		return rec
 	}
 	rec.Signature = meta.Signature
+	rec.Ownership = meta.Ownership
 
 	findings := capability.FromMetadata(meta.Capability)
 	if !c.SkipTarball && meta.Tarball != "" {
@@ -117,6 +121,7 @@ func (c *NPM) lookup(ctx context.Context, dep ecosystem.Dependency) Record {
 
 type versionMeta struct {
 	Signature  lockfile.EvidenceState
+	Ownership  lockfile.OwnershipEvidence
 	Capability capability.Metadata
 	Tarball    string
 }
@@ -133,6 +138,7 @@ func (c *NPM) versionMeta(ctx context.Context, dep ecosystem.Dependency) (versio
 	case http.StatusNotFound:
 		return versionMeta{
 			Signature: lockfile.EvidenceMissing,
+			Ownership: lockfile.OwnershipEvidence{State: lockfile.CapChecked},
 		}, true
 	case http.StatusOK:
 	default:
@@ -149,6 +155,19 @@ func (c *NPM) versionMeta(ctx context.Context, dep ecosystem.Dependency) (versio
 		sig = lockfile.EvidencePresent
 	}
 
+	owner := lockfile.OwnershipEvidence{State: lockfile.CapChecked}
+	if parsed.NPMUser != nil {
+		owner.Publisher = identityName(parsed.NPMUser.Name, parsed.NPMUser.Email)
+	}
+	if owner.Publisher == "" && parsed.Author.Person != nil {
+		owner.Publisher = identityName(parsed.Author.Person.Name, parsed.Author.Person.Email)
+	}
+	for _, m := range parsed.Maintainers {
+		if id := identityName(m.Name, m.Email); id != "" {
+			owner.Maintainers = append(owner.Maintainers, id)
+		}
+	}
+
 	capMeta := capability.Metadata{
 		HasInstallScript: parsed.HasInstallScript,
 		Scripts:          parsed.Scripts,
@@ -162,6 +181,7 @@ func (c *NPM) versionMeta(ctx context.Context, dep ecosystem.Dependency) (versio
 
 	return versionMeta{
 		Signature:  sig,
+		Ownership:  owner,
 		Capability: capMeta,
 		Tarball:    parsed.Dist.Tarball,
 	}, true
@@ -295,14 +315,45 @@ type npmVersionDoc struct {
 	OptionalDependencies map[string]string `json:"optionalDependencies"`
 	BundleDependencies   softStringList    `json:"bundleDependencies"`
 	Files                []string          `json:"files"`
+	Maintainers          []npmPerson       `json:"maintainers"`
+	Author               softPerson        `json:"author"`
+	NPMUser              *npmPerson        `json:"_npmUser"`
 	Dist                 struct {
 		Signatures []json.RawMessage `json:"signatures"`
 		Tarball    string            `json:"tarball"`
 	} `json:"dist"`
 }
 
+type npmPerson struct {
+	Name  string `json:"name"`
+	Email string `json:"email"`
+}
 
+type softPerson struct {
+	Person *npmPerson
+}
 
+func (p *softPerson) UnmarshalJSON(raw []byte) error {
+	raw = bytes.TrimSpace(raw)
+	if len(raw) == 0 || string(raw) == "null" {
+		return nil
+	}
+	if raw[0] == '"' {
+		var s string
+		if err := json.Unmarshal(raw, &s); err != nil {
+			return err
+		}
+		name, email := splitPerson(s)
+		p.Person = &npmPerson{Name: name, Email: email}
+		return nil
+	}
+	var person npmPerson
+	if err := json.Unmarshal(raw, &person); err != nil {
+		return err
+	}
+	p.Person = &person
+	return nil
+}
 
 type softStringList []string
 
@@ -323,8 +374,40 @@ func (s *softStringList) UnmarshalJSON(raw []byte) error {
 	return nil
 }
 
+func splitPerson(s string) (name, email string) {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return "", ""
+	}
+	if i := strings.Index(s, "<"); i >= 0 {
+		j := strings.Index(s[i:], ">")
+		if j > 1 {
+			email = strings.TrimSpace(s[i+1 : i+j])
+			name = strings.TrimSpace(s[:i])
+			return name, email
+		}
+	}
+	if strings.Contains(s, "@") && !strings.Contains(s, " ") {
+		return "", s
+	}
+	return s, ""
+}
 
 
+func identityName(name, email string) string {
+	name = strings.TrimSpace(name)
+	email = strings.TrimSpace(email)
+	switch {
+	case name != "" && email != "":
+		return name + " <" + email + ">"
+	case name != "":
+		return name
+	case email != "":
+		return email
+	default:
+		return ""
+	}
+}
 
 func encodeNPMName(name string) string {
 	if i := strings.Index(name, "/"); i > 0 {

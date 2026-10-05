@@ -18,6 +18,7 @@ func validEvidence() lockfile.Evidence {
 			State: lockfile.VulnUnknown,
 		},
 		Capabilities: lockfile.CapabilityEvidence{State: lockfile.CapUnknown},
+		Ownership:    lockfile.OwnershipEvidence{State: lockfile.CapUnknown},
 	}
 }
 
@@ -66,7 +67,8 @@ func TestEncodeDeterministic(t *testing.T) {
 						},
 					},
 					Capabilities: lockfile.CapabilityEvidence{State: lockfile.CapUnknown},
-							},
+					Ownership:    lockfile.OwnershipEvidence{State: lockfile.CapUnknown},
+				},
 				Trust: lockfile.Trust{Status: lockfile.StatusTrusted},
 			},
 			{

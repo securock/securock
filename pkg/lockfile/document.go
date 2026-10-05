@@ -71,10 +71,11 @@ type Artifact struct {
 }
 
 type Evidence struct {
-	Provenance      EvidenceState      `json:"provenance" yaml:"provenance"`
-	Signature       EvidenceState      `json:"signature" yaml:"signature"`
-	Vulnerabilities VulnEvidence       `json:"vulnerabilities" yaml:"vulnerabilities"`
-	Capabilities    CapabilityEvidence `json:"capabilities" yaml:"capabilities"`
+	Provenance      EvidenceState        `json:"provenance" yaml:"provenance"`
+	Signature       EvidenceState        `json:"signature" yaml:"signature"`
+	Vulnerabilities VulnEvidence         `json:"vulnerabilities" yaml:"vulnerabilities"`
+	Capabilities    CapabilityEvidence   `json:"capabilities" yaml:"capabilities"`
+	Ownership       OwnershipEvidence    `json:"ownership" yaml:"ownership"`
 }
 
 type VulnEvidence struct {
@@ -112,6 +113,12 @@ type CapabilityEvidence struct {
 	Shell          *bool            `json:"shell,omitempty" yaml:"shell,omitempty"`
 	NativeCode     *bool            `json:"native_code,omitempty" yaml:"native_code,omitempty"`
 	InstallScripts *bool            `json:"install_scripts,omitempty" yaml:"install_scripts,omitempty"`
+}
+
+type OwnershipEvidence struct {
+	State       CapState `json:"state" yaml:"state"`
+	Publisher   string   `json:"publisher,omitempty" yaml:"publisher,omitempty"`
+	Maintainers []string `json:"maintainers,omitempty" yaml:"maintainers,omitempty"`
 }
 
 type Trust struct {

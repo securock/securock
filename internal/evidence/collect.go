@@ -11,6 +11,7 @@ type Record struct {
 	Provenance   lockfile.EvidenceState
 	Signature    lockfile.EvidenceState
 	Capabilities lockfile.CapabilityEvidence
+	Ownership    lockfile.OwnershipEvidence
 }
 
 type Collector interface {

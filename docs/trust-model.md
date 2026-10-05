@@ -52,7 +52,7 @@ rules:
 v0.1 npm collection can emit `present`, never `verified`. `verified`
 is reserved for Sigstore and registry-key verification.
 
-Offline scans leave provenance, signature, capability, and
+Offline scans leave provenance, signature, capability, ownership, and
 vulnerability state as `unknown`. That is not a clean bill of health.
 
 Private registries are not queried in the default `public-only`
@@ -67,6 +67,7 @@ network mode. See [Privacy](privacy.md).
 | provenance | npm provenance attestation present | `unknown` |
 | signature | npm `dist.signatures` present | `unknown` |
 | capabilities | registry metadata + package source heuristics | `unknown` |
+| ownership | npm publisher (`_npmUser`) and maintainers | `unknown` |
 
 Capability detection for npm uses install-script and native-build
 metadata, then a deterministic scan of published JS/TS sources for

@@ -22,7 +22,8 @@ func TestURLArtifactOmitsVersion(t *testing.T) {
         "provenance": "unknown",
         "signature": "unknown",
         "vulnerabilities": { "state": "unknown" },
-        "capabilities": { "state": "unknown" }
+        "capabilities": { "state": "unknown" },
+        "ownership": { "state": "unknown" }
       },
       "trust": { "status": "unknown" }
     }
@@ -43,7 +44,8 @@ func TestNPMArtifactRequiresVersion(t *testing.T) {
         "provenance": "unknown",
         "signature": "unknown",
         "vulnerabilities": { "state": "unknown" },
-        "capabilities": { "state": "unknown" }
+        "capabilities": { "state": "unknown" },
+        "ownership": { "state": "unknown" }
       },
       "trust": { "status": "unknown" }
     }
@@ -117,7 +119,8 @@ func TestRejectsUnknownArtifactField(t *testing.T) {
         "provenance": "unknown",
         "signature": "unknown",
         "vulnerabilities": { "state": "unknown" },
-        "capabilities": { "state": "unknown" }
+        "capabilities": { "state": "unknown" },
+        "ownership": { "state": "unknown" }
       },
       "trust": { "status": "unknown" }
     }

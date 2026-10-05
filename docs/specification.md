@@ -52,6 +52,8 @@ artifacts:
         state: unknown
       capabilities:
         state: unknown
+      ownership:
+        state: unknown
     trust:
       status: unknown
       reasons:
@@ -79,9 +81,10 @@ A change to `source.kind`, `source.registry`, `source.artifact`,
 name, version, and digest stay the same.
 
 `capabilities` records observed package abilities (network, filesystem,
-environment, shell, native code, install scripts). Use `state: checked`
-when collected and `unknown` when skipped (offline or non-npm). A change
-to capabilities is trust drift.
+environment, shell, native code, install scripts). `ownership` records
+the publisher and maintainers. Both use `state: checked` when collected
+and `unknown` when skipped (offline or non-npm). A change to either is
+trust drift.
 
 URL artifacts may omit `version`. Their identity is `subject.name`
 (the requested URL). Do not encode a URL into `version`; that makes
@@ -132,6 +135,7 @@ states, and trust statuses are errors.
 - YAML 1.2, 2-space indentation
 - artifacts sorted by subject `ecosystem`, then `name`, then `version`, then resolver
 - vulnerability ids sorted lexicographically
+- ownership maintainers sorted lexicographically
 - trust reasons sorted lexicographically
 - empty optional collections omitted
 
@@ -139,4 +143,4 @@ Evidence states are `unknown`, `missing`, `present`, and `verified`.
 `present` means the evidence was observed. `verified` is reserved for
 cryptographic verification.
 
-Capability states are `unknown` and `checked`.
+Capability and ownership states are `unknown` and `checked`.

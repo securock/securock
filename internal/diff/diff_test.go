@@ -355,6 +355,44 @@ func TestCompareCapabilityDrift(t *testing.T) {
 	}
 }
 
+func TestCompareOwnershipDrift(t *testing.T) {
+	locked := lockfile.Document{Artifacts: []lockfile.Artifact{
+		{
+			Subject: lockfile.Subject{Ecosystem: "npm", Name: "lodash"},
+			Version: "4.17.21",
+			Evidence: lockfile.Evidence{
+				Ownership: lockfile.OwnershipEvidence{
+					State:       lockfile.CapChecked,
+					Publisher:   "alice",
+					Maintainers: []string{"alice", "bob"},
+				},
+			},
+		},
+	}}
+	current := lockfile.Document{Artifacts: []lockfile.Artifact{
+		{
+			Subject: lockfile.Subject{Ecosystem: "npm", Name: "lodash"},
+			Version: "4.17.21",
+			Evidence: lockfile.Evidence{
+				Ownership: lockfile.OwnershipEvidence{
+					State:       lockfile.CapChecked,
+					Publisher:   "unknown-account-392",
+					Maintainers: []string{"alice", "bob", "random-user"},
+				},
+			},
+		},
+	}}
+	got := diff.Compare(locked, current)
+	if !got.TrustDrift() {
+		t.Fatal("ownership drift must be trust drift")
+	}
+	var buf bytes.Buffer
+	diff.Write(&buf, got)
+	out := buf.String()
+	if !strings.Contains(out, "publisher") || !strings.Contains(out, "maintainer added: random-user") {
+		t.Fatalf("missing ownership markers:\n%s", out)
+	}
+}
 
 func TestCompareSourceKindDrift(t *testing.T) {
 	locked := lockfile.Document{Artifacts: []lockfile.Artifact{

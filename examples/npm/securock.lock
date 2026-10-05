@@ -23,6 +23,8 @@ artifacts:
         state: unknown
       capabilities:
         state: unknown
+      ownership:
+        state: unknown
     trust:
       status: unknown
       reasons:

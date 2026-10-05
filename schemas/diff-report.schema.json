@@ -3,184 +3,78 @@
   "$id": "https://securock.dev/schema/diff-report.schema.json",
   "title": "securock diff/verify report",
   "type": "object",
-  "required": [
-    "schema_version",
-    "trust_drift"
-  ],
+  "required": ["schema_version", "trust_drift"],
   "additionalProperties": false,
   "properties": {
-    "schema_version": {
-      "type": "integer",
-      "const": 1
-    },
-    "trust_drift": {
-      "type": "boolean"
-    },
+    "schema_version": { "type": "integer", "const": 1 },
+    "trust_drift": { "type": "boolean" },
     "policy": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "before": {
-          "type": "string"
-        },
-        "after": {
-          "type": "string"
-        }
+        "before": { "type": "string" },
+        "after": { "type": "string" }
       }
     },
     "added": {
       "type": "array",
-      "items": {
-        "type": "string"
-      }
+      "items": { "type": "string" }
     },
     "removed": {
       "type": "array",
-      "items": {
-        "type": "string"
-      }
+      "items": { "type": "string" }
     },
     "changes": {
       "type": "array",
-      "items": {
-        "$ref": "#/$defs/change"
-      }
+      "items": { "$ref": "#/$defs/change" }
     }
   },
   "$defs": {
     "change": {
       "type": "object",
-      "required": [
-        "artifact",
-        "subject",
-        "before",
-        "after"
-      ],
+      "required": ["artifact", "subject", "before", "after"],
       "additionalProperties": false,
       "properties": {
-        "artifact": {
-          "type": "string"
-        },
-        "subject": {
-          "type": "string"
-        },
-        "before": {
-          "$ref": "#/$defs/side"
-        },
-        "after": {
-          "$ref": "#/$defs/side"
-        }
+        "artifact": { "type": "string" },
+        "subject": { "type": "string" },
+        "before": { "$ref": "#/$defs/side" },
+        "after": { "$ref": "#/$defs/side" }
       }
     },
     "side": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "versions": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
-        "digests": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
-        "provenance": {
-          "type": "string"
-        },
-        "signature": {
-          "type": "string"
-        },
-        "vuln_state": {
-          "type": "string"
-        },
-        "vulnerabilities": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
-        "trust": {
-          "type": "string"
-        },
-        "reasons": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
-        "requested": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
-        "resolved": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
-        "kinds": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
-        "registries": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
-        "artifacts": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
-        "capabilities": {
-          "$ref": "#/$defs/capabilities"
-        }
+        "versions": { "type": "array", "items": { "type": "string" } },
+        "digests": { "type": "array", "items": { "type": "string" } },
+        "provenance": { "type": "string" },
+        "signature": { "type": "string" },
+        "vuln_state": { "type": "string" },
+        "vulnerabilities": { "type": "array", "items": { "type": "string" } },
+        "trust": { "type": "string" },
+        "reasons": { "type": "array", "items": { "type": "string" } },
+        "requested": { "type": "array", "items": { "type": "string" } },
+        "resolved": { "type": "array", "items": { "type": "string" } },
+        "kinds": { "type": "array", "items": { "type": "string" } },
+        "registries": { "type": "array", "items": { "type": "string" } },
+        "artifacts": { "type": "array", "items": { "type": "string" } },
+        "capabilities": { "$ref": "#/$defs/capabilities" },
+        "publisher": { "type": "string" },
+        "maintainers": { "type": "array", "items": { "type": "string" } },
+        "ownership_state": { "type": "string", "enum": ["unknown", "checked"] }
       }
     },
     "capabilities": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "state": {
-          "type": "string",
-          "enum": [
-            "unknown",
-            "checked"
-          ]
-        },
-        "network": {
-          "type": "boolean"
-        },
-        "filesystem": {
-          "type": "string",
-          "enum": [
-            "none",
-            "read",
-            "write"
-          ]
-        },
-        "environment": {
-          "type": "boolean"
-        },
-        "shell": {
-          "type": "boolean"
-        },
-        "native_code": {
-          "type": "boolean"
-        },
-        "install_scripts": {
-          "type": "boolean"
-        }
+        "state": { "type": "string", "enum": ["unknown", "checked"] },
+        "network": { "type": "boolean" },
+        "filesystem": { "type": "string", "enum": ["none", "read", "write"] },
+        "environment": { "type": "boolean" },
+        "shell": { "type": "boolean" },
+        "native_code": { "type": "boolean" },
+        "install_scripts": { "type": "boolean" }
       }
     }
   }
