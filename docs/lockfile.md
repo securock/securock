@@ -2,7 +2,7 @@
 
 `securock.lock` is the canonical trust snapshot for a project.
 
-See [specification.md](specification.md) for the v1 format.
+See [specification.md](specification.md) for the v2 format.
 
 ## Commands
 

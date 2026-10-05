@@ -9,7 +9,7 @@ import (
 )
 
 func FuzzRead(f *testing.F) {
-	f.Add([]byte("version: 1\nartifacts: []\n"))
+	f.Add([]byte("version: 2\nartifacts: []\n"))
 	f.Add([]byte("{\"version\":1,\"artifacts\":[]}"))
 	f.Fuzz(func(t *testing.T, data []byte) {
 		dir := t.TempDir()

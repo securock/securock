@@ -8,7 +8,7 @@ import (
 
 func TestCanonicalize(t *testing.T) {
 	doc := lockfile.Document{
-		Version: 1,
+		Version: lockfile.SchemaVersion,
 		Source: lockfile.Source{
 			Ecosystems: []string{"go", "npm", "npm"},
 		},
@@ -68,7 +68,7 @@ func TestURLArtifactIDOmitsEmptyVersion(t *testing.T) {
 
 func TestValidateAllowsEmptyURLVersion(t *testing.T) {
 	doc := lockfile.Document{
-		Version: 1,
+		Version: lockfile.SchemaVersion,
 		Artifacts: []lockfile.Artifact{
 			{
 				Subject: lockfile.Subject{Ecosystem: "url", Name: "https://esm.sh/preact"},
@@ -98,7 +98,7 @@ func TestValidateAllowsEmptyURLVersion(t *testing.T) {
 
 func TestValidateRejectsEmptyNPMVersion(t *testing.T) {
 	doc := lockfile.Document{
-		Version: 1,
+		Version: lockfile.SchemaVersion,
 		Artifacts: []lockfile.Artifact{
 			{
 				Subject: lockfile.Subject{Ecosystem: "npm", Name: "react"},
@@ -123,7 +123,7 @@ func TestValidateRejectsEmptyNPMVersion(t *testing.T) {
 
 func TestValidateRejectsUnknownSourceKind(t *testing.T) {
 	doc := lockfile.Document{
-		Version: 1,
+		Version: lockfile.SchemaVersion,
 		Artifacts: []lockfile.Artifact{
 			{
 				Subject: lockfile.Subject{Ecosystem: "npm", Name: "react"},

@@ -66,7 +66,7 @@ func TestEvaluateRequireProvenancePresent(t *testing.T) {
 	}
 	trust.Evaluate(&present, pol)
 	if present.Trust.Status != lockfile.StatusTrusted {
-		t.Fatalf("present provenance should satisfy v0.1 policy: %s", present.Trust.Status)
+		t.Fatalf("present provenance should satisfy policy: %s", present.Trust.Status)
 	}
 }
 

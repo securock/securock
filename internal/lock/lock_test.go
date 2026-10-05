@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/securock/securock/internal/lock"
@@ -28,7 +29,7 @@ func validEvidence() lockfile.Evidence {
 func TestWriteRead(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "securock.lock")
 	doc := lockfile.Document{
-		Version: 1,
+		Version: lockfile.SchemaVersion,
 		Artifacts: []lockfile.Artifact{
 			{
 				Subject:  lockfile.Subject{Ecosystem: "npm", Name: "react"},
@@ -53,7 +54,7 @@ func TestWriteRead(t *testing.T) {
 
 func TestEncodeDeterministic(t *testing.T) {
 	doc := lockfile.Document{
-		Version: 1,
+		Version: lockfile.SchemaVersion,
 		Source:  lockfile.Source{Ecosystems: []string{"npm", "go"}},
 		Artifacts: []lockfile.Artifact{
 			{
@@ -107,7 +108,7 @@ func TestEncodeDeterministic(t *testing.T) {
 
 func TestReadRejectsUnknownField(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "securock.lock")
-	if err := os.WriteFile(path, []byte("version: 1\nbanana: true\nartifacts: []\n"), 0o644); err != nil {
+	if err := os.WriteFile(path, []byte("version: 2\nbanana: true\nartifacts: []\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := lock.Read(path); err == nil {
@@ -115,9 +116,23 @@ func TestReadRejectsUnknownField(t *testing.T) {
 	}
 }
 
+func TestReadRejectsOutdatedVersion(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "securock.lock")
+	if err := os.WriteFile(path, []byte("version: 1\nartifacts: []\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	_, err := lock.Read(path)
+	if err == nil {
+		t.Fatal("expected outdated version to fail")
+	}
+	if !strings.Contains(err.Error(), "outdated") || !strings.Contains(err.Error(), "securock lock") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
 func TestReadRejectsUnknownEcosystem(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "securock.lock")
-	raw := []byte("version: 1\nartifacts:\n  - subject:\n      ecosystem: banana\n      name: x\n    version: \"1\"\n    evidence:\n      provenance: unknown\n      signature: unknown\n      vulnerabilities:\n        state: unknown\n    trust:\n      status: trusted\n")
+	raw := []byte("version: 2\nartifacts:\n  - subject:\n      ecosystem: banana\n      name: x\n    version: \"1\"\n    evidence:\n      provenance: unknown\n      signature: unknown\n      vulnerabilities:\n        state: unknown\n      malicious:\n        state: unknown\n      capabilities:\n        state: unknown\n      behavior:\n        state: unknown\n      ownership:\n        state: unknown\n      chain:\n        state: unknown\n    trust:\n      status: trusted\n")
 	if err := os.WriteFile(path, raw, 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -129,7 +144,7 @@ func TestReadRejectsUnknownEcosystem(t *testing.T) {
 func TestEncodeOmitsEmptyURLVersion(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "securock.lock")
 	doc := lockfile.Document{
-		Version: 1,
+		Version: lockfile.SchemaVersion,
 		Artifacts: []lockfile.Artifact{
 			{
 				Subject: lockfile.Subject{Ecosystem: "url", Name: "https://esm.sh/preact"},

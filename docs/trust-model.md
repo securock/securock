@@ -77,7 +77,7 @@ rules:
     minimum: verified
 ```
 
-v0.1 npm collection can emit `present`, never `verified`. `verified`
+v0.2 npm collection can emit `present`, never `verified`. `verified`
 is reserved for Sigstore and registry-key verification.
 
 Offline scans leave provenance, signature, capability, ownership,
@@ -111,7 +111,7 @@ full behavioral sandbox and may under-report obfuscated code.
 
 Trust chain evidence is extracted from npm provenance attestations
 (SLSA predicates). It records the claimed source repository, commit,
-builder identity, and workflow path when present. v0.1 records these
+builder identity, and workflow path when present. v0.2 records these
 fields for lock and drift; it does not cryptographically verify the
 attestation signature or rebuild the artifact from source.
 
@@ -119,7 +119,7 @@ Deno JSR and HTTPS URL artifacts record integrity from `deno.lock`.
 OSV does not cover those ecosystems yet, so vulnerability state stays
 `unknown`.
 
-v0.1 records presence only. It does not perform full Sigstore or
+v0.2 records presence only. It does not perform full Sigstore or
 registry-key cryptographic verification, so it will not emit
 `verified`.
 

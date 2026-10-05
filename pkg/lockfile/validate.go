@@ -18,6 +18,9 @@ var (
 
 func Validate(doc Document) error {
 	if doc.Version != SchemaVersion {
+		if doc.Version > 0 && doc.Version < SchemaVersion {
+			return fmt.Errorf("lockfile version %d is outdated; run `securock lock` to regenerate it as version %d", doc.Version, SchemaVersion)
+		}
 		return fmt.Errorf("unsupported lockfile version %d", doc.Version)
 	}
 	for _, eco := range doc.Source.Ecosystems {

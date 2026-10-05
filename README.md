@@ -115,7 +115,7 @@ The committed `securock.lock` in that directory is that snapshot.
 
 ```yaml
 # securock.lock (abridged)
-version: 1
+version: 2
 artifacts:
   - subject:
       ecosystem: npm

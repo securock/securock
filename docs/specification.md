@@ -16,7 +16,7 @@ must be stable across machines, clocks, and working directories.
 
 ## Forbidden fields
 
-The v1 lockfile must not contain:
+The lockfile must not contain:
 
 - timestamps such as `generated_at`
 - absolute filesystem paths
@@ -28,7 +28,7 @@ Those values change without a trust-relevant change in the project.
 ## Document
 
 ```yaml
-version: 1
+version: 2
 source:
   ecosystems:
     - npm
@@ -140,6 +140,9 @@ distinguishes PyPI files.
 
 Unknown lockfile fields, schema versions, ecosystems, evidence
 states, and trust statuses are errors.
+
+`version: 1` lockfiles from Securock v0.1.x are not accepted. Run
+`securock lock` to regenerate them as `version: 2`.
 
 ## Canonical encoding
 
