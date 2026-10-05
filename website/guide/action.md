@@ -17,7 +17,7 @@ jobs:
       - uses: securock/securock@<commit-sha>
         with:
           command: both
-          version: v0.2.0
+          version: v0.2.1
 ```
 
 `command` is `verify`, `diff`, or `both` (default). `offline: true`

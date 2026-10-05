@@ -2,7 +2,7 @@
 
 ```sh
 curl -fsSL https://securock.sh/install | sh
-curl -fsSL https://securock.sh/install | sh -s -- --version v0.2.0
+curl -fsSL https://securock.sh/install | sh -s -- --version v0.2.1
 
 brew tap securock/securock https://github.com/securock/securock
 brew install --HEAD securock
