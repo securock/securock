@@ -69,3 +69,8 @@ gh api repos/securock/securock/immutable-releases --jq .enabled
 ```bash
 ./scripts/check-rulesets.sh
 ```
+
+CI runs the same check. The Rulesets API needs Administration: Read,
+so set repository secret `RULESETS_TOKEN` to a fine-grained PAT with
+that permission. Without it, the job falls back to `GITHUB_TOKEN` and
+may fail with 403.

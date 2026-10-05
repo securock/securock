@@ -87,11 +87,12 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      administration: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Check ruleset drift
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Rulesets API needs Administration: Read, which GITHUB_TOKEN
+          # cannot grant. Prefer a fine-grained PAT in RULESETS_TOKEN.
+          GH_TOKEN: ${{ secrets.RULESETS_TOKEN != '' && secrets.RULESETS_TOKEN || secrets.GITHUB_TOKEN }}
           GITHUB_REPOSITORY: ${{ github.repository }}
         run: sh scripts/check-rulesets.sh
