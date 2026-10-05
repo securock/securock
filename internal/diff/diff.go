@@ -562,10 +562,10 @@ func orBool(a, b *bool) *bool {
 
 func worstFilesystem(a, b lockfile.FilesystemAccess) lockfile.FilesystemAccess {
 	order := map[lockfile.FilesystemAccess]int{
-		"":                        0,
-		lockfile.FilesystemNone:   1,
-		lockfile.FilesystemRead:   2,
-		lockfile.FilesystemWrite:  3,
+		"":                       0,
+		lockfile.FilesystemNone:  1,
+		lockfile.FilesystemRead:  2,
+		lockfile.FilesystemWrite: 3,
 	}
 	if order[b] > order[a] {
 		return b

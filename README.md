@@ -6,16 +6,17 @@ Language lockfiles pin versions. `securock.lock` pins the _trust
 decision_ you accepted for those versions.
 
 Securock records digest, provenance, signature, vulnerability,
-capability, ownership, and trust-chain evidence for each artifact, then fails CI when
-that trust state drifts.
+malicious-package, capability, behavior, ownership, and trust-chain
+evidence for each artifact, then fails CI when that trust state drifts.
 
 **Docs:** [securock.dev](https://securock.dev)
 
 **Status:** pre-1.0. All resolvers are stable. npm, pnpm, Yarn, Bun, and
-Deno collect provenance and signature evidence from the npm registry.
-Other resolvers query OSV when their package source can be proven public.
-Otherwise vulnerability evidence remains `unknown`, and their provenance
-and signature evidence stays `unknown`.
+Deno collect provenance, signature, capability, behavior, ownership, and
+trust-chain evidence from the npm registry. Other resolvers query OSV
+when their package source can be proven public. Otherwise vulnerability
+and malicious-package evidence remain `unknown`, and their npm-only
+evidence stays `unknown`.
 
 ## Why
 
@@ -38,6 +39,10 @@ not trusted.
 
 - Deterministic `securock.lock` (no timestamps, no absolute paths)
 - `diff` / `verify` on artifact identity, not just package name
+- npm evidence for provenance, signatures, capabilities, granular
+  behavior, ownership, and source→build→artifact trust chain
+- OpenSSF Malicious Packages (`MAL-*`) recorded separately from CVEs
+- `explain` prints a trust checklist for one package
 - Default network mode is `public-only`: private registries,
   `GOPRIVATE` / `GONOPROXY` modules (including `go env -w`), and custom
   or ambiguous `GOPROXY` lists stay on-machine ([privacy](docs/privacy.md))
@@ -89,9 +94,10 @@ securock diff --offline
 securock verify --offline   # fails until you accept the new tree
 ```
 
-`--offline` skips OSV. The default policy treats unchecked
-vulnerabilities as `unknown`, so the first `lock` needs `--no-fail`.
-The committed `securock.lock` in that directory is that snapshot.
+`--offline` skips OSV and registry lookups. The default policy treats
+unchecked vulnerabilities and malicious reports as `unknown`, so the
+first `lock` needs `--no-fail`. The committed `securock.lock` in that
+directory is that snapshot.
 
 ## Usage
 
@@ -106,9 +112,12 @@ The committed `securock.lock` in that directory is that snapshot.
 
 | Flag / exit | Meaning |
 | ----------- | ------- |
-| `--network public-only` | Default. Public registries only |
-| `--offline` | Skip remote lookups; vulnerabilities stay `unknown` |
-| `--format json` | Stable API on `scan`, `diff`, and `verify` |
+| `--network public-only` | Default. Public registries only (`offline`, `allow-all` also valid) |
+| `--offline` | Skip remote lookups; remote evidence stays `unknown` |
+| `--policy` | Path to a policy file |
+| `--lock` | Path to `securock.lock` (for `lock` / `diff` / `verify`) |
+| `--format json` | Stable JSON on `scan`, `diff`, `verify`, and `explain` |
+| `--no-fail` | Always exit `0` |
 | Exit `0` | Success / no trust drift |
 | `1` | Trust violation |
 | `2` | Configuration or operational error |
@@ -130,6 +139,8 @@ artifacts:
       signature: unknown
       vulnerabilities:
         state: unknown
+      malicious:
+        state: unknown
       capabilities:
         state: checked
         network: false
@@ -138,6 +149,8 @@ artifacts:
         shell: false
         native_code: false
         install_scripts: false
+      behavior:
+        state: checked
       ownership:
         state: checked
         publisher: alice <alice@example.com>
@@ -169,7 +182,7 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - uses: securock/securock@<commit-sha>
         with:
-          command: both
+          command: both # verify, diff, or both
 ```
 
 The action writes a trust report to `$GITHUB_STEP_SUMMARY` even when

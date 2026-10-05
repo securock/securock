@@ -1,8 +1,9 @@
 # Privacy
 
-Securock may send dependency names and versions to third parties when it
-looks up vulnerabilities and npm evidence. For npm capability scanning it
-may also download public package tarballs from the registry.
+Securock may send public dependency names and versions to third parties
+when it looks up vulnerabilities and npm evidence. For npm capability and
+behavior scanning it may also download public package tarballs from the
+registry.
 
 ## Default: public-only
 

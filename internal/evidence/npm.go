@@ -390,7 +390,6 @@ func splitPerson(s string) (name, email string) {
 	return s, ""
 }
 
-
 func identityName(name, email string) string {
 	name = strings.TrimSpace(name)
 	email = strings.TrimSpace(email)

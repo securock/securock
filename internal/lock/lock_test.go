@@ -18,7 +18,7 @@ func validEvidence() lockfile.Evidence {
 		Vulnerabilities: lockfile.VulnEvidence{
 			State: lockfile.VulnUnknown,
 		},
-		Malicious: lockfile.MaliciousEvidence{State: lockfile.VulnUnknown},
+		Malicious:    lockfile.MaliciousEvidence{State: lockfile.VulnUnknown},
 		Capabilities: lockfile.CapabilityEvidence{State: lockfile.CapUnknown},
 		Behavior:     lockfile.BehaviorEvidence{State: lockfile.CapUnknown},
 		Ownership:    lockfile.OwnershipEvidence{State: lockfile.CapUnknown},
@@ -63,7 +63,7 @@ func TestEncodeDeterministic(t *testing.T) {
 				Evidence: lockfile.Evidence{
 					Provenance: lockfile.EvidenceUnknown,
 					Signature:  lockfile.EvidenceUnknown,
-					Malicious: lockfile.MaliciousEvidence{State: lockfile.VulnUnknown},
+					Malicious:  lockfile.MaliciousEvidence{State: lockfile.VulnUnknown},
 					Vulnerabilities: lockfile.VulnEvidence{
 						State: lockfile.VulnChecked,
 						Items: []lockfile.Vulnerability{

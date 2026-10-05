@@ -37,6 +37,8 @@ npm run docs:dev
 
 ## Scope
 
-All lockfile resolvers are stable. Provenance and signature evidence is
-collected from the npm registry for npm, pnpm, Yarn, Bun, and Deno; other
-ecosystems record `unknown` for provenance and signature.
+All lockfile resolvers are stable. Provenance, signature, capability,
+behavior, ownership, and trust-chain evidence is collected from the npm
+registry for npm, pnpm, Yarn, Bun, and Deno; other ecosystems record
+`unknown` for those fields. Vulnerability and malicious-package evidence
+comes from OSV when the package source is proven public.

@@ -8,9 +8,13 @@ npm install
 npm run docs:dev
 ```
 
-Build output is `.vitepress/dist`. Deploy that directory to Cloudflare Pages:
+Build output is `.vitepress/dist`. Deploy with Wrangler to Cloudflare
+Workers (static assets):
 
 ```bash
 npm run docs:build
-npx wrangler pages deploy .vitepress/dist --project-name securock-dev
+npx wrangler deploy
 ```
+
+`wrangler.jsonc` binds the Worker to `securock.dev`. CI runs
+`wrangler deploy` from `.github/workflows/website.yml`.

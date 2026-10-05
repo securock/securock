@@ -20,6 +20,9 @@ jobs:
           version: v0.2.0
 ```
 
+`command` is `verify`, `diff`, or `both` (default). `offline: true`
+passes `--offline` to the CLI.
+
 After a tagged release exists, set `version` to that tag so the action
 downloads the attested binary instead of building from source. A `v*`
 action ref does the same. Local checkouts such as `uses: ./` still

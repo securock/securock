@@ -50,3 +50,8 @@ Securock trusts, as inputs:
 A compromise of those services can produce a `trusted` result that is
 still wrong. The lockfile exists so that drift against a previously
 accepted state is still observable.
+
+OpenSSF Malicious Packages (`MAL-*` via OSV) are recorded separately
+from CVEs. Capability and behavior fields are heuristic for npm package
+sources; they detect drift and policy violations, not every possible
+malicious payload.

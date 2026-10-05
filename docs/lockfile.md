@@ -7,15 +7,23 @@ See [specification.md](specification.md) for the v2 format.
 ## Commands
 
 ```bash
+securock scan
 securock lock
 securock diff
 securock verify
 securock explain <package>
+securock version
 ```
 
-`lock` writes the file. `diff` shows what changed. `verify` uses the
-same comparison and fails when there is trust-relevant drift.
-`explain` prints a trust checklist for one package.
+`scan` inspects the tree (and is the default command). `lock` writes
+the file. `diff` shows what changed. `verify` uses the same comparison
+and fails when there is trust-relevant drift. `explain` prints a trust
+checklist for one package: digest, source, provenance, signature, trust
+chain, ownership, capabilities, vulnerabilities, and malicious-package
+reports.
+
+Shared flags: `--offline`, `--network`, `--policy`, `--lock`,
+`--format`, `--no-fail`.
 
 Exit codes:
 
@@ -24,7 +32,8 @@ Exit codes:
 - `2` configuration or operational error
 
 `scan --format json` emits the lock document. `diff` and `verify`
-print a `schema_version: 1` report. JSON Schemas live in `schemas/`.
+print a `schema_version: 1` report. `explain --format json` emits the
+matched artifacts. JSON Schemas live in `schemas/`.
 
 ## Identity
 

@@ -156,6 +156,9 @@ states, and trust statuses are errors.
 
 Evidence states are `unknown`, `missing`, `present`, and `verified`.
 `present` means the evidence was observed. `verified` is reserved for
-cryptographic verification.
+cryptographic verification. Provenance, signature, and chain use these
+states.
 
-Capability and ownership states are `unknown` and `checked`.
+Vulnerability and malicious-report states are `unknown` and `checked`.
+Capability, behavior, and ownership states are also `unknown` and
+`checked`.

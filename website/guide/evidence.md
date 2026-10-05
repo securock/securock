@@ -4,24 +4,33 @@
 | --- | --- |
 | `unknown` | Lookup skipped or failed. |
 | `missing` | Lookup succeeded and found nothing. |
-| `present` | Registry returned provenance or signatures. Not cryptographically verified. |
+| `present` | Registry returned provenance, signatures, or a trust chain. Not cryptographically verified. |
 | `verified` | Reserved for future Sigstore / registry-key verification. |
 
-v0.2 records presence only. It will not emit `verified`.
+Provenance, signature, and chain use these states. v0.2 records presence
+only. It will not emit `verified`.
 
-Vulnerability lookups have their own state:
+Vulnerability and malicious-package lookups have their own state:
 
 | State | Meaning |
 | --- | --- |
 | `unknown` | OSV was not queried (offline, private registry, or error). |
-| `checked` | OSV was queried; `items` is the ID list. |
+| `checked` | OSV was queried. Vulns use `items`; malware uses `reports` (`MAL-*`). |
 
-Capability and ownership evidence use the same `unknown` / `checked`
-states. For npm, Securock records install scripts, native code hints,
-publisher, and maintainers from the registry, then scans published
-package sources for network, filesystem, environment, and shell
-indicators.
+Capability, behavior, and ownership evidence use the same `unknown` /
+`checked` states. For npm, Securock records:
+
+- install scripts and native-code hints from the registry
+- publisher and maintainers
+- network, filesystem, environment, and shell indicators from published
+  package sources
+- finer-grained hosts, paths, commands, and env vars as `behavior`
+- source → build → artifact fields from provenance attestations as `chain`
+
+Malicious package reports are not vulnerabilities. A package with no
+CVEs can still be malware. The default policy denies both.
 
 Default policy treats `unknown` as unknown trust, not trusted.
 
 See [Privacy](https://github.com/securock/securock/blob/main/docs/privacy.md) for what is sent off-machine.
+See [Trust model](https://github.com/securock/securock/blob/main/docs/trust-model.md) for the full evidence matrix.

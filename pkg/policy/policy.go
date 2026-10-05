@@ -68,8 +68,8 @@ type MaliciousRule struct {
 }
 
 type CapabilityRule struct {
-	Deny       []string         `json:"deny,omitempty" yaml:"deny,omitempty"`
-	Filesystem FilesystemRule   `json:"filesystem,omitempty" yaml:"filesystem,omitempty"`
+	Deny       []string       `json:"deny,omitempty" yaml:"deny,omitempty"`
+	Filesystem FilesystemRule `json:"filesystem,omitempty" yaml:"filesystem,omitempty"`
 }
 
 type FilesystemRule struct {

@@ -93,8 +93,8 @@ type Vulnerability struct {
 // MaliciousEvidence records OpenSSF Malicious Packages / OSV MAL-* reports.
 // It is separate from VulnerabilityEvidence: malware is not a CVE.
 type MaliciousEvidence struct {
-	State   VulnState          `json:"state" yaml:"state"`
-	Reports []MaliciousReport  `json:"reports,omitempty" yaml:"reports,omitempty"`
+	State   VulnState         `json:"state" yaml:"state"`
+	Reports []MaliciousReport `json:"reports,omitempty" yaml:"reports,omitempty"`
 }
 
 type MaliciousReport struct {
