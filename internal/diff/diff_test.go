@@ -7,6 +7,7 @@ import (
 
 	"github.com/securock/securock/internal/diff"
 	"github.com/securock/securock/pkg/lockfile"
+	"github.com/securock/securock/pkg/policy"
 )
 
 func TestCompareTrustDrift(t *testing.T) {
@@ -391,6 +392,79 @@ func TestCompareOwnershipDrift(t *testing.T) {
 	out := buf.String()
 	if !strings.Contains(out, "publisher") || !strings.Contains(out, "maintainer added: random-user") {
 		t.Fatalf("missing ownership markers:\n%s", out)
+	}
+}
+
+func TestOwnershipPolicyWarnDoesNotFail(t *testing.T) {
+	locked := lockfile.Document{Artifacts: []lockfile.Artifact{
+		{
+			Subject: lockfile.Subject{Ecosystem: "npm", Name: "lodash"},
+			Version: "4.17.21",
+			Evidence: lockfile.Evidence{
+				Ownership: lockfile.OwnershipEvidence{
+					State:       lockfile.CapChecked,
+					Publisher:   "alice",
+					Maintainers: []string{"alice"},
+				},
+			},
+		},
+	}}
+	current := lockfile.Document{Artifacts: []lockfile.Artifact{
+		{
+			Subject: lockfile.Subject{Ecosystem: "npm", Name: "lodash"},
+			Version: "4.17.21",
+			Evidence: lockfile.Evidence{
+				Ownership: lockfile.OwnershipEvidence{
+					State:       lockfile.CapChecked,
+					Publisher:   "alice",
+					Maintainers: []string{"alice", "bob"},
+				},
+			},
+		},
+	}}
+	pol := policy.Document{Rules: policy.Rules{
+		Ownership: policy.OwnershipRule{
+			PublisherChange: policy.ActionDeny,
+			MaintainerAdded: policy.ActionWarn,
+		},
+	}}
+	got := diff.Compare(locked, current).WithPolicy(pol)
+	if got.TrustDrift() {
+		t.Fatal("warn-only maintainer add must not fail verify")
+	}
+}
+
+func TestOwnershipPolicyDenyPublisher(t *testing.T) {
+	locked := lockfile.Document{Artifacts: []lockfile.Artifact{
+		{
+			Subject: lockfile.Subject{Ecosystem: "npm", Name: "lodash"},
+			Version: "4.17.21",
+			Evidence: lockfile.Evidence{
+				Ownership: lockfile.OwnershipEvidence{
+					State:     lockfile.CapChecked,
+					Publisher: "alice",
+				},
+			},
+		},
+	}}
+	current := lockfile.Document{Artifacts: []lockfile.Artifact{
+		{
+			Subject: lockfile.Subject{Ecosystem: "npm", Name: "lodash"},
+			Version: "4.17.21",
+			Evidence: lockfile.Evidence{
+				Ownership: lockfile.OwnershipEvidence{
+					State:     lockfile.CapChecked,
+					Publisher: "bob",
+				},
+			},
+		},
+	}}
+	pol := policy.Document{Rules: policy.Rules{
+		Ownership: policy.OwnershipRule{PublisherChange: policy.ActionDeny},
+	}}
+	got := diff.Compare(locked, current).WithPolicy(pol)
+	if !got.TrustDrift() {
+		t.Fatal("publisher deny must fail verify")
 	}
 }
 

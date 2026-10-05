@@ -43,7 +43,7 @@ func newVerifyCommand(opts *options) *cobra.Command {
 				return opErr(err)
 			}
 
-			got := diff.Compare(locked, result.Document)
+			got := diff.Compare(locked, result.Document).WithPolicy(pol)
 			if strings.ToLower(opts.format) == "json" {
 				if err := diff.WriteJSON(cmd.OutOrStdout(), got); err != nil {
 					return opErr(err)

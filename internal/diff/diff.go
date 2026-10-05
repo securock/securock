@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/securock/securock/pkg/lockfile"
+	"github.com/securock/securock/pkg/policy"
 )
 
 type Side struct {
@@ -44,6 +45,12 @@ type Result struct {
 	Removed      []string
 	PolicyBefore string
 	PolicyAfter  string
+	Policy       policy.Document
+}
+
+func (r Result) WithPolicy(pol policy.Document) Result {
+	r.Policy = pol
+	return r
 }
 
 func Compare(locked, current lockfile.Document) Result {
@@ -98,7 +105,7 @@ func (r Result) TrustDrift() bool {
 		return true
 	}
 	for _, c := range r.Changes {
-		if trustRelevant(c.Before, c.After) {
+		if trustRelevant(c.Before, c.After, r.Policy) {
 			return true
 		}
 	}
@@ -111,7 +118,7 @@ func (r Result) TrustChanges() int {
 		n++
 	}
 	for _, c := range r.Changes {
-		if trustRelevant(c.Before, c.After) {
+		if trustRelevant(c.Before, c.After, r.Policy) {
 			n++
 		}
 	}
@@ -154,6 +161,7 @@ func Write(w io.Writer, r Result) {
 		writeField(w, "resolved", join(c.Before.Resolved), join(c.After.Resolved), false)
 		writeCapabilities(w, c.Before.Capabilities, c.After.Capabilities)
 		writeOwnership(w, c.Before, c.After)
+		writeOwnershipPolicy(w, c.Before, c.After, r.Policy.Rules.Ownership)
 	}
 
 	if r.TrustDrift() {
@@ -259,6 +267,10 @@ func sideOf(arts []lockfile.Artifact) Side {
 }
 
 func changed(a, b Side) bool {
+	return nonOwnershipChanged(a, b) || ownershipChanged(a, b)
+}
+
+func nonOwnershipChanged(a, b Side) bool {
 	return join(a.Versions) != join(b.Versions) ||
 		join(a.Digests) != join(b.Digests) ||
 		a.Provenance != b.Provenance ||
@@ -268,14 +280,95 @@ func changed(a, b Side) bool {
 		a.Trust != b.Trust ||
 		join(a.TrustReason) != join(b.TrustReason) ||
 		sourceChanged(a, b) ||
-		!capabilitiesEqual(a.Capabilities, b.Capabilities) ||
-		a.OwnershipState != b.OwnershipState ||
+		!capabilitiesEqual(a.Capabilities, b.Capabilities)
+}
+
+func ownershipChanged(a, b Side) bool {
+	return a.OwnershipState != b.OwnershipState ||
 		a.Publisher != b.Publisher ||
 		join(a.Maintainers) != join(b.Maintainers)
 }
 
-func trustRelevant(a, b Side) bool {
-	return changed(a, b)
+func trustRelevant(a, b Side, pol policy.Document) bool {
+	if nonOwnershipChanged(a, b) {
+		return true
+	}
+	if !ownershipChanged(a, b) {
+		return false
+	}
+	return ownershipFails(a, b, pol.Rules.Ownership)
+}
+
+func ownershipFails(a, b Side, rule policy.OwnershipRule) bool {
+	if !rule.Configured() {
+		return true
+	}
+	if a.Publisher != b.Publisher {
+		action := rule.PublisherChange
+		if action == "" {
+			action = policy.ActionDeny
+		}
+		if action.Fails() {
+			return true
+		}
+	}
+	removed, added := listDelta(a.Maintainers, b.Maintainers)
+	if len(added) > 0 {
+		action := rule.MaintainerAdded
+		if action == "" {
+			action = policy.ActionDeny
+		}
+		if action.Fails() {
+			return true
+		}
+	}
+	if len(removed) > 0 {
+		action := rule.MaintainerRemoved
+		if action == "" {
+			action = policy.ActionDeny
+		}
+		if action.Fails() {
+			return true
+		}
+	}
+	if a.OwnershipState != b.OwnershipState {
+		return true
+	}
+	return false
+}
+
+func writeOwnershipPolicy(w io.Writer, before, after Side, rule policy.OwnershipRule) {
+	if !rule.Configured() || !ownershipChanged(before, after) {
+		return
+	}
+	if before.Publisher != after.Publisher {
+		action := rule.PublisherChange
+		if action == "" {
+			action = policy.ActionDeny
+		}
+		if action.Reports() {
+			fmt.Fprintf(w, "  ownership violation: publisher changed (%s)\n", action)
+		}
+	}
+	removed, added := listDelta(before.Maintainers, after.Maintainers)
+	if len(added) > 0 {
+		action := rule.MaintainerAdded
+		if action == "" {
+			action = policy.ActionDeny
+		}
+		if action.Reports() {
+			fmt.Fprintf(w, "  ownership violation: maintainer added (%s)\n", action)
+		}
+	}
+	if len(removed) > 0 {
+		action := rule.MaintainerRemoved
+		if action == "" {
+			action = policy.ActionDeny
+		}
+		if action.Reports() {
+			fmt.Fprintf(w, "  ownership violation: maintainer removed (%s)\n", action)
+		}
+	}
 }
 
 func sourceChanged(a, b Side) bool {

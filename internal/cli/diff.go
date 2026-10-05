@@ -43,7 +43,7 @@ func newDiffCommand(opts *options) *cobra.Command {
 				return opErr(err)
 			}
 
-			got := diff.Compare(locked, result.Document)
+			got := diff.Compare(locked, result.Document).WithPolicy(pol)
 			if err := writeDiff(cmd, got, opts.format); err != nil {
 				return opErr(err)
 			}

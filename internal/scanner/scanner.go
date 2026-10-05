@@ -33,7 +33,7 @@ func Scan(ctx context.Context, opts Options) (*Result, error) {
 	if path == "" {
 		path = "."
 	}
-	if opts.Policy.Version == 0 && opts.Policy.Rules == (policy.Rules{}) && opts.Policy.Network.Mode == "" && len(opts.Policy.Network.Registries) == 0 {
+	if opts.Policy.Version == 0 {
 		opts.Policy = policy.Default()
 	}
 

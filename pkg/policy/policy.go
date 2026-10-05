@@ -17,6 +17,15 @@ const (
 	ModeAllowAll   Mode = "allow-all"
 )
 
+type ChangeAction string
+
+const (
+	ActionAllow  ChangeAction = "allow"
+	ActionWarn   ChangeAction = "warn"
+	ActionReview ChangeAction = "review"
+	ActionDeny   ChangeAction = "deny"
+)
+
 type Document struct {
 	Version int     `json:"version" yaml:"version"`
 	Network Network `json:"network,omitempty" yaml:"network,omitempty"`
@@ -29,16 +38,40 @@ type Network struct {
 }
 
 type Rules struct {
-	RequireNoVulnerabilities bool         `json:"require_no_vulnerabilities" yaml:"require_no_vulnerabilities"`
-	RequireDigest            bool         `json:"require_digest" yaml:"require_digest"`
-	RequireProvenance        bool         `json:"require_provenance" yaml:"require_provenance"`
-	RequireSignature         bool         `json:"require_signature" yaml:"require_signature"`
-	Provenance               EvidenceRule `json:"provenance,omitempty" yaml:"provenance,omitempty"`
-	Signature                EvidenceRule `json:"signature,omitempty" yaml:"signature,omitempty"`
+	RequireNoVulnerabilities bool             `json:"require_no_vulnerabilities" yaml:"require_no_vulnerabilities"`
+	RequireDigest            bool             `json:"require_digest" yaml:"require_digest"`
+	RequireProvenance        bool             `json:"require_provenance" yaml:"require_provenance"`
+	RequireSignature         bool             `json:"require_signature" yaml:"require_signature"`
+	Provenance               EvidenceRule     `json:"provenance,omitempty" yaml:"provenance,omitempty"`
+	Signature                EvidenceRule     `json:"signature,omitempty" yaml:"signature,omitempty"`
+	Vulnerabilities          VulnerabilityRule `json:"vulnerabilities,omitempty" yaml:"vulnerabilities,omitempty"`
+	Capabilities             CapabilityRule   `json:"capabilities,omitempty" yaml:"capabilities,omitempty"`
+	Ownership                OwnershipRule    `json:"ownership,omitempty" yaml:"ownership,omitempty"`
 }
 
 type EvidenceRule struct {
 	Minimum string `json:"minimum,omitempty" yaml:"minimum,omitempty"`
+}
+
+// VulnerabilityRule is an optional structured form of vulnerability policy.
+// allow: "none" is equivalent to require_no_vulnerabilities: true.
+type VulnerabilityRule struct {
+	Allow string `json:"allow,omitempty" yaml:"allow,omitempty"`
+}
+
+type CapabilityRule struct {
+	Deny       []string         `json:"deny,omitempty" yaml:"deny,omitempty"`
+	Filesystem FilesystemRule   `json:"filesystem,omitempty" yaml:"filesystem,omitempty"`
+}
+
+type FilesystemRule struct {
+	Maximum string `json:"maximum,omitempty" yaml:"maximum,omitempty"`
+}
+
+type OwnershipRule struct {
+	PublisherChange   ChangeAction `json:"publisher_change,omitempty" yaml:"publisher_change,omitempty"`
+	MaintainerAdded   ChangeAction `json:"maintainer_added,omitempty" yaml:"maintainer_added,omitempty"`
+	MaintainerRemoved ChangeAction `json:"maintainer_removed,omitempty" yaml:"maintainer_removed,omitempty"`
 }
 
 func Default() Document {
@@ -56,6 +89,29 @@ func (n Network) ResolvedMode() Mode {
 		return ModePublicOnly
 	}
 	return n.Mode
+}
+
+func (r Rules) DenyVulnerabilities() bool {
+	if r.RequireNoVulnerabilities {
+		return true
+	}
+	return r.Vulnerabilities.Allow == "none"
+}
+
+func (a ChangeAction) Fails() bool {
+	return a == ActionDeny || a == ActionReview
+}
+
+func (a ChangeAction) Reports() bool {
+	return a == ActionWarn || a.Fails()
+}
+
+func (r OwnershipRule) Configured() bool {
+	return r.PublisherChange != "" || r.MaintainerAdded != "" || r.MaintainerRemoved != ""
+}
+
+func (r CapabilityRule) Configured() bool {
+	return len(r.Deny) > 0 || r.Filesystem.Maximum != ""
 }
 
 func Fingerprint(doc Document) (string, error) {
@@ -79,16 +135,34 @@ type canonicalNetwork struct {
 }
 
 type canonicalRules struct {
-	RequireNoVulnerabilities bool               `json:"require_no_vulnerabilities,omitempty"`
-	RequireDigest            bool               `json:"require_digest,omitempty"`
-	RequireProvenance        bool               `json:"require_provenance,omitempty"`
-	RequireSignature         bool               `json:"require_signature,omitempty"`
-	Provenance               *canonicalEvidence `json:"provenance,omitempty"`
-	Signature                *canonicalEvidence `json:"signature,omitempty"`
+	RequireNoVulnerabilities bool                 `json:"require_no_vulnerabilities,omitempty"`
+	RequireDigest            bool                 `json:"require_digest,omitempty"`
+	RequireProvenance        bool                 `json:"require_provenance,omitempty"`
+	RequireSignature         bool                 `json:"require_signature,omitempty"`
+	Provenance               *canonicalEvidence   `json:"provenance,omitempty"`
+	Signature                *canonicalEvidence   `json:"signature,omitempty"`
+	Vulnerabilities          *canonicalVulnRule   `json:"vulnerabilities,omitempty"`
+	Capabilities             *canonicalCapRule    `json:"capabilities,omitempty"`
+	Ownership                *canonicalOwnerRule  `json:"ownership,omitempty"`
 }
 
 type canonicalEvidence struct {
 	Minimum string `json:"minimum,omitempty"`
+}
+
+type canonicalVulnRule struct {
+	Allow string `json:"allow,omitempty"`
+}
+
+type canonicalCapRule struct {
+	Deny       []string `json:"deny,omitempty"`
+	Filesystem string   `json:"filesystem_maximum,omitempty"`
+}
+
+type canonicalOwnerRule struct {
+	PublisherChange   ChangeAction `json:"publisher_change,omitempty"`
+	MaintainerAdded   ChangeAction `json:"maintainer_added,omitempty"`
+	MaintainerRemoved ChangeAction `json:"maintainer_removed,omitempty"`
 }
 
 func canonical(doc Document) canonicalDocument {
@@ -108,6 +182,9 @@ func canonical(doc Document) canonicalDocument {
 			RequireSignature:         doc.Rules.RequireSignature,
 			Provenance:               canonicalEvidenceRule(doc.Rules.Provenance),
 			Signature:                canonicalEvidenceRule(doc.Rules.Signature),
+			Vulnerabilities:          canonicalVuln(doc.Rules.Vulnerabilities),
+			Capabilities:             canonicalCapabilities(doc.Rules.Capabilities),
+			Ownership:                canonicalOwnership(doc.Rules.Ownership),
 		},
 	}
 }
@@ -117,6 +194,37 @@ func canonicalEvidenceRule(rule EvidenceRule) *canonicalEvidence {
 		return nil
 	}
 	return &canonicalEvidence{Minimum: rule.Minimum}
+}
+
+func canonicalVuln(rule VulnerabilityRule) *canonicalVulnRule {
+	if rule.Allow == "" {
+		return nil
+	}
+	return &canonicalVulnRule{Allow: rule.Allow}
+}
+
+func canonicalCapabilities(rule CapabilityRule) *canonicalCapRule {
+	if !rule.Configured() {
+		return nil
+	}
+	deny := slices.Clone(rule.Deny)
+	slices.Sort(deny)
+	deny = slices.Compact(deny)
+	return &canonicalCapRule{
+		Deny:       deny,
+		Filesystem: rule.Filesystem.Maximum,
+	}
+}
+
+func canonicalOwnership(rule OwnershipRule) *canonicalOwnerRule {
+	if !rule.Configured() {
+		return nil
+	}
+	return &canonicalOwnerRule{
+		PublisherChange:   rule.PublisherChange,
+		MaintainerAdded:   rule.MaintainerAdded,
+		MaintainerRemoved: rule.MaintainerRemoved,
+	}
 }
 
 func canonicalRegistries(in map[string][]string) map[string][]string {

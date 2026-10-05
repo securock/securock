@@ -8,12 +8,37 @@ behavior. The CLI prints this as `trusted (under active policy)`.
 
 The default policy requires that OSV was queried and returned no
 known vulnerabilities. Unchecked vulnerabilities (`state: unknown`)
-are `unknown`, not `trusted`. Digest, provenance, and signature checks
-are optional policy rules and are off by default.
+are `unknown`, not `trusted`. Digest, provenance, signature,
+capability, and ownership checks are optional policy rules and are off
+by default.
 
 Policy files are fail-closed: unknown fields, versions, and network
 modes are errors. Typos such as `require_provenace` do not silently
 disable a rule.
+
+Example capability and ownership gates:
+
+```yaml
+version: 1
+rules:
+  require_no_vulnerabilities: true
+  capabilities:
+    deny:
+      - shell
+      - native_code
+      - install_scripts
+    filesystem:
+      maximum: read
+  ownership:
+    publisher_change: deny
+    maintainer_added: warn
+    maintainer_removed: review
+```
+
+`deny` and `review` fail `verify`. `warn` is reported but does not fail.
+When ownership rules are omitted, any ownership change remains trust
+drift. When any ownership action is set, unset actions default to
+`deny` (fail-closed).
 
 ## What "untrusted" means
 
@@ -23,6 +48,8 @@ The artifact failed at least one enabled policy rule. Typical reasons:
 - missing digest, when required
 - provenance not verified, when required
 - signature not verified, when required
+- denied capability (shell, install scripts, …)
+- filesystem access above the configured maximum
 
 ## What "unknown" means
 

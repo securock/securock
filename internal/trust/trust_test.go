@@ -1,6 +1,7 @@
 package trust_test
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/securock/securock/internal/trust"
@@ -116,6 +117,86 @@ func TestEvaluateRequireDigest(t *testing.T) {
 	}
 	pol := policy.Default()
 	pol.Rules.RequireDigest = true
+	trust.Evaluate(&art, pol)
+	if art.Trust.Status != lockfile.StatusUntrusted {
+		t.Fatalf("status = %s", art.Trust.Status)
+	}
+}
+
+func TestEvaluateDeniedCapability(t *testing.T) {
+	pol := policy.Default()
+	pol.Rules.Capabilities.Deny = []string{"shell", "install_scripts"}
+
+	art := lockfile.Artifact{
+		Evidence: lockfile.Evidence{
+			Vulnerabilities: lockfile.VulnEvidence{State: lockfile.VulnChecked},
+			Capabilities: lockfile.CapabilityEvidence{
+				State:          lockfile.CapChecked,
+				Shell:          lockfile.Bool(true),
+				InstallScripts: lockfile.Bool(true),
+				Network:        lockfile.Bool(false),
+			},
+		},
+	}
+	trust.Evaluate(&art, pol)
+	if art.Trust.Status != lockfile.StatusUntrusted {
+		t.Fatalf("status = %s", art.Trust.Status)
+	}
+	joined := strings.Join(art.Trust.Reasons, ",")
+	if !strings.Contains(joined, "denied capability: shell") || !strings.Contains(joined, "denied capability: install_scripts") {
+		t.Fatalf("reasons = %v", art.Trust.Reasons)
+	}
+}
+
+func TestEvaluateFilesystemMaximum(t *testing.T) {
+	pol := policy.Default()
+	pol.Rules.Capabilities.Filesystem.Maximum = "read"
+
+	art := lockfile.Artifact{
+		Evidence: lockfile.Evidence{
+			Vulnerabilities: lockfile.VulnEvidence{State: lockfile.VulnChecked},
+			Capabilities: lockfile.CapabilityEvidence{
+				State:      lockfile.CapChecked,
+				Filesystem: lockfile.FilesystemWrite,
+			},
+		},
+	}
+	trust.Evaluate(&art, pol)
+	if art.Trust.Status != lockfile.StatusUntrusted {
+		t.Fatalf("status = %s", art.Trust.Status)
+	}
+}
+
+func TestEvaluateCapabilitiesUnknown(t *testing.T) {
+	pol := policy.Default()
+	pol.Rules.Capabilities.Deny = []string{"shell"}
+	art := lockfile.Artifact{
+		Evidence: lockfile.Evidence{
+			Vulnerabilities: lockfile.VulnEvidence{State: lockfile.VulnChecked},
+			Capabilities:    lockfile.CapabilityEvidence{State: lockfile.CapUnknown},
+		},
+	}
+	trust.Evaluate(&art, pol)
+	if art.Trust.Status != lockfile.StatusUnknown {
+		t.Fatalf("status = %s", art.Trust.Status)
+	}
+}
+
+func TestEvaluateVulnerabilitiesAllowNone(t *testing.T) {
+	pol := policy.Document{
+		Version: 1,
+		Rules: policy.Rules{
+			Vulnerabilities: policy.VulnerabilityRule{Allow: "none"},
+		},
+	}
+	art := lockfile.Artifact{
+		Evidence: lockfile.Evidence{
+			Vulnerabilities: lockfile.VulnEvidence{
+				State: lockfile.VulnChecked,
+				Items: []lockfile.Vulnerability{{ID: "GHSA-x"}},
+			},
+		},
+	}
 	trust.Evaluate(&art, pol)
 	if art.Trust.Status != lockfile.StatusUntrusted {
 		t.Fatalf("status = %s", art.Trust.Status)

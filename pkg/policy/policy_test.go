@@ -82,3 +82,50 @@ func TestFingerprintEvidenceMinimum(t *testing.T) {
 		t.Fatal("provenance minimum must change fingerprint")
 	}
 }
+
+func TestFingerprintCapabilities(t *testing.T) {
+	base, err := policy.Fingerprint(policy.Default())
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := policy.Fingerprint(policy.Document{
+		Version: 1,
+		Network: policy.Network{Mode: policy.ModePublicOnly},
+		Rules: policy.Rules{
+			RequireNoVulnerabilities: true,
+			Capabilities: policy.CapabilityRule{
+				Deny: []string{"shell", "native_code"},
+			},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got == base {
+		t.Fatal("capability deny must change fingerprint")
+	}
+}
+
+func TestValidateCapabilityAndOwnership(t *testing.T) {
+	doc := policy.Document{
+		Version: 1,
+		Rules: policy.Rules{
+			Capabilities: policy.CapabilityRule{
+				Deny:       []string{"shell"},
+				Filesystem: policy.FilesystemRule{Maximum: "read"},
+			},
+			Ownership: policy.OwnershipRule{
+				PublisherChange:   policy.ActionDeny,
+				MaintainerAdded:   policy.ActionWarn,
+				MaintainerRemoved: policy.ActionReview,
+			},
+		},
+	}
+	if err := policy.Validate(doc); err != nil {
+		t.Fatal(err)
+	}
+	doc.Rules.Capabilities.Deny = []string{"laser"}
+	if err := policy.Validate(doc); err == nil {
+		t.Fatal("unknown capability must fail")
+	}
+}
