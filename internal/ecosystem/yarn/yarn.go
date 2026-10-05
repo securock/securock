@@ -3,6 +3,7 @@ package yarn
 import (
 	"bufio"
 	"bytes"
+	"net/url"
 	"os"
 	"strings"
 
@@ -79,10 +80,8 @@ func berryDeps(project string, raw []byte) ([]core.Dependency, error) {
 		kind, tarball := classifyProtocol(protocol, locator)
 		registry := ""
 		if kind == core.SourceRegistry {
+			// Yarn berry does not read .npmrc, so an unknown registry stays unknown.
 			registry = yarnrc.Registry(project, name, tarball)
-			if registry == "" {
-				registry = npmrc.Registry(project, name, tarball)
-			}
 		}
 		deps = append(deps, core.Dependency{
 			Ecosystem:  "npm",
@@ -257,6 +256,14 @@ func classifyResolved(resolved string) (kind, tarball string) {
 }
 
 func tarballURL(locator string) string {
+	// Berry records the archive of non-default registries as ::__archiveUrl=<escaped url>.
+	if _, query, ok := strings.Cut(locator, "::"); ok {
+		if values, err := url.ParseQuery(query); err == nil {
+			if archive := values.Get("__archiveUrl"); strings.HasPrefix(archive, "https://") || strings.HasPrefix(archive, "http://") {
+				return archive
+			}
+		}
+	}
 	for _, prefix := range []string{"https://", "http://"} {
 		i := strings.Index(locator, prefix)
 		if i >= 0 {

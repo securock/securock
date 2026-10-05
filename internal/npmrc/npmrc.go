@@ -52,7 +52,7 @@ func applyEnv(cfg *parsed, name string) {
 		cfg.general = v
 	}
 	if scope := scopeOf(name); scope != "" {
-		if v := envValue("npm_config_"+scope+":registry"); v != "" {
+		if v := envValue("npm_config_" + scope + ":registry"); v != "" {
 			cfg.scoped = v
 		}
 	}
