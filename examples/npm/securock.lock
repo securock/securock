@@ -29,6 +29,8 @@ artifacts:
         state: unknown
       ownership:
         state: unknown
+      chain:
+        state: unknown
     trust:
       status: unknown
       reasons:

@@ -105,6 +105,12 @@ func validateArtifact(art Artifact) error {
 			return fmt.Errorf("missing maintainer name")
 		}
 	}
+	if art.Evidence.Chain.State == "" {
+		return fmt.Errorf("missing chain state")
+	}
+	if !slices.Contains(evidence, art.Evidence.Chain.State) {
+		return fmt.Errorf("unknown chain state %q", art.Evidence.Chain.State)
+	}
 	if !slices.Contains(statuses, art.Trust.Status) {
 		return fmt.Errorf("unknown trust status %q", art.Trust.Status)
 	}

@@ -15,7 +15,23 @@ func TestNPMEvidence(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/-/npm/v1/attestations/react@19.2.0":
-			w.Write([]byte(`{"attestations":[{"predicateType":"https://slsa.dev/provenance/v1"}]}`))
+			w.Write([]byte(`{
+				"attestations":[{
+					"predicateType":"https://slsa.dev/provenance/v1",
+					"predicate":{
+						"buildDefinition":{
+							"resolvedDependencies":[{
+								"uri":"git+https://github.com/facebook/react",
+								"digest":{"sha1":"deadbeefdeadbeefdeadbeefdeadbeefdeadbeef"}
+							}],
+							"externalParameters":{
+								"workflow":{"path":".github/workflows/release.yml"}
+							}
+						},
+						"runDetails":{"builder":{"id":"https://github.com/actions/runner"}}
+					}
+				}]
+			}`))
 		case "/react/19.2.0":
 			w.Write([]byte(`{
 				"dist":{"signatures":[{"keyid":"abc","sig":"def"}],"tarball":"http://example.invalid/react.tgz"},
@@ -57,6 +73,12 @@ func TestNPMEvidence(t *testing.T) {
 	if react.Provenance != lockfile.EvidencePresent || react.Signature != lockfile.EvidencePresent {
 		t.Fatalf("react = %+v", react)
 	}
+	if react.Chain.State != lockfile.EvidencePresent || react.Chain.Source != "github.com/facebook/react" {
+		t.Fatalf("react chain = %+v", react.Chain)
+	}
+	if react.Chain.Workflow != "release.yml" {
+		t.Fatalf("react workflow = %q", react.Chain.Workflow)
+	}
 	if react.Ownership.State != lockfile.CapChecked || react.Ownership.Publisher != "alice <alice@example.com>" {
 		t.Fatalf("react ownership = %+v", react.Ownership)
 	}
@@ -67,6 +89,9 @@ func TestNPMEvidence(t *testing.T) {
 	left := got[evidence.Key(ecosystem.Dependency{Ecosystem: "npm", Name: "leftpad", Version: "1.0.0"})]
 	if left.Provenance != lockfile.EvidenceMissing || left.Signature != lockfile.EvidenceMissing {
 		t.Fatalf("leftpad = %+v", left)
+	}
+	if left.Chain.State != lockfile.EvidenceMissing {
+		t.Fatalf("leftpad chain = %+v", left.Chain)
 	}
 	if left.Capabilities.InstallScripts == nil || !*left.Capabilities.InstallScripts {
 		t.Fatalf("leftpad should have install scripts: %+v", left.Capabilities)

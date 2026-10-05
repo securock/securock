@@ -434,6 +434,47 @@ func TestBehaviorDrift(t *testing.T) {
 	}
 }
 
+func TestChainDrift(t *testing.T) {
+	locked := lockfile.Document{Artifacts: []lockfile.Artifact{
+		{
+			Subject: lockfile.Subject{Ecosystem: "npm", Name: "react"},
+			Version: "19.2.0",
+			Evidence: lockfile.Evidence{
+				Chain: lockfile.ChainEvidence{
+					State:    lockfile.EvidencePresent,
+					Source:   "github.com/facebook/react",
+					Commit:   "aaa111",
+					Workflow: "release.yml",
+				},
+			},
+		},
+	}}
+	current := lockfile.Document{Artifacts: []lockfile.Artifact{
+		{
+			Subject: lockfile.Subject{Ecosystem: "npm", Name: "react"},
+			Version: "19.3.0",
+			Evidence: lockfile.Evidence{
+				Chain: lockfile.ChainEvidence{
+					State:    lockfile.EvidencePresent,
+					Source:   "github.com/facebook/react",
+					Commit:   "bbb222",
+					Workflow: "publish.yml",
+				},
+			},
+		},
+	}}
+	got := diff.Compare(locked, current)
+	if !got.TrustDrift() {
+		t.Fatal("chain drift must be trust drift")
+	}
+	var buf bytes.Buffer
+	diff.Write(&buf, got)
+	out := buf.String()
+	if !strings.Contains(out, "trust chain") || !strings.Contains(out, "publish.yml") {
+		t.Fatalf("missing chain markers:\n%s", out)
+	}
+}
+
 func TestOwnershipPolicyWarnDoesNotFail(t *testing.T) {
 	locked := lockfile.Document{Artifacts: []lockfile.Artifact{
 		{

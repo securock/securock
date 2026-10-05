@@ -44,6 +44,9 @@ func Canonicalize(doc *Document) {
 		if art.Evidence.Ownership.State == "" {
 			art.Evidence.Ownership.State = CapUnknown
 		}
+		if art.Evidence.Chain.State == "" {
+			art.Evidence.Chain.State = EvidenceUnknown
+		}
 		slices.SortFunc(art.Evidence.Vulnerabilities.Items, func(a, b Vulnerability) int {
 			return cmp.Compare(a.ID, b.ID)
 		})

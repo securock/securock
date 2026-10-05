@@ -99,7 +99,7 @@
     },
     "evidence": {
       "type": "object",
-      "required": ["provenance", "signature", "vulnerabilities", "malicious", "capabilities", "behavior", "ownership"],
+      "required": ["provenance", "signature", "vulnerabilities", "malicious", "capabilities", "behavior", "ownership", "chain"],
       "additionalProperties": false,
       "properties": {
         "provenance": { "$ref": "#/$defs/evidenceState" },
@@ -108,7 +108,8 @@
         "malicious": { "$ref": "#/$defs/maliciousEvidence" },
         "capabilities": { "$ref": "#/$defs/capabilities" },
         "behavior": { "$ref": "#/$defs/behavior" },
-        "ownership": { "$ref": "#/$defs/ownership" }
+        "ownership": { "$ref": "#/$defs/ownership" },
+        "chain": { "$ref": "#/$defs/chain" }
       }
     },
     "vulnEvidence": {
@@ -196,6 +197,18 @@
           "items": { "type": "string", "minLength": 1 },
           "uniqueItems": true
         }
+      }
+    },
+    "chain": {
+      "type": "object",
+      "required": ["state"],
+      "additionalProperties": false,
+      "properties": {
+        "state": { "$ref": "#/$defs/evidenceState" },
+        "source": { "type": "string", "minLength": 1 },
+        "commit": { "type": "string", "minLength": 1 },
+        "builder": { "type": "string", "minLength": 1 },
+        "workflow": { "type": "string", "minLength": 1 }
       }
     },
     "trust": {

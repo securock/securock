@@ -58,6 +58,8 @@ artifacts:
         state: unknown
       ownership:
         state: unknown
+      chain:
+        state: unknown
     trust:
       status: unknown
       reasons:
@@ -87,9 +89,12 @@ name, version, and digest stay the same.
 
 `capabilities` records observed package abilities (network, filesystem,
 environment, shell, native code, install scripts). `ownership` records
-the publisher and maintainers. Both use `state: checked` when collected
-and `unknown` when skipped (offline or non-npm). A change to either is
-trust drift.
+the publisher and maintainers. `behavior` records finer-grained hosts,
+paths, commands, and environment variables. `chain` records the
+source → build → artifact trust chain extracted from provenance
+attestations (repository, commit, builder, workflow). These use
+`state: checked` / evidence states when collected and `unknown` when
+skipped (offline or non-npm). A change to any of them is trust drift.
 
 URL artifacts may omit `version`. Their identity is `subject.name`
 (the requested URL). Do not encode a URL into `version`; that makes

@@ -78,6 +78,7 @@ type Evidence struct {
 	Capabilities    CapabilityEvidence `json:"capabilities" yaml:"capabilities"`
 	Behavior        BehaviorEvidence   `json:"behavior" yaml:"behavior"`
 	Ownership       OwnershipEvidence  `json:"ownership" yaml:"ownership"`
+	Chain           ChainEvidence      `json:"chain" yaml:"chain"`
 }
 
 type VulnEvidence struct {
@@ -114,6 +115,14 @@ const (
 	FilesystemRead  FilesystemAccess = "read"
 	FilesystemWrite FilesystemAccess = "write"
 )
+
+type ChainEvidence struct {
+	State    EvidenceState `json:"state" yaml:"state"`
+	Source   string        `json:"source,omitempty" yaml:"source,omitempty"`
+	Commit   string        `json:"commit,omitempty" yaml:"commit,omitempty"`
+	Builder  string        `json:"builder,omitempty" yaml:"builder,omitempty"`
+	Workflow string        `json:"workflow,omitempty" yaml:"workflow,omitempty"`
+}
 
 // CapabilityEvidence records observed package capabilities.
 // When State is CapUnknown, capability fields are omitted.

@@ -9,8 +9,9 @@ fail CI:
   in `securock.lock`
 - **Artifact modification** — the digest for a subject changes
 - **Trust-state changes** — provenance, signature, vulnerability IDs,
-  capabilities, ownership (publisher/maintainers), trust status, or
-  trust reasons drift between lock and the current tree
+  capabilities, behavior, ownership (publisher/maintainers), trust
+  chain (source/commit/builder/workflow), trust status, or trust
+  reasons drift between lock and the current tree
 - **Known vulnerable dependency changes** — OSV reports an advisory for
   a locked or updated artifact when the default policy is enabled
 - **Package-manager disguise** — switching npm ↔ pnpm does not rewrite

@@ -13,6 +13,7 @@ type Record struct {
 	Capabilities lockfile.CapabilityEvidence
 	Behavior     lockfile.BehaviorEvidence
 	Ownership    lockfile.OwnershipEvidence
+	Chain        lockfile.ChainEvidence
 }
 
 type Collector interface {

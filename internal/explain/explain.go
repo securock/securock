@@ -57,11 +57,52 @@ func writeChecks(w io.Writer, art lockfile.Artifact) {
 	writeSource(w, art)
 	writeEvidence(w, "provenance verified", "provenance present", "provenance missing", "provenance not checked", art.Evidence.Provenance)
 	writeEvidence(w, "signature verified", "signature present", "signature missing", "signature not checked", art.Evidence.Signature)
+	writeChain(w, art)
 	writeOwnership(w, art.Evidence.Ownership)
 	writeCapabilities(w, art.Evidence.Capabilities)
 	writeVulns(w, art.Evidence.Vulnerabilities)
 	writeMalicious(w, art.Evidence.Malicious)
 	writeTrust(w, art.Trust)
+}
+
+func writeChain(w io.Writer, art lockfile.Artifact) {
+	chain := art.Evidence.Chain
+	switch chain.State {
+	case lockfile.EvidencePresent, lockfile.EvidenceVerified:
+		fmt.Fprintln(w, "✓ trust chain")
+		if chain.Source != "" {
+			fmt.Fprintf(w, "  source     %s\n", chain.Source)
+		}
+		if chain.Commit != "" {
+			fmt.Fprintf(w, "  commit     %s\n", chain.Commit)
+		}
+		if chain.Builder != "" {
+			fmt.Fprintf(w, "  builder    %s\n", chain.Builder)
+		}
+		if chain.Workflow != "" {
+			fmt.Fprintf(w, "  workflow   %s\n", chain.Workflow)
+		}
+		fmt.Fprintln(w, "  Chain")
+		writeChainStep(w, "source", chain.Source != "")
+		fmt.Fprintln(w, "       ↓")
+		writeChainStep(w, "workflow", chain.Workflow != "" || chain.Builder != "")
+		fmt.Fprintln(w, "       ↓")
+		writeChainStep(w, "provenance", art.Evidence.Provenance.Present())
+		fmt.Fprintln(w, "       ↓")
+		writeChainStep(w, "artifact", art.Digest != "")
+	case lockfile.EvidenceMissing:
+		fmt.Fprintln(w, "✗ trust chain missing")
+	default:
+		fmt.Fprintln(w, "? trust chain not checked")
+	}
+}
+
+func writeChainStep(w io.Writer, name string, ok bool) {
+	mark := "✗"
+	if ok {
+		mark = "✓"
+	}
+	fmt.Fprintf(w, "  %-10s %s\n", name, mark)
 }
 
 func writeSource(w io.Writer, art lockfile.Artifact) {

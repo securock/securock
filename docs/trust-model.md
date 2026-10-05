@@ -81,8 +81,8 @@ v0.1 npm collection can emit `present`, never `verified`. `verified`
 is reserved for Sigstore and registry-key verification.
 
 Offline scans leave provenance, signature, capability, ownership,
-vulnerability, and malicious-report state as `unknown`. That is not a
-clean bill of health.
+behavior, chain, vulnerability, and malicious-report state as
+`unknown`. That is not a clean bill of health.
 
 Private registries are not queried in the default `public-only`
 network mode. See [Privacy](privacy.md).
@@ -99,6 +99,7 @@ network mode. See [Privacy](privacy.md).
 | capabilities | registry metadata + package source heuristics | `unknown` |
 | behavior | hosts, file paths, commands, env vars from source heuristics | `unknown` |
 | ownership | npm publisher (`_npmUser`) and maintainers | `unknown` |
+| chain | source repo, commit, builder, workflow from provenance attestations | `unknown` |
 
 Malicious package reports are not vulnerabilities. A package with no
 CVEs can still be malware. The default policy denies both.
@@ -107,6 +108,12 @@ Capability detection for npm uses install-script and native-build
 metadata, then a deterministic scan of published JS/TS sources for
 network, filesystem, environment, and shell indicators. It is not a
 full behavioral sandbox and may under-report obfuscated code.
+
+Trust chain evidence is extracted from npm provenance attestations
+(SLSA predicates). It records the claimed source repository, commit,
+builder identity, and workflow path when present. v0.1 records these
+fields for lock and drift; it does not cryptographically verify the
+attestation signature or rebuild the artifact from source.
 
 Deno JSR and HTTPS URL artifacts record integrity from `deno.lock`.
 OSV does not cover those ecosystems yet, so vulnerability state stays
@@ -124,3 +131,4 @@ registry-key cryptographic verification, so it will not emit
 - that GitHub, npm, or OSV are uncompromised
 - that non-npm ecosystems collect provenance or signature evidence
 - that capability heuristics catch every malicious behavior
+- that a present trust chain proves the artifact was built from that source

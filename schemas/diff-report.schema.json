@@ -62,6 +62,7 @@
         "artifacts": { "type": "array", "items": { "type": "string" } },
         "capabilities": { "$ref": "#/$defs/capabilities" },
         "behavior": { "$ref": "#/$defs/behavior" },
+        "chain": { "$ref": "#/$defs/chain" },
         "publisher": { "type": "string" },
         "maintainers": { "type": "array", "items": { "type": "string" } },
         "ownership_state": { "type": "string", "enum": ["unknown", "checked"] }
@@ -83,6 +84,17 @@
         },
         "commands": { "type": "array", "items": { "type": "string" } },
         "environment": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "chain": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "state": { "type": "string" },
+        "source": { "type": "string" },
+        "commit": { "type": "string" },
+        "builder": { "type": "string" },
+        "workflow": { "type": "string" }
       }
     },
     "capabilities": {

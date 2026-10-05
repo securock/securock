@@ -143,6 +143,9 @@ func Scan(ctx context.Context, opts Options) (*Result, error) {
 				Ownership: lockfile.OwnershipEvidence{
 					State: lockfile.CapUnknown,
 				},
+				Chain: lockfile.ChainEvidence{
+					State: lockfile.EvidenceUnknown,
+				},
 			},
 		}
 		key := ecosystem.Identity(dep)
@@ -157,6 +160,9 @@ func Scan(ctx context.Context, opts Options) (*Result, error) {
 			}
 			if rec.Ownership.State != "" {
 				art.Evidence.Ownership = rec.Ownership
+			}
+			if rec.Chain.State != "" {
+				art.Evidence.Chain = rec.Chain
 			}
 		}
 		if allowed[key] {

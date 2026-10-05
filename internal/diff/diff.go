@@ -30,6 +30,7 @@ type Side struct {
 	Resolved       []string                    `json:"resolved,omitempty"`
 	Capabilities   lockfile.CapabilityEvidence `json:"capabilities,omitempty"`
 	Behavior       lockfile.BehaviorEvidence   `json:"behavior,omitempty"`
+	Chain          lockfile.ChainEvidence      `json:"chain,omitempty"`
 	Publisher      string                      `json:"publisher,omitempty"`
 	Maintainers    []string                    `json:"maintainers,omitempty"`
 	OwnershipState lockfile.CapState           `json:"ownership_state,omitempty"`
@@ -166,6 +167,7 @@ func Write(w io.Writer, r Result) {
 		writeField(w, "resolved", join(c.Before.Resolved), join(c.After.Resolved), false)
 		writeCapabilities(w, c.Before.Capabilities, c.After.Capabilities)
 		writeBehavior(w, c.Before.Behavior, c.After.Behavior)
+		writeChain(w, c.Before.Chain, c.After.Chain)
 		writeOwnership(w, c.Before, c.After)
 		writeOwnershipPolicy(w, c.Before, c.After, r.Policy.Rules.Ownership)
 	}
@@ -201,6 +203,9 @@ func sideOf(arts []lockfile.Artifact) Side {
 		Behavior: lockfile.BehaviorEvidence{
 			State: lockfile.CapUnknown,
 		},
+		Chain: lockfile.ChainEvidence{
+			State: lockfile.EvidenceUnknown,
+		},
 		OwnershipState: lockfile.CapUnknown,
 	}
 	if len(arts) == 0 {
@@ -211,6 +216,7 @@ func sideOf(arts []lockfile.Artifact) Side {
 	s.Trust = arts[0].Trust.Status
 	s.Capabilities = arts[0].Evidence.Capabilities
 	s.Behavior = arts[0].Evidence.Behavior
+	s.Chain = arts[0].Evidence.Chain
 	s.OwnershipState = arts[0].Evidence.Ownership.State
 	var publishers []string
 	for _, art := range arts {
@@ -234,6 +240,7 @@ func sideOf(arts []lockfile.Artifact) Side {
 		s.TrustReason = append(s.TrustReason, art.Trust.Reasons...)
 		s.Capabilities = mergeCapabilities(s.Capabilities, art.Evidence.Capabilities)
 		s.Behavior = mergeBehavior(s.Behavior, art.Evidence.Behavior)
+		s.Chain = mergeChain(s.Chain, art.Evidence.Chain)
 		s.OwnershipState = worstCap(s.OwnershipState, art.Evidence.Ownership.State)
 		if art.Evidence.Ownership.Publisher != "" {
 			publishers = append(publishers, art.Evidence.Ownership.Publisher)
@@ -300,7 +307,8 @@ func nonOwnershipChanged(a, b Side) bool {
 		join(a.TrustReason) != join(b.TrustReason) ||
 		sourceChanged(a, b) ||
 		!capabilitiesEqual(a.Capabilities, b.Capabilities) ||
-		!behaviorEqual(a.Behavior, b.Behavior)
+		!behaviorEqual(a.Behavior, b.Behavior) ||
+		!chainEqual(a.Chain, b.Chain)
 }
 
 func ownershipChanged(a, b Side) bool {
@@ -451,6 +459,46 @@ func writeBehavior(w io.Writer, before, after lockfile.BehaviorEvidence) {
 	writeListDelta(w, "filesystem write", behaviorFiles(before).Write, behaviorFiles(after).Write)
 	writeListDelta(w, "commands", before.Commands, after.Commands)
 	writeListDelta(w, "environment", before.Environment, after.Environment)
+	if before.State != after.State {
+		fmt.Fprintf(w, "    state          %s → %s\n", before.State, after.State)
+	}
+}
+
+func chainEqual(a, b lockfile.ChainEvidence) bool {
+	return a.State == b.State &&
+		a.Source == b.Source &&
+		a.Commit == b.Commit &&
+		a.Builder == b.Builder &&
+		a.Workflow == b.Workflow
+}
+
+func mergeChain(a, b lockfile.ChainEvidence) lockfile.ChainEvidence {
+	out := a
+	out.State = worstEvidence(a.State, b.State)
+	if out.Source == "" {
+		out.Source = b.Source
+	}
+	if out.Commit == "" {
+		out.Commit = b.Commit
+	}
+	if out.Builder == "" {
+		out.Builder = b.Builder
+	}
+	if out.Workflow == "" {
+		out.Workflow = b.Workflow
+	}
+	return out
+}
+
+func writeChain(w io.Writer, before, after lockfile.ChainEvidence) {
+	if chainEqual(before, after) {
+		return
+	}
+	fmt.Fprintln(w, "  trust chain")
+	writeField(w, "source", before.Source, after.Source, false)
+	writeField(w, "commit", before.Commit, after.Commit, false)
+	writeField(w, "builder", before.Builder, after.Builder, false)
+	writeField(w, "workflow", before.Workflow, after.Workflow, false)
 	if before.State != after.State {
 		fmt.Fprintf(w, "    state          %s → %s\n", before.State, after.State)
 	}

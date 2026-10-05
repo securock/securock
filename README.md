@@ -6,7 +6,7 @@ Language lockfiles pin versions. `securock.lock` pins the _trust
 decision_ you accepted for those versions.
 
 Securock records digest, provenance, signature, vulnerability,
-capability, and ownership evidence for each artifact, then fails CI when
+capability, ownership, and trust-chain evidence for each artifact, then fails CI when
 that trust state drifts.
 
 **Docs:** [securock.dev](https://securock.dev)
@@ -143,6 +143,11 @@ artifacts:
         publisher: alice <alice@example.com>
         maintainers:
           - alice
+      chain:
+        state: present
+        source: github.com/facebook/react
+        commit: abc123
+        workflow: release.yml
     trust:
       status: unknown
 ```

@@ -89,8 +89,9 @@ func (c *NPM) Collect(ctx context.Context, deps []ecosystem.Dependency) (map[str
 }
 
 func (c *NPM) lookup(ctx context.Context, dep ecosystem.Dependency) Record {
+	prov, chain := c.attestations(ctx, dep)
 	rec := Record{
-		Provenance: c.provenance(ctx, dep),
+		Provenance: prov,
 		Signature:  lockfile.EvidenceUnknown,
 		Capabilities: lockfile.CapabilityEvidence{
 			State: lockfile.CapUnknown,
@@ -101,6 +102,7 @@ func (c *NPM) lookup(ctx context.Context, dep ecosystem.Dependency) Record {
 		Ownership: lockfile.OwnershipEvidence{
 			State: lockfile.CapUnknown,
 		},
+		Chain: chain,
 	}
 
 	meta, ok := c.versionMeta(ctx, dep)
@@ -253,36 +255,27 @@ func sameRegistryHost(registryHost, targetHost string) bool {
 	return false
 }
 
-func (c *NPM) provenance(ctx context.Context, dep ecosystem.Dependency) lockfile.EvidenceState {
+func (c *NPM) attestations(ctx context.Context, dep ecosystem.Dependency) (lockfile.EvidenceState, lockfile.ChainEvidence) {
 	endpoint := strings.TrimRight(c.registryFor(dep), "/") + npmAttestationsPath + url.PathEscape(dep.Name) + "@" + url.PathEscape(dep.Version)
 	res, err := c.get(ctx, endpoint)
 	if err != nil {
-		return lockfile.EvidenceUnknown
+		return lockfile.EvidenceUnknown, lockfile.ChainEvidence{State: lockfile.EvidenceUnknown}
 	}
 	defer res.Body.Close()
 
 	switch res.StatusCode {
 	case http.StatusNotFound:
-		return lockfile.EvidenceMissing
+		return lockfile.EvidenceMissing, lockfile.ChainEvidence{State: lockfile.EvidenceMissing}
 	case http.StatusOK:
 	default:
-		return lockfile.EvidenceUnknown
+		return lockfile.EvidenceUnknown, lockfile.ChainEvidence{State: lockfile.EvidenceUnknown}
 	}
 
-	var parsed struct {
-		Attestations []struct {
-			PredicateType string `json:"predicateType"`
-		} `json:"attestations"`
+	raw, err := io.ReadAll(io.LimitReader(res.Body, 2<<20))
+	if err != nil {
+		return lockfile.EvidenceUnknown, lockfile.ChainEvidence{State: lockfile.EvidenceUnknown}
 	}
-	if err := json.NewDecoder(res.Body).Decode(&parsed); err != nil {
-		return lockfile.EvidenceUnknown
-	}
-	for _, att := range parsed.Attestations {
-		if isProvenance(att.PredicateType) {
-			return lockfile.EvidencePresent
-		}
-	}
-	return lockfile.EvidenceMissing
+	return extractChain(raw)
 }
 
 func (c *NPM) registryFor(dep ecosystem.Dependency) string {

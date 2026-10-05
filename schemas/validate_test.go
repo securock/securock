@@ -25,7 +25,8 @@ func TestURLArtifactOmitsVersion(t *testing.T) {
         "malicious": { "state": "unknown" },
         "capabilities": { "state": "unknown" },
         "behavior": { "state": "unknown" },
-        "ownership": { "state": "unknown" }
+        "ownership": { "state": "unknown" },
+        "chain": { "state": "unknown" }
       },
       "trust": { "status": "unknown" }
     }
@@ -49,7 +50,8 @@ func TestNPMArtifactRequiresVersion(t *testing.T) {
         "malicious": { "state": "unknown" },
         "capabilities": { "state": "unknown" },
         "behavior": { "state": "unknown" },
-        "ownership": { "state": "unknown" }
+        "ownership": { "state": "unknown" },
+        "chain": { "state": "unknown" }
       },
       "trust": { "status": "unknown" }
     }
@@ -126,7 +128,8 @@ func TestRejectsUnknownArtifactField(t *testing.T) {
         "malicious": { "state": "unknown" },
         "capabilities": { "state": "unknown" },
         "behavior": { "state": "unknown" },
-        "ownership": { "state": "unknown" }
+        "ownership": { "state": "unknown" },
+        "chain": { "state": "unknown" }
       },
       "trust": { "status": "unknown" }
     }
