@@ -89,7 +89,7 @@ func Scan(ctx context.Context, opts Options) (*Result, error) {
 		}
 		collector := opts.Evidence
 		if collector == nil {
-			collector = evidence.NewNPM()
+			collector = evidence.NewDefault()
 		}
 		ev, err = collector.Collect(ctx, query)
 		if err != nil {

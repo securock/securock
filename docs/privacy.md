@@ -1,9 +1,10 @@
 # Privacy
 
 Securock may send public dependency names and versions to third parties
-when it looks up vulnerabilities and npm evidence. For npm capability and
-behavior scanning it may also download public package tarballs from the
-registry.
+when it looks up vulnerabilities and package evidence. For npm capability
+and behavior scanning it may also download public package tarballs from
+the registry. For PyPI it may query the Integrity API for public file
+provenance.
 
 ## Default: public-only
 
@@ -12,6 +13,8 @@ The default network mode is `public-only`. Securock only queries:
 - OSV (`https://api.osv.dev`)
 - the npm registry (`https://registry.npmjs.org`) and Yarn's default
   (`https://registry.yarnpkg.com`)
+- the PyPI Integrity API (`https://pypi.org/integrity/...`) for public
+  PyPI artifacts with a filename in the language lockfile
 
 and only for artifacts whose lockfile registry is a known public registry:
 
@@ -62,8 +65,9 @@ securock scan --network allow-all
 ```
 
 `--offline` skips all remote lookups. `allow-all` sends every dependency
-name and version to OSV and, for npm, the registry. Use it only when that
-disclosure is acceptable.
+name and version to OSV and, for supported collectors, registry evidence
+endpoints (npm attestations/signatures and PyPI Integrity API). Use it
+only when that disclosure is acceptable.
 
 Policy files can set the same mode:
 

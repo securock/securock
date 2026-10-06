@@ -29,8 +29,13 @@ Capability, behavior, and ownership evidence use the same `unknown` /
 - source → build → artifact fields from provenance attestations as
   `chain` (source, commit, ref, builder, workflow, predicate type)
 
-Provenance verification only accepts SLSA predicate types. Policy can
-further limit accepted sources, builders, workflows, refs, and
+For PyPI (uv / Poetry / PDM), Securock queries the Integrity API and
+records PEP 740 attestation bundles as provenance/signature `present`,
+with Trusted Publisher repository and workflow on the chain. Local
+Sigstore re-verification of those envelopes is not implemented yet.
+
+Provenance verification for npm only accepts SLSA predicate types.
+Policy can further limit accepted sources, builders, workflows, refs, and
 predicate types via `allow_*` lists under `rules.provenance`; those
 lists require a verified trust chain.
 

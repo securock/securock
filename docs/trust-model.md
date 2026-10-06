@@ -109,12 +109,21 @@ securock verify --profile strict
 ```
 
 `strict` requires digests plus `provenance` / `signature` minimum
-`verified`. It is mutually exclusive with `--policy`.
+`verified`. It is mutually exclusive with `--policy`. Prefer `strict`
+on npm-heavy trees today: PyPI attestations are collected as `present`
+(not yet locally re-verified to `verified`), and other ecosystems still
+leave provenance and signature as `unknown`.
 
 npm collection verifies registry ECDSA signatures against
 `/-/npm/v1/keys` and Sigstore provenance bundles against the public-good
 trusted root. Both require the lockfile digest to match the signed
 artifact before emitting `verified`.
+
+PyPI collection queries the Integrity API
+(`GET /integrity/<project>/<version>/<filename>/provenance`) for public
+packages and records PEP 740 attestation bundles as `present`, including
+Trusted Publisher repository and workflow on the trust chain. Local
+Sigstore re-verification of those envelopes is not implemented yet.
 
 Offline scans leave provenance, signature, capability, ownership,
 behavior, chain, vulnerability, and malicious-report state as
@@ -125,17 +134,17 @@ network mode. See [Privacy](privacy.md).
 
 ## Evidence Securock records
 
-| Evidence | npm / pnpm / yarn / bun / deno npm | all other ecosystems |
-| --- | --- | --- |
-| digest | from the language lockfile | from the language lockfile |
-| vulnerabilities | OSV ids (non-`MAL-`) | OSV ids when the source is proven public |
-| malicious | OpenSSF Malicious Packages via OSV `MAL-*` | same, when OSV is queried |
-| provenance | npm provenance attestation present; `verified` after Sigstore check + digest bind | `unknown` |
-| signature | npm `dist.signatures` present; `verified` after ECDSA check + digest bind | `unknown` |
-| capabilities | registry metadata + package source heuristics | `unknown` |
-| behavior | hosts, file paths, commands, env vars from source heuristics | `unknown` |
-| ownership | npm publisher (`_npmUser`) and maintainers | `unknown` |
-| chain | source repo, commit, ref, builder, workflow, predicate type from provenance attestations | `unknown` |
+| Evidence | npm / pnpm / yarn / bun / deno npm | PyPI (uv / Poetry / PDM) | all other ecosystems |
+| --- | --- | --- | --- |
+| digest | from the language lockfile | from the language lockfile | from the language lockfile |
+| vulnerabilities | OSV ids (non-`MAL-`) | OSV ids when the source is proven public | OSV ids when the source is proven public |
+| malicious | OpenSSF Malicious Packages via OSV `MAL-*` | same, when OSV is queried | same, when OSV is queried |
+| provenance | npm provenance attestation present; `verified` after Sigstore check + digest bind | PEP 740 Integrity API attestations recorded as `present` with Trusted Publisher chain | `unknown` |
+| signature | npm `dist.signatures` present; `verified` after ECDSA check + digest bind | recorded as `present` when Integrity API returns attestations | `unknown` |
+| capabilities | registry metadata + package source heuristics | `unknown` | `unknown` |
+| behavior | hosts, file paths, commands, env vars from source heuristics | `unknown` | `unknown` |
+| ownership | npm publisher (`_npmUser`) and maintainers | `unknown` | `unknown` |
+| chain | source repo, commit, ref, builder, workflow, predicate type from provenance attestations | Trusted Publisher repository, workflow, and predicate type from PEP 740 | `unknown` |
 
 Malicious package reports are not vulnerabilities. A package with no
 CVEs can still be malware. The default policy denies both.
