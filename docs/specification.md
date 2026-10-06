@@ -130,8 +130,15 @@ Digest prefixes keep ecosystem meaning:
 
 | Prefix | Meaning |
 | --- | --- |
-| `sha256:` / `sha512:` | content hash of the package artifact (npm SRI, Cargo checksum, PyPI file) |
+| `sha256:` / `sha384:` / `sha512:` | content hash of the package artifact (npm SRI, Cargo checksum, PyPI file) |
 | `goh1:` | Go module directory hash from `go.sum` (`h1:`) |
+
+`require_digest: true` (including the `strict` profile) requires a
+non-empty digest that uses a strong algorithm with a well-formed
+payload: `sha256`, `sha384`, `sha512`, or `goh1`. `sha1` and opaque
+strings fail the policy. Lockfile validation rejects colon-form
+digests whose payload length or alphabet does not match the algorithm;
+legacy SRI strings remain readable so existing lockfiles load.
 
 PyPI may emit one artifact per wheel or sdist, distinguished by
 `filename`.

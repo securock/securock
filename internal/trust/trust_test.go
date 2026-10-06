@@ -148,6 +148,24 @@ func TestEvaluateRequireDigest(t *testing.T) {
 	if art.Trust.Status != lockfile.StatusUntrusted {
 		t.Fatalf("status = %s", art.Trust.Status)
 	}
+	if !strings.Contains(strings.Join(art.Trust.Reasons, ","), "missing digest") {
+		t.Fatalf("reasons = %v", art.Trust.Reasons)
+	}
+
+	art.Digest = "sha1:" + strings.Repeat("ab", 20)
+	trust.Evaluate(&art, pol)
+	if art.Trust.Status != lockfile.StatusUntrusted {
+		t.Fatalf("weak digest status = %s", art.Trust.Status)
+	}
+	if !strings.Contains(strings.Join(art.Trust.Reasons, ","), "invalid digest") {
+		t.Fatalf("reasons = %v", art.Trust.Reasons)
+	}
+
+	art.Digest = "sha256:" + strings.Repeat("ab", 32)
+	trust.Evaluate(&art, pol)
+	if art.Trust.Status != lockfile.StatusTrusted {
+		t.Fatalf("strong digest should pass: %s %v", art.Trust.Status, art.Trust.Reasons)
+	}
 }
 
 func TestEvaluateDeniedCapability(t *testing.T) {

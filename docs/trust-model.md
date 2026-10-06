@@ -47,6 +47,7 @@ The artifact failed at least one enabled policy rule. Typical reasons:
 - known vulnerabilities
 - malicious package reports (`MAL-*`)
 - missing digest, when required
+- invalid or weak digest (sha1 / malformed), when `require_digest` is set
 - provenance not verified, when required
 - signature not verified, when required
 - denied capability (shell, install scripts, …)

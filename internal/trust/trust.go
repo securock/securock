@@ -5,6 +5,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/securock/securock/internal/ecosystem/core"
 	"github.com/securock/securock/pkg/lockfile"
 	"github.com/securock/securock/pkg/policy"
 )
@@ -33,8 +34,13 @@ func Evaluate(art *lockfile.Artifact, pol policy.Document) {
 			unknown = append(unknown, "malicious reports not checked")
 		}
 	}
-	if pol.Rules.RequireDigest && art.Digest == "" {
-		untrusted = append(untrusted, "missing digest")
+	if pol.Rules.RequireDigest {
+		switch {
+		case art.Digest == "":
+			untrusted = append(untrusted, "missing digest")
+		case core.StrongDigest(art.Digest) != nil:
+			untrusted = append(untrusted, "invalid digest")
+		}
 	}
 	if need := evidenceFloor(pol.Rules.Provenance.Minimum, pol.Rules.RequireProvenance); need != "" {
 		if !meets(art.Evidence.Provenance, need) {

@@ -34,7 +34,7 @@ func TestWriteRead(t *testing.T) {
 			{
 				Subject:  lockfile.Subject{Ecosystem: "npm", Name: "react"},
 				Version:  "19.2.0",
-				Digest:   "sha256:abc",
+				Digest:   "sha256:9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
 				Evidence: validEvidence(),
 				Trust:    lockfile.Trust{Status: lockfile.StatusTrusted},
 			},
@@ -246,7 +246,7 @@ artifacts:
       ecosystem: npm
       name: leftpad
     version: "1.0.0"
-    digest: sha256:abc
+    digest: sha256:9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08
     evidence:
       provenance: present
       signature: missing
@@ -411,7 +411,7 @@ func TestMigrateV1TwiceIsIdempotent(t *testing.T) {
 		Artifacts: []lockfile.V1Artifact{{
 			Subject: lockfile.Subject{Ecosystem: "npm", Name: "ms"},
 			Version: "2.1.3",
-			Digest:  "sha256:abc",
+			Digest:  "sha256:9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
 			Evidence: lockfile.V1Evidence{
 				Provenance:      lockfile.EvidencePresent,
 				Signature:       lockfile.EvidenceMissing,

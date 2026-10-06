@@ -14,7 +14,7 @@ func TestMigrateV1(t *testing.T) {
 		Artifacts: []lockfile.V1Artifact{{
 			Subject:  lockfile.Subject{Ecosystem: "npm", Name: "ms"},
 			Version:  "2.1.3",
-			Digest:   "sha256:abc",
+			Digest:   "sha256:9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
 			Filename: "ms.tgz",
 			Source: lockfile.ArtifactSource{
 				Resolver: "npm",
@@ -44,7 +44,7 @@ func TestMigrateV1(t *testing.T) {
 		t.Fatalf("policy = %#v", got.Policy)
 	}
 	art := got.Artifacts[0]
-	if art.Digest != "sha256:abc" || art.Filename != "ms.tgz" || art.Source.Registry == "" {
+	if art.Digest != "sha256:9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08" || art.Filename != "ms.tgz" || art.Source.Registry == "" {
 		t.Fatalf("kept fields: %#v", art)
 	}
 	if art.Evidence.Provenance != lockfile.EvidencePresent || art.Evidence.Signature != lockfile.EvidenceVerified {

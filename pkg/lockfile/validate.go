@@ -1,8 +1,10 @@
 package lockfile
 
 import (
+	"encoding/base64"
 	"fmt"
 	"slices"
+	"strings"
 )
 
 var (
@@ -56,6 +58,9 @@ func validateArtifact(art Artifact) error {
 	}
 	if !slices.Contains(sourceKinds, art.Source.Kind) {
 		return fmt.Errorf("unknown source kind %q", art.Source.Kind)
+	}
+	if err := validateDigest(art.Digest); err != nil {
+		return err
 	}
 	if !slices.Contains(evidence, art.Evidence.Provenance) {
 		return fmt.Errorf("unknown provenance state %q", art.Evidence.Provenance)
@@ -118,4 +123,67 @@ func validateArtifact(art Artifact) error {
 		return fmt.Errorf("unknown trust status %q", art.Trust.Status)
 	}
 	return nil
+}
+
+func validateDigest(raw string) error {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return nil
+	}
+	alg, payload, ok := strings.Cut(raw, ":")
+	if !ok {
+		// Legacy SRI (alg-payload) and opaque values stay readable.
+		return nil
+	}
+	switch strings.ToLower(alg) {
+	case "sha1":
+		if !digestHex(payload, 40) {
+			return fmt.Errorf("invalid sha1 digest %q", raw)
+		}
+	case "sha256":
+		if !digestHex(payload, 64) {
+			return fmt.Errorf("invalid sha256 digest %q", raw)
+		}
+	case "sha384":
+		if !digestHex(payload, 96) {
+			return fmt.Errorf("invalid sha384 digest %q", raw)
+		}
+	case "sha512":
+		if !digestHex(payload, 128) {
+			return fmt.Errorf("invalid sha512 digest %q", raw)
+		}
+	case "goh1":
+		decoded, err := decodeDigestBase64(payload)
+		if err != nil || len(decoded) != 32 {
+			return fmt.Errorf("invalid goh1 digest %q", raw)
+		}
+	default:
+		return fmt.Errorf("unknown digest algorithm %q", alg)
+	}
+	return nil
+}
+
+func digestHex(s string, wantLen int) bool {
+	if len(s) != wantLen {
+		return false
+	}
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		switch {
+		case c >= '0' && c <= '9', c >= 'a' && c <= 'f', c >= 'A' && c <= 'F':
+		default:
+			return false
+		}
+	}
+	return true
+}
+
+func decodeDigestBase64(payload string) ([]byte, error) {
+	if raw, err := base64.StdEncoding.DecodeString(payload); err == nil {
+		return raw, nil
+	}
+	if raw, err := base64.RawStdEncoding.DecodeString(strings.TrimRight(payload, "=")); err == nil {
+		return raw, nil
+	}
+	return nil, fmt.Errorf("invalid base64")
 }
