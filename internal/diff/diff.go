@@ -468,8 +468,10 @@ func chainEqual(a, b lockfile.ChainEvidence) bool {
 	return a.State == b.State &&
 		a.Source == b.Source &&
 		a.Commit == b.Commit &&
+		a.Ref == b.Ref &&
 		a.Builder == b.Builder &&
-		a.Workflow == b.Workflow
+		a.Workflow == b.Workflow &&
+		a.PredicateType == b.PredicateType
 }
 
 func mergeChain(a, b lockfile.ChainEvidence) lockfile.ChainEvidence {
@@ -481,11 +483,17 @@ func mergeChain(a, b lockfile.ChainEvidence) lockfile.ChainEvidence {
 	if out.Commit == "" {
 		out.Commit = b.Commit
 	}
+	if out.Ref == "" {
+		out.Ref = b.Ref
+	}
 	if out.Builder == "" {
 		out.Builder = b.Builder
 	}
 	if out.Workflow == "" {
 		out.Workflow = b.Workflow
+	}
+	if out.PredicateType == "" {
+		out.PredicateType = b.PredicateType
 	}
 	return out
 }
@@ -497,8 +505,10 @@ func writeChain(w io.Writer, before, after lockfile.ChainEvidence) {
 	fmt.Fprintln(w, "  trust chain")
 	writeField(w, "source", before.Source, after.Source, false)
 	writeField(w, "commit", before.Commit, after.Commit, false)
+	writeField(w, "ref", before.Ref, after.Ref, false)
 	writeField(w, "builder", before.Builder, after.Builder, false)
 	writeField(w, "workflow", before.Workflow, after.Workflow, false)
+	writeField(w, "predicate_type", before.PredicateType, after.PredicateType, false)
 	if before.State != after.State {
 		fmt.Fprintf(w, "    state          %s → %s\n", before.State, after.State)
 	}

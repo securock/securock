@@ -76,11 +76,17 @@ func writeChain(w io.Writer, art lockfile.Artifact) {
 		if chain.Commit != "" {
 			fmt.Fprintf(w, "  commit     %s\n", chain.Commit)
 		}
+		if chain.Ref != "" {
+			fmt.Fprintf(w, "  ref        %s\n", chain.Ref)
+		}
 		if chain.Builder != "" {
 			fmt.Fprintf(w, "  builder    %s\n", chain.Builder)
 		}
 		if chain.Workflow != "" {
 			fmt.Fprintf(w, "  workflow   %s\n", chain.Workflow)
+		}
+		if chain.PredicateType != "" {
+			fmt.Fprintf(w, "  predicate  %s\n", chain.PredicateType)
 		}
 		fmt.Fprintln(w, "  Chain")
 		writeChainStep(w, "source", chain.Source != "")

@@ -164,6 +164,7 @@ func chainFromVerifiedStatement(res *verify.VerificationResult) lockfile.ChainEv
 	filled := fillChainFromPredicate(predJSON)
 	filled.Source = normalizeSource(filled.Source)
 	filled.Workflow = normalizeWorkflow(filled.Workflow, filled.Builder)
+	filled.PredicateType = res.Statement.GetPredicateType()
 	filled.State = lockfile.EvidenceVerified
 	return filled
 }

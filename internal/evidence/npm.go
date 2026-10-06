@@ -442,5 +442,12 @@ func encodeNPMName(name string) string {
 }
 
 func isProvenance(predicateType string) bool {
-	return strings.Contains(strings.ToLower(predicateType), "provenance")
+	switch strings.TrimSpace(predicateType) {
+	case "https://slsa.dev/provenance/v1",
+		"https://slsa.dev/provenance/v0.2",
+		"https://slsa.dev/provenance/v0.1":
+		return true
+	default:
+		return false
+	}
 }

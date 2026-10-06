@@ -3,6 +3,7 @@ package trust
 import (
 	"fmt"
 	"slices"
+	"strings"
 
 	"github.com/securock/securock/pkg/lockfile"
 	"github.com/securock/securock/pkg/policy"
@@ -42,6 +43,16 @@ func Evaluate(art *lockfile.Artifact, pol policy.Document) {
 			} else {
 				untrusted = append(untrusted, "provenance not present")
 			}
+		}
+	}
+	if pol.Rules.Provenance.OriginConfigured() {
+		switch art.Evidence.Chain.State {
+		case lockfile.EvidenceUnknown:
+			unknown = append(unknown, "provenance origin not checked")
+		case lockfile.EvidenceVerified:
+			untrusted = append(untrusted, provenanceOriginViolations(art.Evidence.Chain, pol.Rules.Provenance)...)
+		default:
+			untrusted = append(untrusted, "provenance origin not verified")
 		}
 	}
 	if need := evidenceFloor(pol.Rules.Signature.Minimum, pol.Rules.RequireSignature); need != "" {
@@ -100,6 +111,108 @@ func capabilityViolations(caps lockfile.CapabilityEvidence, rule policy.Capabili
 	}
 	slices.Sort(out)
 	return out
+}
+
+func provenanceOriginViolations(chain lockfile.ChainEvidence, rule policy.EvidenceRule) []string {
+	var out []string
+	if len(rule.AllowSources) > 0 && !matchSource(chain.Source, rule.AllowSources) {
+		out = append(out, "provenance source not allowed")
+	}
+	if len(rule.AllowBuilders) > 0 && !matchBuilder(chain.Builder, rule.AllowBuilders) {
+		out = append(out, "provenance builder not allowed")
+	}
+	if len(rule.AllowWorkflows) > 0 && !matchWorkflow(chain.Workflow, rule.AllowWorkflows) {
+		out = append(out, "provenance workflow not allowed")
+	}
+	if len(rule.AllowRefs) > 0 && !matchExact(chain.Ref, rule.AllowRefs) {
+		out = append(out, "provenance ref not allowed")
+	}
+	if len(rule.AllowPredicateTypes) > 0 && !matchExact(chain.PredicateType, rule.AllowPredicateTypes) {
+		out = append(out, "provenance predicate type not allowed")
+	}
+	slices.Sort(out)
+	return out
+}
+
+func matchSource(got string, allow []string) bool {
+	got = normalizeSource(got)
+	if got == "" {
+		return false
+	}
+	for _, entry := range allow {
+		if got == normalizeSource(entry) {
+			return true
+		}
+	}
+	return false
+}
+
+func matchBuilder(got string, allow []string) bool {
+	got = strings.TrimSpace(got)
+	if got == "" {
+		return false
+	}
+	for _, entry := range allow {
+		entry = strings.TrimSpace(entry)
+		if entry == "" {
+			continue
+		}
+		if got == entry || strings.HasPrefix(got, entry+"@") || strings.HasPrefix(got, entry+"/") {
+			return true
+		}
+	}
+	return false
+}
+
+func matchWorkflow(got string, allow []string) bool {
+	got = workflowBase(got)
+	if got == "" {
+		return false
+	}
+	for _, entry := range allow {
+		if got == workflowBase(entry) {
+			return true
+		}
+	}
+	return false
+}
+
+func matchExact(got string, allow []string) bool {
+	got = strings.TrimSpace(got)
+	if got == "" {
+		return false
+	}
+	for _, entry := range allow {
+		if got == strings.TrimSpace(entry) {
+			return true
+		}
+	}
+	return false
+}
+
+func workflowBase(s string) string {
+	s = strings.TrimSpace(s)
+	if i := strings.LastIndex(s, "/"); i >= 0 {
+		return s[i+1:]
+	}
+	return s
+}
+
+func normalizeSource(s string) string {
+	s = strings.TrimSpace(s)
+	s = strings.TrimPrefix(s, "git+")
+	if !strings.HasPrefix(s, "git@") {
+		if i := strings.LastIndex(s, "@"); i > 0 {
+			s = s[:i]
+		}
+	}
+	s = strings.TrimSuffix(s, ".git")
+	s = strings.TrimPrefix(s, "https://")
+	s = strings.TrimPrefix(s, "http://")
+	s = strings.TrimPrefix(s, "ssh://git@")
+	s = strings.TrimPrefix(s, "git@")
+	s = strings.Replace(s, ":", "/", 1)
+	return strings.TrimSuffix(s, "/")
 }
 
 func capabilityEnabled(caps lockfile.CapabilityEvidence, name string) bool {

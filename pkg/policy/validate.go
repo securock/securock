@@ -3,6 +3,7 @@ package policy
 import (
 	"fmt"
 	"slices"
+	"strings"
 )
 
 var (
@@ -20,11 +21,14 @@ func Validate(doc Document) error {
 	default:
 		return fmt.Errorf("unknown network mode %q", doc.Network.Mode)
 	}
-	if err := validateEvidenceRule("provenance", doc.Rules.Provenance.Minimum); err != nil {
+	if err := validateEvidenceRule("provenance", doc.Rules.Provenance); err != nil {
 		return err
 	}
-	if err := validateEvidenceRule("signature", doc.Rules.Signature.Minimum); err != nil {
+	if err := validateEvidenceRule("signature", doc.Rules.Signature); err != nil {
 		return err
+	}
+	if doc.Rules.Signature.OriginConfigured() {
+		return fmt.Errorf("signature policy does not support provenance origin allowlists")
 	}
 	switch doc.Rules.Vulnerabilities.Allow {
 	case "", "none":
@@ -45,13 +49,29 @@ func Validate(doc Document) error {
 	return nil
 }
 
-func validateEvidenceRule(name, minimum string) error {
-	switch minimum {
+func validateEvidenceRule(name string, rule EvidenceRule) error {
+	switch rule.Minimum {
 	case "", "present", "verified":
-		return nil
 	default:
-		return fmt.Errorf("unknown %s minimum %q", name, minimum)
+		return fmt.Errorf("unknown %s minimum %q", name, rule.Minimum)
 	}
+	for _, pair := range []struct {
+		field string
+		vals  []string
+	}{
+		{"allow_sources", rule.AllowSources},
+		{"allow_builders", rule.AllowBuilders},
+		{"allow_workflows", rule.AllowWorkflows},
+		{"allow_refs", rule.AllowRefs},
+		{"allow_predicate_types", rule.AllowPredicateTypes},
+	} {
+		for _, v := range pair.vals {
+			if strings.TrimSpace(v) == "" {
+				return fmt.Errorf("%s %s entry must not be empty", name, pair.field)
+			}
+		}
+	}
+	return nil
 }
 
 func validateCapabilityRule(rule CapabilityRule) error {

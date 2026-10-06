@@ -52,7 +52,21 @@ type Rules struct {
 }
 
 type EvidenceRule struct {
-	Minimum string `json:"minimum,omitempty" yaml:"minimum,omitempty"`
+	Minimum             string   `json:"minimum,omitempty" yaml:"minimum,omitempty"`
+	AllowSources        []string `json:"allow_sources,omitempty" yaml:"allow_sources,omitempty"`
+	AllowBuilders       []string `json:"allow_builders,omitempty" yaml:"allow_builders,omitempty"`
+	AllowWorkflows      []string `json:"allow_workflows,omitempty" yaml:"allow_workflows,omitempty"`
+	AllowRefs           []string `json:"allow_refs,omitempty" yaml:"allow_refs,omitempty"`
+	AllowPredicateTypes []string `json:"allow_predicate_types,omitempty" yaml:"allow_predicate_types,omitempty"`
+}
+
+// OriginConfigured reports whether provenance origin allowlists are set.
+func (r EvidenceRule) OriginConfigured() bool {
+	return len(r.AllowSources) > 0 ||
+		len(r.AllowBuilders) > 0 ||
+		len(r.AllowWorkflows) > 0 ||
+		len(r.AllowRefs) > 0 ||
+		len(r.AllowPredicateTypes) > 0
 }
 
 // VulnerabilityRule is an optional structured form of vulnerability policy.
@@ -193,7 +207,12 @@ type canonicalRules struct {
 }
 
 type canonicalEvidence struct {
-	Minimum string `json:"minimum,omitempty"`
+	Minimum             string   `json:"minimum,omitempty"`
+	AllowSources        []string `json:"allow_sources,omitempty"`
+	AllowBuilders       []string `json:"allow_builders,omitempty"`
+	AllowWorkflows      []string `json:"allow_workflows,omitempty"`
+	AllowRefs           []string `json:"allow_refs,omitempty"`
+	AllowPredicateTypes []string `json:"allow_predicate_types,omitempty"`
 }
 
 type canonicalVulnRule struct {
@@ -238,10 +257,26 @@ func canonical(doc Document) canonicalDocument {
 }
 
 func canonicalEvidenceRule(rule EvidenceRule) *canonicalEvidence {
-	if rule.Minimum == "" {
+	if rule.Minimum == "" && !rule.OriginConfigured() {
 		return nil
 	}
-	return &canonicalEvidence{Minimum: rule.Minimum}
+	return &canonicalEvidence{
+		Minimum:             rule.Minimum,
+		AllowSources:        sortedCompact(rule.AllowSources),
+		AllowBuilders:       sortedCompact(rule.AllowBuilders),
+		AllowWorkflows:      sortedCompact(rule.AllowWorkflows),
+		AllowRefs:           sortedCompact(rule.AllowRefs),
+		AllowPredicateTypes: sortedCompact(rule.AllowPredicateTypes),
+	}
+}
+
+func sortedCompact(in []string) []string {
+	if len(in) == 0 {
+		return nil
+	}
+	out := slices.Clone(in)
+	slices.Sort(out)
+	return slices.Compact(out)
 }
 
 func canonicalVuln(rule VulnerabilityRule) *canonicalVulnRule {

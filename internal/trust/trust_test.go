@@ -233,3 +233,77 @@ func TestEvaluateVulnerabilitiesAllowNone(t *testing.T) {
 		t.Fatalf("status = %s", art.Trust.Status)
 	}
 }
+
+func TestEvaluateProvenanceOriginAllowlists(t *testing.T) {
+	base := lockfile.Artifact{
+		Evidence: lockfile.Evidence{
+			Provenance: lockfile.EvidenceVerified,
+			Vulnerabilities: lockfile.VulnEvidence{
+				State: lockfile.VulnChecked,
+			},
+			Malicious: lockfile.MaliciousEvidence{State: lockfile.VulnChecked},
+			Chain: lockfile.ChainEvidence{
+				State:         lockfile.EvidenceVerified,
+				Source:        "github.com/acme/pkg",
+				Builder:       "https://github.com/actions/runner",
+				Workflow:      "release.yml",
+				Ref:           "refs/heads/main",
+				PredicateType: "https://slsa.dev/provenance/v1",
+			},
+		},
+	}
+
+	ok := policy.Default()
+	ok.Rules.Provenance = policy.EvidenceRule{
+		Minimum:             "verified",
+		AllowSources:        []string{"https://github.com/acme/pkg"},
+		AllowBuilders:       []string{"https://github.com/actions/runner"},
+		AllowWorkflows:      []string{".github/workflows/release.yml"},
+		AllowRefs:           []string{"refs/heads/main"},
+		AllowPredicateTypes: []string{"https://slsa.dev/provenance/v1"},
+	}
+	art := base
+	trust.Evaluate(&art, ok)
+	if art.Trust.Status != lockfile.StatusTrusted {
+		t.Fatalf("allowed origin should pass: %s %v", art.Trust.Status, art.Trust.Reasons)
+	}
+
+	denied := ok
+	denied.Rules.Provenance.AllowSources = []string{"github.com/other/pkg"}
+	art = base
+	trust.Evaluate(&art, denied)
+	if art.Trust.Status != lockfile.StatusUntrusted {
+		t.Fatalf("disallowed source should fail: %s", art.Trust.Status)
+	}
+	if !strings.Contains(strings.Join(art.Trust.Reasons, ","), "provenance source not allowed") {
+		t.Fatalf("reasons = %v", art.Trust.Reasons)
+	}
+
+	unverified := ok
+	art = base
+	art.Evidence.Chain.State = lockfile.EvidencePresent
+	art.Evidence.Provenance = lockfile.EvidencePresent
+	trust.Evaluate(&art, unverified)
+	if art.Trust.Status != lockfile.StatusUntrusted {
+		t.Fatalf("unverified chain must fail origin allowlists: %s", art.Trust.Status)
+	}
+	if !strings.Contains(strings.Join(art.Trust.Reasons, ","), "provenance origin not verified") {
+		t.Fatalf("reasons = %v", art.Trust.Reasons)
+	}
+}
+
+func TestEvaluateProvenanceOriginUnknown(t *testing.T) {
+	pol := policy.Default()
+	pol.Rules.Provenance.AllowSources = []string{"github.com/acme/pkg"}
+	art := lockfile.Artifact{
+		Evidence: lockfile.Evidence{
+			Vulnerabilities: lockfile.VulnEvidence{State: lockfile.VulnChecked},
+			Malicious:       lockfile.MaliciousEvidence{State: lockfile.VulnChecked},
+			Chain:           lockfile.ChainEvidence{State: lockfile.EvidenceUnknown},
+		},
+	}
+	trust.Evaluate(&art, pol)
+	if art.Trust.Status != lockfile.StatusUnknown {
+		t.Fatalf("status = %s, want unknown", art.Trust.Status)
+	}
+}

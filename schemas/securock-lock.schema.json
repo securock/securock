@@ -207,8 +207,10 @@
         "state": { "$ref": "#/$defs/evidenceState" },
         "source": { "type": "string", "minLength": 1 },
         "commit": { "type": "string", "minLength": 1 },
+        "ref": { "type": "string", "minLength": 1 },
         "builder": { "type": "string", "minLength": 1 },
-        "workflow": { "type": "string", "minLength": 1 }
+        "workflow": { "type": "string", "minLength": 1 },
+        "predicate_type": { "type": "string", "minLength": 1 }
       }
     },
     "trust": {

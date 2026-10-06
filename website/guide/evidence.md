@@ -26,7 +26,13 @@ Capability, behavior, and ownership evidence use the same `unknown` /
 - network, filesystem, environment, and shell indicators from published
   package sources
 - finer-grained hosts, paths, commands, and env vars as `behavior`
-- source → build → artifact fields from provenance attestations as `chain`
+- source → build → artifact fields from provenance attestations as
+  `chain` (source, commit, ref, builder, workflow, predicate type)
+
+Provenance verification only accepts SLSA predicate types. Policy can
+further limit accepted sources, builders, workflows, refs, and
+predicate types via `allow_*` lists under `rules.provenance`; those
+lists require a verified trust chain.
 
 Malicious package reports are not vulnerabilities. A package with no
 CVEs can still be malware. The default policy denies both.

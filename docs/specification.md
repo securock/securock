@@ -92,7 +92,8 @@ environment, shell, native code, install scripts). `ownership` records
 the publisher and maintainers. `behavior` records finer-grained hosts,
 paths, commands, and environment variables. `chain` records the
 source → build → artifact trust chain extracted from provenance
-attestations (repository, commit, builder, workflow). These use
+attestations (repository, commit, ref, builder, workflow, predicate
+type). These use
 `state: checked` / evidence states when collected and `unknown` when
 skipped (offline or non-npm). A change to any of them is trust drift.
 
@@ -116,9 +117,10 @@ Internal comparison uses structured keys (`ecosystem`, `name`,
 
 `policy.digest` is a SHA-256 of a canonical JSON encoding of the active
 policy (version, resolved network mode, registry allowlists, and
-non-default rules including capability deny lists and ownership change
-actions). It must not include a file path. Adding unused optional
-fields to the Go struct must not change the digest.
+non-default rules including capability deny lists, ownership change
+actions, and provenance origin allowlists). It must not include a file
+path. Adding unused optional fields to the Go struct must not change
+the digest.
 
 Vulnerability evidence is not a bare list. `state: checked` means
 OSV was queried. `unknown` means it was not. An empty `items` list

@@ -42,12 +42,14 @@ func extractChain(raw []byte) (lockfile.EvidenceState, lockfile.ChainEvidence) {
 			continue
 		}
 		foundProvenance = true
-		if filled := fillChainFromPredicate(pred); filled.Source != "" || filled.Commit != "" || filled.Builder != "" || filled.Workflow != "" {
+		if filled := fillChainFromPredicate(pred); filled.Source != "" || filled.Commit != "" || filled.Builder != "" || filled.Workflow != "" || filled.Ref != "" {
 			chain = filled
+			chain.PredicateType = predType
 			chain.State = lockfile.EvidencePresent
 			break
 		}
 		chain.State = lockfile.EvidencePresent
+		chain.PredicateType = predType
 	}
 	if !foundProvenance {
 		return lockfile.EvidenceMissing, lockfile.ChainEvidence{State: lockfile.EvidenceMissing}
@@ -137,6 +139,7 @@ func fillFromKnownPaths(pred map[string]any, out *lockfile.ChainEvidence) {
 			if wf, ok := asMap(params["workflow"]); ok {
 				setSource(out, stringField(wf, "repository"))
 				setWorkflow(out, stringField(wf, "path"))
+				setRef(out, stringField(wf, "ref"))
 			}
 			setSource(out, stringField(params, "source"))
 			setSource(out, stringField(params, "repository"))
@@ -225,6 +228,10 @@ func walkChain(v any, out *lockfile.ChainEvidence) {
 				if s, ok := child.(string); ok {
 					setCommit(out, s)
 				}
+			case "ref":
+				if s, ok := child.(string); ok {
+					setRef(out, s)
+				}
 			case "digest":
 				if digests, ok := asMap(child); ok {
 					setCommit(out, stringField(digests, "sha1"))
@@ -264,6 +271,13 @@ func setCommit(out *lockfile.ChainEvidence, s string) {
 	}
 }
 
+func setRef(out *lockfile.ChainEvidence, s string) {
+	s = strings.TrimSpace(s)
+	if out.Ref == "" && looksLikeRef(s) {
+		out.Ref = s
+	}
+}
+
 func asMap(v any) (map[string]any, bool) {
 	m, ok := v.(map[string]any)
 	return m, ok
@@ -300,6 +314,13 @@ func looksLikeCommit(s string) bool {
 		}
 	}
 	return true
+}
+
+func looksLikeRef(s string) bool {
+	if s == "" || strings.ContainsAny(s, " \t\n") {
+		return false
+	}
+	return strings.HasPrefix(s, "refs/") || (!strings.Contains(s, "://") && !strings.Contains(s, "/.git"))
 }
 
 func looksLikeWorkflow(s string) bool {

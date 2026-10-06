@@ -77,6 +77,30 @@ rules:
     minimum: verified
 ```
 
+To also require that verified provenance came from an expected origin:
+
+```yaml
+rules:
+  provenance:
+    minimum: verified
+    allow_sources:
+      - github.com/acme/pkg
+    allow_builders:
+      - https://github.com/actions/runner
+    allow_workflows:
+      - release.yml
+    allow_refs:
+      - refs/heads/main
+    allow_predicate_types:
+      - https://slsa.dev/provenance/v1
+```
+
+Empty allowlists are ignored. When any origin allowlist is set, Securock
+requires a cryptographically verified trust chain and fails artifacts
+whose chain fields do not match. Offline scans leave chain evidence
+`unknown`, so origin allowlists surface as `unknown` rather than
+trusted.
+
 Or use the built-in strict profile:
 
 ```bash
@@ -110,7 +134,7 @@ network mode. See [Privacy](privacy.md).
 | capabilities | registry metadata + package source heuristics | `unknown` |
 | behavior | hosts, file paths, commands, env vars from source heuristics | `unknown` |
 | ownership | npm publisher (`_npmUser`) and maintainers | `unknown` |
-| chain | source repo, commit, builder, workflow from provenance attestations | `unknown` |
+| chain | source repo, commit, ref, builder, workflow, predicate type from provenance attestations | `unknown` |
 
 Malicious package reports are not vulnerabilities. A package with no
 CVEs can still be malware. The default policy denies both.
@@ -122,10 +146,14 @@ full behavioral sandbox and may under-report obfuscated code.
 
 Trust chain evidence is extracted from npm provenance attestations
 (SLSA predicates). It records the claimed source repository, commit,
-builder identity, and workflow path when present. When the Sigstore
-bundle verifies and the subject digest matches the lockfile digest,
-provenance and chain are recorded as `verified`. Securock does not
-rebuild the artifact from source.
+ref, builder identity, workflow path, and predicate type when present.
+When the Sigstore bundle verifies and the subject digest matches the
+lockfile digest, provenance and chain are recorded as `verified`.
+Securock only accepts SLSA provenance predicate types
+(`https://slsa.dev/provenance/v0.1`, `v0.2`, and `v1`) for provenance
+evidence. Policy origin allowlists can further restrict which source,
+builder, workflow, ref, and predicate type count as trusted. Securock
+does not rebuild the artifact from source.
 
 Deno JSR and HTTPS URL artifacts record integrity from `deno.lock`.
 OSV does not cover those ecosystems yet, so vulnerability state stays

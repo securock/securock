@@ -166,3 +166,55 @@ func TestValidateCapabilityAndOwnership(t *testing.T) {
 		t.Fatal("unknown capability must fail")
 	}
 }
+
+func TestFingerprintProvenanceOrigin(t *testing.T) {
+	base, err := policy.Fingerprint(policy.Default())
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := policy.Fingerprint(policy.Document{
+		Version: 1,
+		Network: policy.Network{Mode: policy.ModePublicOnly},
+		Rules: policy.Rules{
+			RequireNoVulnerabilities: true,
+			RequireNoMalicious:       true,
+			Provenance: policy.EvidenceRule{
+				AllowSources: []string{"github.com/acme/pkg"},
+			},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got == base {
+		t.Fatal("provenance allow_sources must change fingerprint")
+	}
+}
+
+func TestValidateSignatureRejectsOriginAllowlists(t *testing.T) {
+	doc := policy.Document{
+		Version: 1,
+		Rules: policy.Rules{
+			Signature: policy.EvidenceRule{
+				AllowSources: []string{"github.com/acme/pkg"},
+			},
+		},
+	}
+	if err := policy.Validate(doc); err == nil {
+		t.Fatal("signature origin allowlists must fail validation")
+	}
+}
+
+func TestValidateProvenanceOriginEmptyEntry(t *testing.T) {
+	doc := policy.Document{
+		Version: 1,
+		Rules: policy.Rules{
+			Provenance: policy.EvidenceRule{
+				AllowSources: []string{" "},
+			},
+		},
+	}
+	if err := policy.Validate(doc); err == nil {
+		t.Fatal("empty allow_sources entry must fail")
+	}
+}

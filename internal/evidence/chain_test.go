@@ -48,6 +48,12 @@ func TestExtractChainFromPredicate(t *testing.T) {
 	if chain.Workflow != "release.yml" {
 		t.Fatalf("workflow = %q", chain.Workflow)
 	}
+	if chain.Ref != "refs/heads/main" {
+		t.Fatalf("ref = %q", chain.Ref)
+	}
+	if chain.PredicateType != "https://slsa.dev/provenance/v1" {
+		t.Fatalf("predicate_type = %q", chain.PredicateType)
+	}
 	if chain.Builder == "" {
 		t.Fatal("expected builder")
 	}

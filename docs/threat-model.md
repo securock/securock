@@ -40,7 +40,9 @@ even when the lockfile already records them. The GitHub Action default
   both attacker-controlled
 - obfuscated capability use that the package source heuristics miss
 - provenance signed by an OIDC issuer outside the trusted GitHub Actions
-  / GitLab patterns Securock accepts for `verified`
+  / GitLab patterns Securock accepts for `verified`, or provenance whose
+  source/builder/workflow/ref/predicate type is outside an active policy
+  origin allowlist
 
 ## Trust boundary
 

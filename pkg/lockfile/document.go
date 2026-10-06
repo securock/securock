@@ -117,11 +117,13 @@ const (
 )
 
 type ChainEvidence struct {
-	State    EvidenceState `json:"state" yaml:"state"`
-	Source   string        `json:"source,omitempty" yaml:"source,omitempty"`
-	Commit   string        `json:"commit,omitempty" yaml:"commit,omitempty"`
-	Builder  string        `json:"builder,omitempty" yaml:"builder,omitempty"`
-	Workflow string        `json:"workflow,omitempty" yaml:"workflow,omitempty"`
+	State         EvidenceState `json:"state" yaml:"state"`
+	Source        string        `json:"source,omitempty" yaml:"source,omitempty"`
+	Commit        string        `json:"commit,omitempty" yaml:"commit,omitempty"`
+	Ref           string        `json:"ref,omitempty" yaml:"ref,omitempty"`
+	Builder       string        `json:"builder,omitempty" yaml:"builder,omitempty"`
+	Workflow      string        `json:"workflow,omitempty" yaml:"workflow,omitempty"`
+	PredicateType string        `json:"predicate_type,omitempty" yaml:"predicate_type,omitempty"`
 }
 
 // CapabilityEvidence records observed package capabilities.
