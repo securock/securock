@@ -119,7 +119,7 @@ func (c *PyPI) lookup(ctx context.Context, dep ecosystem.Dependency) Record {
 		return rec
 	}
 
-	prov, sig, chain := parsePyPIProvenance(raw, dep.Digest)
+	prov, sig, chain := parsePyPIProvenance(raw, dep.Digest, dep.Filename)
 	rec.Provenance = prov
 	rec.Signature = sig
 	rec.Chain = chain
@@ -161,7 +161,7 @@ func (c *PyPI) fetchProvenance(ctx context.Context, dep ecosystem.Dependency) ([
 	return raw, res.StatusCode, nil
 }
 
-func parsePyPIProvenance(raw []byte, digest string) (lockfile.EvidenceState, lockfile.EvidenceState, lockfile.ChainEvidence) {
+func parsePyPIProvenance(raw []byte, digest, filename string) (lockfile.EvidenceState, lockfile.EvidenceState, lockfile.ChainEvidence) {
 	var parsed struct {
 		AttestationBundles []struct {
 			Attestations []json.RawMessage `json:"attestations"`
@@ -201,9 +201,12 @@ func parsePyPIProvenance(raw []byte, digest string) (lockfile.EvidenceState, loc
 		}
 		for _, att := range bundle.Attestations {
 			foundAttestation = true
-			predType, _ := pypiAttestationMeta(att, digest)
+			predType, _ := pypiAttestationMeta(att, digest, filename)
 			if predType != "" && chain.PredicateType == "" {
 				chain.PredicateType = predType
+			}
+			if res, ok := verifyPyPIAttestation(att, digest, filename); ok {
+				return lockfile.EvidenceVerified, lockfile.EvidenceVerified, chainFromPyPIVerified(res, chain)
 			}
 		}
 	}
@@ -212,14 +215,13 @@ func parsePyPIProvenance(raw []byte, digest string) (lockfile.EvidenceState, loc
 		return lockfile.EvidenceMissing, lockfile.EvidenceMissing, lockfile.ChainEvidence{State: lockfile.EvidenceMissing}
 	}
 
+	// Attestations are present but local Sigstore re-verification did not
+	// succeed (missing digest, incomplete envelope, or crypto failure).
 	chain.State = lockfile.EvidencePresent
-	// PyPI attestations are index-served Sigstore statements. Securock
-	// records them as present with Trusted Publisher chain fields. Full
-	// local Sigstore re-verification of PEP 740 envelopes is not done yet.
 	return lockfile.EvidencePresent, lockfile.EvidencePresent, chain
 }
 
-func pypiAttestationMeta(att json.RawMessage, digest string) (predicateType string, subjectMatches bool) {
+func pypiAttestationMeta(att json.RawMessage, digest, filename string) (predicateType string, subjectMatches bool) {
 	var obj struct {
 		Envelope struct {
 			Statement string `json:"statement"`
@@ -238,6 +240,7 @@ func pypiAttestationMeta(att json.RawMessage, digest string) (predicateType stri
 	var stmt struct {
 		PredicateType string `json:"predicateType"`
 		Subject       []struct {
+			Name   string            `json:"name"`
 			Digest map[string]string `json:"digest"`
 		} `json:"subject"`
 	}
@@ -253,7 +256,11 @@ func pypiAttestationMeta(att json.RawMessage, digest string) (predicateType stri
 		return predicateType, false
 	}
 	wantAlg = strings.ToLower(wantAlg)
+	filename = strings.TrimSpace(filename)
 	for _, sub := range stmt.Subject {
+		if filename != "" && sub.Name != filename {
+			continue
+		}
 		for alg, hexDigest := range sub.Digest {
 			if strings.EqualFold(alg, wantAlg) && strings.EqualFold(hexDigest, wantHex) {
 				return predicateType, true

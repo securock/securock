@@ -14,11 +14,12 @@ evidence for each artifact, then fails CI when that trust state drifts.
 **Status:** pre-1.0. All resolvers are stable. npm, pnpm, Yarn, Bun, and
 Deno collect provenance, signature, capability, behavior, ownership, and
 trust-chain evidence from the npm registry. PyPI (uv / Poetry / PDM)
-collects Integrity API attestations as provenance/signature `present`
-with Trusted Publisher chain fields. Other resolvers query OSV when
-their package source can be proven public. Otherwise vulnerability and
-malicious-package evidence remain `unknown`, and unsupported evidence
-axes stay `unknown`.
+collects Integrity API attestations and locally re-verifies PEP 740
+Sigstore envelopes to provenance/signature `verified` when the signer
+identity, filename, digest, signature, and transparency log check out.
+Other resolvers query OSV when their package source can be proven
+public. Otherwise vulnerability and malicious-package evidence remain
+`unknown`, and unsupported evidence axes stay `unknown`.
 
 **Compatibility:** `version: 1` lockfiles are migrated to `version: 2` in
 memory on `diff` / `verify`. Run `securock lock` to write a refreshed v2
@@ -47,8 +48,8 @@ not trusted.
 - `diff` / `verify` on artifact identity, not just package name
 - npm evidence for provenance, signatures, capabilities, granular
   behavior, ownership, and source→build→artifact trust chain
-- PyPI Integrity API attestations (PEP 740) as provenance/signature
-  `present` with Trusted Publisher chain fields
+- PyPI Integrity API attestations (PEP 740) with local Sigstore
+  re-verification to provenance/signature `verified`
 - OpenSSF Malicious Packages (`MAL-*`) recorded separately from CVEs
 - `explain` prints a trust checklist for one package
 - Default network mode is `public-only`: private registries,
