@@ -1,5 +1,5 @@
 name: Securock
-description: Run securock verify and report trust drift
+description: Run securock scan/diff/verify for policy violations and trust drift
 author: securock
 branding:
   icon: shield
@@ -9,8 +9,14 @@ inputs:
     description: Project directory
     default: "."
   command:
-    description: "verify, diff, or both"
-    default: both
+    description: "scan, verify, diff, both (diff+verify), or all (scan+diff+verify)"
+    default: all
+  policy:
+    description: Path to a policy file (mutually exclusive with profile)
+    default: ""
+  profile:
+    description: Built-in policy profile (default or strict; mutually exclusive with policy)
+    default: ""
   offline:
     description: Skip remote vulnerability lookups
     default: "false"
@@ -90,6 +96,8 @@ runs:
         COMMAND: ${{ inputs.command }}
         WORKDIR: ${{ inputs.path }}
         OFFLINE: ${{ inputs.offline }}
+        POLICY: ${{ inputs.policy }}
+        PROFILE: ${{ inputs.profile }}
         SECUROCK_REPORT: ${{ runner.temp }}/securock-report.txt
       run: "${{ github.action_path }}/action/run.sh"
     - name: Comment trust report
@@ -135,7 +143,7 @@ runs:
             issue_number: context.issue.number,
             body,
           });
-    - name: Fail on trust drift
+    - name: Fail on policy violations or trust drift
       if: ${{ steps.run.outputs.failed == 'true' }}
       shell: bash
       run: exit 1

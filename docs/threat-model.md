@@ -18,8 +18,11 @@ fail CI:
   subject identity, because resolver is separate from ecosystem
 
 `securock diff` is the operator-facing view of those changes.
-`securock verify` is the CI gate. `securock explain <package>` shows
-why a subject is trusted under the active scan.
+`securock verify` fails CI on trust-relevant drift against
+`securock.lock`. `securock scan` fails CI on current policy violations
+even when the lockfile already records them. The GitHub Action default
+(`command: all`) runs `scan`, `diff`, and `verify`. `securock explain
+<package>` shows why a subject is trusted under the active scan.
 
 ## Does not protect against
 

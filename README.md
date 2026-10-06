@@ -187,8 +187,14 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - uses: securock/securock@<commit-sha>
         with:
-          command: both # verify, diff, or both
+          command: all # scan+diff+verify (default); also scan, diff, verify, both
+          # profile: strict
+          # policy: .securock/policy.yaml
 ```
+
+Default `command: all` runs `scan` (current policy violations), then
+`diff` and `verify` (trust drift). Use `both` for drift-only checks.
+`policy` and `profile` are mutually exclusive.
 
 The action writes a trust report to `$GITHUB_STEP_SUMMARY` even when
 it cannot comment on a fork PR.

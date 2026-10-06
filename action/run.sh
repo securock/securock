@@ -1,16 +1,30 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-command="${COMMAND:-both}"
+command="${COMMAND:-all}"
 workdir="${WORKDIR:-.}"
 offline="${OFFLINE:-false}"
+policy="${POLICY:-}"
+profile="${PROFILE:-}"
 report="${SECUROCK_REPORT:?SECUROCK_REPORT is required}"
 
 cd "$workdir"
 
+if [ -n "$policy" ] && [ -n "$profile" ]; then
+  echo "policy and profile are mutually exclusive" | tee "$report" >&2
+  echo "failed=true" >>"$GITHUB_OUTPUT"
+  exit 1
+fi
+
 flags=()
 if [ "$offline" = "true" ]; then
   flags+=(--offline)
+fi
+if [ -n "$policy" ]; then
+  flags+=(--policy "$policy")
+fi
+if [ -n "$profile" ]; then
+  flags+=(--profile "$profile")
 fi
 
 : >"$report"
@@ -22,13 +36,20 @@ run_cmd() {
   {
     echo "$name"
     echo
-    "$@" "${flags[@]}"
+    if [ "${#flags[@]}" -eq 0 ]; then
+      "$@"
+    else
+      "$@" "${flags[@]}"
+    fi
   } >>"$report" 2>&1 && return 0
   failed=true
   return 0
 }
 
 case "$command" in
+  scan)
+    run_cmd "securock scan" securock scan
+    ;;
   diff)
     run_cmd "securock diff" securock diff
     ;;
@@ -36,6 +57,15 @@ case "$command" in
     run_cmd "securock verify" securock verify
     ;;
   both)
+    # Drift-only path for callers that intentionally skip current-state
+    # policy checks (for example offline fixtures with unknown evidence).
+    run_cmd "securock diff" securock diff
+    echo >>"$report"
+    run_cmd "securock verify" securock verify
+    ;;
+  all)
+    run_cmd "securock scan" securock scan
+    echo >>"$report"
     run_cmd "securock diff" securock diff
     echo >>"$report"
     run_cmd "securock verify" securock verify

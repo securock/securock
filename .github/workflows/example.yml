@@ -16,6 +16,8 @@ jobs:
       - uses: ./
         with:
           path: examples/npm
+          # Offline fixtures leave evidence unknown; use both (diff+verify)
+          # instead of the default all, which also runs scan.
           command: both
           offline: "true"
           comment: "false"

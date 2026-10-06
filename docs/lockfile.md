@@ -18,11 +18,13 @@ securock version
 ```
 
 `scan` inspects the tree (and is the default command). `lock` writes
-the file. `diff` shows what changed. `verify` uses the same comparison
-and fails when there is trust-relevant drift. `explain` prints a trust
-checklist for one package: digest, source, provenance, signature, trust
-chain, ownership, capabilities, vulnerabilities, and malicious-package
-reports.
+the file. `diff` shows what changed. `verify` fails when there is
+trust-relevant drift against the lockfile. `scan` fails on current
+policy violations even when those states are already locked. The
+GitHub Action default runs `scan`, `diff`, and `verify`. `explain`
+prints a trust checklist for one package: digest, source, provenance,
+signature, trust chain, ownership, capabilities, vulnerabilities, and
+malicious-package reports.
 
 Shared flags: `--offline`, `--network`, `--policy`, `--profile`, `--lock`,
 `--format`, `--no-fail`.

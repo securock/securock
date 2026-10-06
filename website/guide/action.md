@@ -16,12 +16,18 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - uses: securock/securock@<commit-sha>
         with:
-          command: both
+          command: all
           version: v0.2.1
 ```
 
-`command` is `verify`, `diff`, or `both` (default). `offline: true`
-passes `--offline` to the CLI.
+`command` is `all` (default: `scan` + `diff` + `verify`), `scan`,
+`diff`, `verify`, or `both` (`diff` + `verify` only). Default `all`
+fails CI on current policy violations and on trust drift. Use `both`
+when you only want drift checks (for example offline fixtures that
+leave evidence `unknown`).
+
+`policy` passes `--policy` and `profile` passes `--profile`. They are
+mutually exclusive. `offline: true` passes `--offline` to the CLI.
 
 After a tagged release exists, set `version` to that tag so the action
 downloads the attested binary instead of building from source. A `v*`

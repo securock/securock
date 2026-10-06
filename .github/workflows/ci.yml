@@ -18,6 +18,8 @@ jobs:
           go-version-file: go.mod
       - name: Test
         run: go test ./...
+      - name: Action script
+        run: bash action/run_test.sh
       - name: Race
         run: go test -race ./...
       - name: Vet
