@@ -1,13 +1,15 @@
 ---
 layout: home
+title: Securock
+description: A lockfile for trust, not just versions. Snapshot dependency digests, provenance, signatures, and policy decisions, then fail CI when that trust state drifts.
 hero:
   name: Securock
   text: A lockfile for trust, not just versions.
   tagline: Reads npm, pnpm, Yarn, Bun, Deno, Cargo, Go, uv, Poetry, PDM, Composer, Bundler, NuGet, SwiftPM, Pub, Mix, and Gradle lockfiles. Records digest, provenance, signature, vulnerability, malicious-package, capability, behavior, ownership, and trust-chain evidence, then fails when that trust state drifts.
   actions:
     - theme: brand
-      text: Read the docs
-      link: /guide/install
+      text: Quick start
+      link: /guide/quickstart
     - theme: alt
       text: Try the example
       link: https://github.com/securock/securock/tree/main/examples/npm
