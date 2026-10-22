@@ -8,7 +8,7 @@
   "properties": {
     "version": {
       "type": "integer",
-      "const": 2
+      "const": 3
     },
     "source": {
       "type": "object",

@@ -37,7 +37,7 @@ Those values change without a trust-relevant change in the project.
 ## Document shape (v2)
 
 ```yaml
-version: 2
+version: 3
 source:
   ecosystems:
     - npm
@@ -166,7 +166,7 @@ path.
 
 ## v1 migration
 
-`version: 1` lockfiles from Securock v0.1.x are migrated to `version: 2`
+`version: 1` lockfiles from Securock v0.1.x are migrated to `version: 3`
 in memory on read. Kept fields are digest, source, provenance,
 signature, and vulnerabilities. New evidence axes (`malicious`,
 `capabilities`, `behavior`, `ownership`, `chain`) and trust are set to
@@ -205,3 +205,16 @@ JSON Schemas: [`schemas/`](https://github.com/securock/securock/tree/main/schema
 - [Usage](/guide/usage) — CLI workflow around the lockfile
 - [Evidence](/guide/evidence) — reading evidence states
 - [Threat model](/reference/threat-model) — what drift protects against
+
+## Version history
+
+| Version | Written by | Change                                                                                                                 |
+| ------- | ---------- | ---------------------------------------------------------------------------------------------------------------------- |
+| 1       | v0.1.x     | First format                                                                                                           |
+| 2       | v0.2.x     | Evidence axes for malicious reports, capabilities, behavior, ownership, and chain                                      |
+| 3       | current    | Optional release `health`, advisory `severity` and `fixed`, and `--reachability` fields (`scope`, `dependencies`, ...) |
+
+Older versions are migrated in memory. A file written at a newer version than the running
+securock is refused with a message to upgrade, and older releases refuse a version 3 file,
+because decoding is strict: do not commit a v3 lockfile until every machine and CI job that
+runs securock has been updated.

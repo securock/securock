@@ -21,9 +21,11 @@ Other resolvers query OSV when their package source can be proven
 public. Otherwise vulnerability and malicious-package evidence remain
 `unknown`, and unsupported evidence axes stay `unknown`.
 
-**Compatibility:** `version: 1` lockfiles are migrated to `version: 2` in
-memory on `diff` / `verify`. Run `securock lock` to write a refreshed v2
-file.
+**Compatibility:** `version: 1` and `version: 2` lockfiles are migrated to
+`version: 3` in memory on `diff` / `verify`. Run `securock lock` to write a
+refreshed v3 file. A v3 file is refused by older releases (they decode
+strictly), so update every machine and CI job that runs securock before
+committing one.
 
 ## Why
 
@@ -159,7 +161,7 @@ Cargo under [`examples/`](examples/).
 
 ```yaml
 # securock.lock (abridged)
-version: 2
+version: 3
 artifacts:
   - subject:
       ecosystem: npm

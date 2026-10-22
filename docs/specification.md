@@ -28,7 +28,7 @@ Those values change without a trust-relevant change in the project.
 ## Document
 
 ```yaml
-version: 2
+version: 3
 source:
   ecosystems:
     - npm
@@ -150,7 +150,7 @@ distinguishes PyPI files.
 Unknown lockfile fields, schema versions, ecosystems, evidence
 states, and trust statuses are errors.
 
-`version: 1` lockfiles from Securock v0.1.x are migrated to `version: 2`
+`version: 1` lockfiles from Securock v0.1.x are migrated to `version: 3`
 in memory on read. Kept fields are digest, source, provenance, signature,
 and vulnerabilities. New evidence axes (`malicious`, `capabilities`,
 `behavior`, `ownership`, `chain`) and trust are set to `unknown` — a v1
@@ -175,3 +175,16 @@ lockfile digest. Provenance, signature, and chain use these states.
 Vulnerability and malicious-report states are `unknown` and `checked`.
 Capability, behavior, and ownership states are also `unknown` and
 `checked`.
+
+## Version history
+
+| Version | Written by | Change                                                                                                                  |
+| ------- | ---------- | ----------------------------------------------------------------------------------------------------------------------- |
+| 1       | v0.1.x     | First format                                                                                                            |
+| 2       | v0.2.x     | Evidence axes for malicious reports, capabilities, behavior, ownership, and chain                                      |
+| 3       | current    | Optional release `health`, advisory `severity` and `fixed`, and `--reachability` fields (`scope`, `dependencies`, ...) |
+
+Older versions are migrated in memory. A file written at a newer version than the running
+securock is refused with a message to upgrade, and older releases refuse a version 3 file,
+because decoding is strict: do not commit a v3 lockfile until every machine and CI job that
+runs securock has been updated.

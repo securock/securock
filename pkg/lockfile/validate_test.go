@@ -12,7 +12,7 @@ func TestValidateOutdatedVersion(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected outdated version error")
 	}
-	if !strings.Contains(err.Error(), "outdated") || !strings.Contains(err.Error(), "version 2") {
+	if !strings.Contains(err.Error(), "outdated") || !strings.Contains(err.Error(), "version 3") {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
@@ -22,7 +22,7 @@ func TestValidateUnsupportedFutureVersion(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected unsupported version error")
 	}
-	if !strings.Contains(err.Error(), "unsupported") {
+	if !strings.Contains(err.Error(), "newer securock") {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
@@ -46,19 +46,19 @@ func TestValidateDigestFormat(t *testing.T) {
 
 	ok := base
 	ok.Digest = "sha256:" + strings.Repeat("ab", 32)
-	if err := lockfile.Validate(lockfile.Document{Version: 2, Artifacts: []lockfile.Artifact{ok}}); err != nil {
+	if err := lockfile.Validate(lockfile.Document{Version: lockfile.SchemaVersion, Artifacts: []lockfile.Artifact{ok}}); err != nil {
 		t.Fatal(err)
 	}
 
 	bad := base
 	bad.Digest = "sha256:abcd"
-	if err := lockfile.Validate(lockfile.Document{Version: 2, Artifacts: []lockfile.Artifact{bad}}); err == nil {
+	if err := lockfile.Validate(lockfile.Document{Version: lockfile.SchemaVersion, Artifacts: []lockfile.Artifact{bad}}); err == nil {
 		t.Fatal("short sha256 must fail validation")
 	}
 
 	badGoh1 := base
 	badGoh1.Digest = "goh1:not-valid!!!"
-	if err := lockfile.Validate(lockfile.Document{Version: 2, Artifacts: []lockfile.Artifact{badGoh1}}); err == nil {
+	if err := lockfile.Validate(lockfile.Document{Version: lockfile.SchemaVersion, Artifacts: []lockfile.Artifact{badGoh1}}); err == nil {
 		t.Fatal("malformed goh1 must fail validation")
 	}
 }

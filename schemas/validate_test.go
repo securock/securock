@@ -8,7 +8,7 @@ import (
 
 func TestURLArtifactOmitsVersion(t *testing.T) {
 	raw := []byte(`{
-  "version": 2,
+  "version": 3,
   "artifacts": [
     {
       "subject": { "ecosystem": "url", "name": "https://esm.sh/preact" },
@@ -39,7 +39,7 @@ func TestURLArtifactOmitsVersion(t *testing.T) {
 
 func TestNPMArtifactRequiresVersion(t *testing.T) {
 	raw := []byte(`{
-  "version": 2,
+  "version": 3,
   "artifacts": [
     {
       "subject": { "ecosystem": "npm", "name": "react" },
@@ -115,7 +115,7 @@ func TestDiffSideRegistries(t *testing.T) {
 
 func TestRejectsUnknownArtifactField(t *testing.T) {
 	raw := []byte(`{
-  "version": 2,
+  "version": 3,
   "artifacts": [
     {
       "subject": { "ecosystem": "npm", "name": "react" },
@@ -143,7 +143,7 @@ func TestRejectsUnknownArtifactField(t *testing.T) {
 func TestHealthEvidenceIsOptionalAndBounded(t *testing.T) {
 	doc := func(health string) []byte {
 		return []byte(`{
-  "version": 2,
+  "version": 3,
   "artifacts": [
     {
       "subject": { "ecosystem": "npm", "name": "react" },

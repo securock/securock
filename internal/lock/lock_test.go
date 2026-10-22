@@ -352,14 +352,14 @@ func TestReadRejectsVersionZero(t *testing.T) {
 
 func TestReadRejectsFutureVersion(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "securock.lock")
-	if err := os.WriteFile(path, []byte("version: 3\nartifacts: []\n"), 0o644); err != nil {
+	if err := os.WriteFile(path, []byte("version: 4\nartifacts: []\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	_, _, err := lock.Read(path)
 	if err == nil {
 		t.Fatal("expected future version to fail")
 	}
-	if !strings.Contains(err.Error(), "unsupported") {
+	if !strings.Contains(err.Error(), "newer securock") {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
@@ -465,5 +465,33 @@ func assertV2UnknownAxes(t *testing.T, art lockfile.Artifact) {
 	}
 	if art.Evidence.Chain.State != lockfile.EvidenceUnknown {
 		t.Fatalf("chain = %q", art.Evidence.Chain.State)
+	}
+}
+
+func TestReadMigratesVersion2InMemory(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "securock.lock")
+	v2 := "version: 2\nartifacts:\n  - subject:\n      ecosystem: npm\n      name: ms\n    version: 2.1.3\n    evidence:\n      provenance: unknown\n      signature: unknown\n      vulnerabilities:\n        state: unknown\n      malicious:\n        state: unknown\n      capabilities:\n        state: unknown\n      behavior:\n        state: unknown\n      ownership:\n        state: unknown\n      chain:\n        state: unknown\n    trust:\n      status: unknown\n"
+	if err := os.WriteFile(path, []byte(v2), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	doc, migrated, err := lock.Read(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !migrated || doc.Version != lockfile.SchemaVersion || len(doc.Artifacts) != 1 {
+		t.Fatalf("migrated = %v, version = %d, artifacts = %d", migrated, doc.Version, len(doc.Artifacts))
+	}
+	if raw, _ := os.ReadFile(path); string(raw) != v2 {
+		t.Fatal("the file on disk must not be rewritten")
+	}
+
+	// Writing it back produces the current version, which then reads without migrating.
+	if err := lock.Write(path, doc); err != nil {
+		t.Fatal(err)
+	}
+	again, migrated, err := lock.Read(path)
+	if err != nil || migrated || again.Version != lockfile.SchemaVersion {
+		t.Fatalf("version = %d, migrated = %v, err = %v", again.Version, migrated, err)
 	}
 }

@@ -39,3 +39,10 @@ func MigrateV1(v1 V1Document) (Document, error) {
 	}
 	return out, nil
 }
+
+// MigrateV2 converts a version 2 document. Version 3 only added optional fields, so nothing
+// in a version 2 document changes meaning; it is the same evidence under a newer version.
+func MigrateV2(doc Document) Document {
+	doc.Version = SchemaVersion
+	return doc
+}

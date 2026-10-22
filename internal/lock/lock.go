@@ -18,7 +18,7 @@ const DefaultName = "securock.lock"
 
 // MigrationWarning is printed to stderr when a v1 lockfile is accepted
 // in memory. The on-disk file is not modified.
-const MigrationWarning = "securock.lock v1 migrated to v2 in memory; run 'securock lock' to accept the current trust state"
+const MigrationWarning = "securock.lock is an older version and was migrated in memory; run 'securock lock' to write the current version and accept the current trust state"
 
 func Path(root, override string) string {
 	if override != "" {
@@ -64,9 +64,9 @@ func Encode(path string, doc lockfile.Document) ([]byte, error) {
 	}
 }
 
-// Read loads a lockfile. Version 1 documents are migrated to version 2 in
-// memory only; the file on disk is never rewritten. migrated is true when
-// a v1→v2 migration was applied.
+// Read loads a lockfile. Version 1 and 2 documents are migrated to the current version in
+// memory only; the file on disk is never rewritten. migrated is true when a migration
+// was applied.
 func Read(path string) (doc lockfile.Document, migrated bool, err error) {
 	raw, err := core.ReadFile(path)
 	if err != nil {
@@ -91,7 +91,17 @@ func Parse(path string, raw []byte) (doc lockfile.Document, migrated bool, err e
 			return lockfile.Document{}, false, fmt.Errorf("parse %s: %w", path, err)
 		}
 		migrated = true
+	case 2:
+		doc, err = parseCurrent(raw, asJSON)
+		if err != nil {
+			return lockfile.Document{}, false, fmt.Errorf("parse %s: %w", path, err)
+		}
+		doc = lockfile.MigrateV2(doc)
+		migrated = true
 	default:
+		if version > lockfile.SchemaVersion {
+			return lockfile.Document{}, false, fmt.Errorf("parse %s: lockfile version %d was written by a newer securock than this one (version %d); upgrade securock", path, version, lockfile.SchemaVersion)
+		}
 		doc, err = parseCurrent(raw, asJSON)
 		if err != nil {
 			return lockfile.Document{}, false, fmt.Errorf("parse %s: %w", path, err)

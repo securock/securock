@@ -1,6 +1,9 @@
 package lockfile
 
-const SchemaVersion = 2
+// SchemaVersion is the current lockfile version. Version 3 added optional release health,
+// advisory severity and fixed versions, and reachability fields. A file written at version 3
+// is refused by older releases, which decode strictly, instead of being half read.
+const SchemaVersion = 3
 
 type Status string
 
