@@ -139,7 +139,8 @@ approver.
 
 - that a trusted package is benign
 - that a version bump is a security fix
-- that transitive behavior is reachable or exploitable
+- that transitive behavior is reachable or exploitable (`--reachability` follows the dependency
+  graph, not the code, and `yes` only means a package is not shown to be development-only)
 - that GitHub, npm, or OSV are uncompromised
 - that non-npm ecosystems collect provenance or signature evidence
 - that capability heuristics catch every malicious behavior

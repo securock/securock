@@ -110,6 +110,12 @@ and license when the registry answered, and is omitted otherwise. It is
 informational and not trust drift on its own. See
 [Release health](/guide/evidence#release-health).
 
+With `--reachability`, each artifact also records `scope` (`runtime`, `dev`, or `optional`) and
+`dependencies` (the artifact IDs it depends on directly), and each vulnerability item records
+`reachable` (`yes`, `no`, or `unknown`) and, for an indirect `yes`, `via`, the shortest dependency
+path from a runtime package. These fields are optional and are not trust drift. See
+[Usage](/guide/usage#reachability).
+
 Vulnerability evidence is not a bare list. `state: checked` means OSV
 was queried. `unknown` means it was not. An empty `items` list with
 `state: unknown` is not the same as zero vulnerabilities.

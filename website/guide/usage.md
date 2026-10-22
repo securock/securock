@@ -102,6 +102,38 @@ securock accept remove known-vulnerability:GHSA-xxxx-xxxx-xxxx --subject npm:lod
   toward `--fail-on`. Once an exception expires the finding returns, with
   an `exception-expired` finding alongside it.
 
+### Reachability
+
+A dependency scan finds a vulnerable package whether or not it ends up in what you ship. A
+vulnerability in a test runner and one in your web framework look the same in a lockfile.
+`--reachability` tells them apart using the dependency graph:
+
+```sh
+securock audit --reachability
+securock lock --reachability
+securock explain lodash --reachability
+```
+
+For each package it records how it enters the project (`scope`: `runtime`, `dev`, or `optional`)
+and its direct `dependencies`, then marks every known vulnerability:
+
+| `reachable` | Meaning                                                                                     |
+| ----------- | ------------------------------------------------------------------------------------------- |
+| `yes`       | A runtime package is, or depends on, the vulnerable one. `via` shows the shortest path.     |
+| `no`        | The lockfile marks the package development-only and no runtime package depends on it.       |
+| `unknown`   | Anything else: optional packages, and lockfiles that record neither scope nor dependencies. |
+
+`audit` lists a `no` as a **low** finding ("development-only dependency") so it no longer fails
+`--fail-on high`, and shows the path for a `yes`. Reachability never raises a severity and never
+turns `unknown` into `no`: missing information is not evidence of safety.
+
+This is the graph, not the code. It cannot tell whether your code calls the vulnerable function, and
+`yes` means "not shown to be development-only", not "exploitable". Which resolvers can supply scope
+and edges is in [Ecosystems](/guide/ecosystems#reachability).
+
+Scope and dependencies are only written when `--reachability` is set, and changing them is not
+trust drift: `verify` with or without the flag accepts the same lockfile.
+
 ### `scan` vs `verify`
 
 These answer different questions:
@@ -136,17 +168,18 @@ is at or above it.
 
 ## Shared flags
 
-| Flag           | Meaning                                                          |
-| -------------- | ---------------------------------------------------------------- |
-| `--network`    | `public-only` (default), `offline`, or `allow-all`               |
-| `--offline`    | Skip remote lookups; remote evidence stays `unknown`             |
-| `--policy`     | Path to a policy file                                            |
-| `--profile`    | Built-in policy: `default` or `strict` (not with `--policy`)     |
-| `--lock`       | Path to `securock.lock` (for `lock` / `diff` / `verify`)         |
-| `--format`     | `text` (default), `json`, or `sarif`                             |
-| `--output`     | Write the report to a file instead of stdout                     |
-| `--exceptions` | Path to the accepted-findings file (`accept`, `audit`, `doctor`) |
-| `--no-fail`    | Always exit `0`                                                  |
+| Flag             | Meaning                                                                                   |
+| ---------------- | ----------------------------------------------------------------------------------------- |
+| `--network`      | `public-only` (default), `offline`, or `allow-all`                                        |
+| `--offline`      | Skip remote lookups; remote evidence stays `unknown`                                      |
+| `--policy`       | Path to a policy file                                                                     |
+| `--profile`      | Built-in policy: `default` or `strict` (not with `--policy`)                              |
+| `--lock`         | Path to `securock.lock` (for `lock` / `diff` / `verify`)                                  |
+| `--format`       | `text` (default), `json`, or `sarif`                                                      |
+| `--output`       | Write the report to a file instead of stdout                                              |
+| `--exceptions`   | Path to the accepted-findings file (`accept`, `audit`, `doctor`)                          |
+| `--reachability` | Record scope and dependencies and mark vulnerabilities reachable, unreachable, or unknown |
+| `--no-fail`      | Always exit `0`                                                                           |
 
 `--offline` records vulnerability, malicious, capability, behavior,
 ownership, provenance, signature, and chain evidence as `unknown`.
