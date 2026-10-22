@@ -6,9 +6,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"maps"
 	"net/http"
 	"net/url"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/securock/securock/internal/ecosystem"
@@ -19,6 +21,8 @@ import (
 const (
 	defaultEndpoint = "https://api.osv.dev/v1/querybatch"
 	batchSize       = 100
+	// batchParallelism is kept small to stay well inside the OSV rate limits.
+	batchParallelism = 3
 )
 
 type Client interface {
@@ -47,11 +51,33 @@ func (c *HTTPClient) Query(ctx context.Context, deps []ecosystem.Dependency) (ma
 		return out, nil
 	}
 
+	// Batches are independent, so a few go out together. Each fills its own map and the
+	// results are merged in order, which keeps the error that is reported independent of
+	// timing.
+	var batches [][]ecosystem.Dependency
 	for i := 0; i < len(deps); i += batchSize {
-		end := min(i+batchSize, len(deps))
-		if err := c.queryBatch(ctx, deps[i:end], out); err != nil {
-			return nil, err
+		batches = append(batches, deps[i:min(i+batchSize, len(deps))])
+	}
+	results := make([]map[string][]lockfile.Vulnerability, len(batches))
+	errs := make([]error, len(batches))
+	sem := make(chan struct{}, batchParallelism)
+	var wg sync.WaitGroup
+	for i, batch := range batches {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			sem <- struct{}{}
+			defer func() { <-sem }()
+			results[i] = make(map[string][]lockfile.Vulnerability, len(batch))
+			errs[i] = c.queryBatch(ctx, batch, results[i])
+		}()
+	}
+	wg.Wait()
+	for i := range batches {
+		if errs[i] != nil {
+			return nil, errs[i]
 		}
+		maps.Copy(out, results[i])
 	}
 	return out, nil
 }
