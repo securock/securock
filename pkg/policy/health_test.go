@@ -69,6 +69,9 @@ func TestLicenseRuleValidation(t *testing.T) {
 		{policy.LicenseRule{}, false},
 		{policy.LicenseRule{Allow: []string{"MIT", "Apache-2.0"}, Deny: []string{"GPL-*", "AGPL-3.0-only"}}, false},
 		{policy.LicenseRule{Allow: []string{""}}, true},
+		{policy.LicenseRule{Deny: []string{"GPL-*"}, Unchecked: "allow"}, false},
+		{policy.LicenseRule{Deny: []string{"GPL-*"}, Unchecked: "unknown"}, false},
+		{policy.LicenseRule{Deny: []string{"GPL-*"}, Unchecked: "deny"}, true},
 		{policy.LicenseRule{Deny: []string{"MIT OR ISC"}}, true},
 		{policy.LicenseRule{Deny: []string{"(MIT)"}}, true},
 		{policy.LicenseRule{Deny: []string{"G*L"}}, true},
@@ -102,6 +105,9 @@ func TestFingerprintLicenseRule(t *testing.T) {
 	}
 	if fp(policy.LicenseRule{Deny: []string{"b", "a", "a"}}) != fp(policy.LicenseRule{Deny: []string{"a", "b"}}) {
 		t.Fatal("entry order and duplicates must not matter")
+	}
+	if fp(policy.LicenseRule{Deny: []string{"GPL-*"}}) == fp(policy.LicenseRule{Deny: []string{"GPL-*"}, Unchecked: "allow"}) {
+		t.Fatal("unchecked must change the fingerprint")
 	}
 	if fp(policy.LicenseRule{Allow: []string{"MIT"}}) == fp(policy.LicenseRule{Deny: []string{"MIT"}}) {
 		t.Fatal("allow and deny must differ")

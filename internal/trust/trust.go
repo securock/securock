@@ -111,12 +111,15 @@ func Evaluate(art *lockfile.Artifact, pol policy.Document) {
 }
 
 // licenseVerdict adds the reasons a package fails the license rule. Without health
-// evidence the license is unknown. A package that declares no license cannot pass an allow
+// evidence the license is unknown, unless the rule says unchecked packages pass. A package that declares no license cannot pass an allow
 // list, but is not rejected by a deny list alone, since nothing known is denied.
 func licenseVerdict(art *lockfile.Artifact, rule policy.LicenseRule, untrusted, unknown []string) ([]string, []string) {
 	h := art.Evidence.Health
 	switch {
 	case h == nil:
+		if rule.AllowUnchecked() {
+			return untrusted, unknown
+		}
 		return untrusted, append(unknown, "license not checked")
 	case h.License == "":
 		if len(rule.Allow) > 0 {

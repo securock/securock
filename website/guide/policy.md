@@ -157,8 +157,19 @@ does: `MIT OR GPL-3.0-only` passes a rule denying `GPL-*`, while `MIT AND GPL-3.
 not. `deny` wins over `allow`.
 
 Licenses are read from the registry (see [Release health](/guide/evidence#release-health)), so
-the rule applies to npm and PyPI. Other ecosystems have no license evidence, which makes them
-`unknown` under any license rule. A package that declares no license fails an `allow` list but
+the rule applies to npm and PyPI. Other ecosystems, and anything scanned offline, have no license
+evidence, which makes them `unknown` under a license rule. Set `unchecked: allow` to let those
+through, so the rule only judges the packages it can see:
+
+```yaml
+rules:
+  licenses:
+    deny: [GPL-*, AGPL-*]
+    unchecked: allow
+```
+
+A package with a license that is denied still fails; `unchecked` only decides about packages with
+no license evidence. A package that declares no license fails an `allow` list but
 is not rejected by a `deny` list alone. Deprecated spellings are normalized (`GPL-3.0` is
 `GPL-3.0-only`), as are common PyPI classifier names such as `MIT License`.
 

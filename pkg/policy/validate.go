@@ -56,6 +56,11 @@ func Validate(doc Document) error {
 }
 
 func validateLicenseRule(rule LicenseRule) error {
+	switch rule.Unchecked {
+	case "", "unknown", "allow":
+	default:
+		return fmt.Errorf("unknown licenses unchecked action %q: use unknown or allow", rule.Unchecked)
+	}
 	for _, pair := range []struct {
 		name    string
 		entries []string

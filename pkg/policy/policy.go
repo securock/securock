@@ -61,9 +61,16 @@ type LicenseRule struct {
 	Allow []string `json:"allow,omitempty" yaml:"allow,omitempty"`
 	// Deny rejects packages whose license is on the list, whatever Allow says.
 	Deny []string `json:"deny,omitempty" yaml:"deny,omitempty"`
+	// Unchecked says what to do with a package whose license was not looked up, which is
+	// every package outside npm and PyPI, and any package scanned offline. "unknown", the
+	// default, makes it unknown; "allow" lets it through so the rule only judges what it can see.
+	Unchecked string `json:"unchecked,omitempty" yaml:"unchecked,omitempty"`
 }
 
 func (r LicenseRule) Configured() bool { return len(r.Allow) > 0 || len(r.Deny) > 0 }
+
+// AllowUnchecked reports whether packages with no license evidence pass the rule.
+func (r LicenseRule) AllowUnchecked() bool { return r.Unchecked == "allow" }
 
 type EvidenceRule struct {
 	Minimum             string   `json:"minimum,omitempty" yaml:"minimum,omitempty"`
@@ -244,8 +251,9 @@ type canonicalRules struct {
 }
 
 type canonicalLicenses struct {
-	Allow []string `json:"allow,omitempty"`
-	Deny  []string `json:"deny,omitempty"`
+	Allow     []string `json:"allow,omitempty"`
+	Deny      []string `json:"deny,omitempty"`
+	Unchecked string   `json:"unchecked,omitempty"`
 }
 
 type canonicalHealth struct {
@@ -371,7 +379,7 @@ func canonicalLicenseRule(rule LicenseRule) *canonicalLicenses {
 	if !rule.Configured() {
 		return nil
 	}
-	return &canonicalLicenses{Allow: sortedCompact(rule.Allow), Deny: sortedCompact(rule.Deny)}
+	return &canonicalLicenses{Allow: sortedCompact(rule.Allow), Deny: sortedCompact(rule.Deny), Unchecked: rule.Unchecked}
 }
 
 func canonicalHealthRule(rule HealthRule) *canonicalHealth {

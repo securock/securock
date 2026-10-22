@@ -35,6 +35,9 @@ func TestLicenseRules(t *testing.T) {
 		{"undeclared fails an allow list", licensed(""), policy.LicenseRule{Allow: []string{"MIT"}}, lockfile.StatusUntrusted, "license not declared"},
 		{"undeclared passes a deny list alone", licensed(""), policy.LicenseRule{Deny: []string{"GPL-*"}}, lockfile.StatusTrusted, ""},
 		{"not checked", healthArtifact("npm", "thing", nil), policy.LicenseRule{Deny: []string{"GPL-*"}}, lockfile.StatusUnknown, "license not checked"},
+		{"not checked but unchecked is allowed", healthArtifact("cargo", "thing", nil), policy.LicenseRule{Deny: []string{"GPL-*"}, Unchecked: "allow"}, lockfile.StatusTrusted, ""},
+		{"unchecked allow does not excuse a bad license", licensed("GPL-3.0-only"), policy.LicenseRule{Deny: []string{"GPL-*"}, Unchecked: "allow"}, lockfile.StatusUntrusted, "denied license"},
+		{"unchecked unknown is the default spelled out", healthArtifact("cargo", "thing", nil), policy.LicenseRule{Deny: []string{"GPL-*"}, Unchecked: "unknown"}, lockfile.StatusUnknown, "license not checked"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
