@@ -59,6 +59,9 @@ your final message instead of committing as if it passed.
 
 - Match the surrounding code: naming, comment density, idiom. Comments explain
   _why_, not what.
+- No pictographic emoji (✅ ❌ ⚠️ 🚀 and the like) in code, CLI output, docs,
+  comments, or commit messages. Plain symbols such as box-drawing lines
+  (`─ │ ├ └`) and arrows (`→`) are fine.
 - Output must be deterministic: sort, no timestamps, no absolute paths. A
   lockfile written twice from the same input is byte-identical.
 - Fail closed: evidence that was not collected is `unknown`, never `checked` or
