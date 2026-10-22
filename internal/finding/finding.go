@@ -44,6 +44,16 @@ type Finding struct {
 type Report struct {
 	Tool     string    `json:"tool"`
 	Findings []Finding `json:"findings"`
+
+	// Location is the file the findings were derived from, such as securock.lock.
+	// It only anchors SARIF results and is not part of the JSON report.
+	Location string `json:"-"`
+}
+
+// WithLocation returns the report with its source file set.
+func (r Report) WithLocation(path string) Report {
+	r.Location = path
+	return r
 }
 
 func New(tool string, findings []Finding) Report {

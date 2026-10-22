@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/securock/securock/internal/diff"
+	"github.com/securock/securock/internal/finding"
 	"github.com/securock/securock/internal/lock"
 	"github.com/securock/securock/internal/policy"
 	"github.com/securock/securock/internal/scanner"
@@ -47,7 +48,7 @@ func newDiffCommand(opts *options) *cobra.Command {
 			}
 
 			got := diff.Compare(locked, result.Document).WithPolicy(pol)
-			if err := writeDiff(cmd, got, opts.format); err != nil {
+			if err := writeDiff(cmd, got, opts.format, reportLocation(path, opts.lockPath)); err != nil {
 				return opErr(err)
 			}
 			if opts.noFail || !got.TrustDrift() {
@@ -58,10 +59,12 @@ func newDiffCommand(opts *options) *cobra.Command {
 	}
 }
 
-func writeDiff(cmd *cobra.Command, got diff.Result, format string) error {
+func writeDiff(cmd *cobra.Command, got diff.Result, format, location string) error {
 	switch strings.ToLower(format) {
 	case "json":
 		return diff.WriteJSON(cmd.OutOrStdout(), got)
+	case "sarif":
+		return finding.WriteSARIF(cmd.OutOrStdout(), got.Findings("diff").WithLocation(location))
 	case "text", "":
 		diff.Write(cmd.OutOrStdout(), got)
 		return nil

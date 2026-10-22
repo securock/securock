@@ -6,6 +6,7 @@ import (
 	"io"
 	"strings"
 
+	"github.com/securock/securock/internal/finding"
 	"github.com/securock/securock/internal/policy"
 	"github.com/securock/securock/internal/scanner"
 	"github.com/securock/securock/pkg/lockfile"
@@ -44,7 +45,7 @@ func runScan(cmd *cobra.Command, opts *options, path string) error {
 		return opErr(err)
 	}
 
-	if err := writeScan(cmd.OutOrStdout(), result.Document, opts.format); err != nil {
+	if err := writeScan(cmd.OutOrStdout(), result.Document, opts.format, reportLocation(path, opts.lockPath)); err != nil {
 		return opErr(err)
 	}
 
@@ -61,12 +62,14 @@ func runScan(cmd *cobra.Command, opts *options, path string) error {
 	return nil
 }
 
-func writeScan(w io.Writer, doc lockfile.Document, format string) error {
+func writeScan(w io.Writer, doc lockfile.Document, format, location string) error {
 	switch strings.ToLower(format) {
 	case "json":
 		enc := json.NewEncoder(w)
 		enc.SetIndent("", "  ")
 		return enc.Encode(doc)
+	case "sarif":
+		return finding.WriteSARIF(w, scanner.Findings("scan", doc).WithLocation(location))
 	case "text", "":
 		return writeScanText(w, doc)
 	default:

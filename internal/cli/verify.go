@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/securock/securock/internal/diff"
+	"github.com/securock/securock/internal/finding"
 	"github.com/securock/securock/internal/lock"
 	"github.com/securock/securock/internal/policy"
 	"github.com/securock/securock/internal/scanner"
@@ -47,13 +48,18 @@ func newVerifyCommand(opts *options) *cobra.Command {
 			}
 
 			got := diff.Compare(locked, result.Document).WithPolicy(pol)
-			if strings.ToLower(opts.format) == "json" {
+			switch {
+			case strings.ToLower(opts.format) == "json":
 				if err := diff.WriteJSON(cmd.OutOrStdout(), got); err != nil {
 					return opErr(err)
 				}
-			} else if !got.TrustDrift() {
+			case strings.ToLower(opts.format) == "sarif":
+				if err := finding.WriteSARIF(cmd.OutOrStdout(), got.Findings("verify").WithLocation(reportLocation(path, opts.lockPath))); err != nil {
+					return opErr(err)
+				}
+			case !got.TrustDrift():
 				fmt.Fprintf(cmd.OutOrStdout(), "ok  %d artifacts\n", len(result.Document.Artifacts))
-			} else {
+			default:
 				diff.Write(cmd.OutOrStdout(), got)
 			}
 			if opts.noFail || !got.TrustDrift() {

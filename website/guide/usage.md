@@ -77,7 +77,8 @@ is at or above it.
 | `--policy`  | Path to a policy file                                        |
 | `--profile` | Built-in policy: `default` or `strict` (not with `--policy`) |
 | `--lock`    | Path to `securock.lock` (for `lock` / `diff` / `verify`)     |
-| `--format`  | `text` (default) or `json`; `audit` and `doctor` also `sarif` |
+| `--format`  | `text` (default), `json`, or `sarif`                         |
+| `--output`  | Write the report to a file instead of stdout                 |
 | `--no-fail` | Always exit `0`                                              |
 
 `--offline` records vulnerability, malicious, capability, behavior,
@@ -102,11 +103,27 @@ securock diff --format json
 securock verify --format json
 securock explain react --format json
 securock audit --format sarif
+securock verify --format sarif --output securock.sarif
 ```
 
 - `scan --format json` emits the lock document shape.
 - `diff` and `verify` print a `schema_version: 1` report.
 - `explain --format json` emits the matched artifacts.
+- `--format sarif` works on `scan`, `diff`, `verify`, `audit`, and `doctor`.
+  Results point at `securock.lock` and name the package as a logical
+  location. Each result has a stable `partialFingerprints` entry so code
+  scanning can track it across runs. `--output` writes the file even when
+  the command exits `1`, so a failing `verify` still produces a report.
+
+Upload SARIF to GitHub code scanning:
+
+```yaml
+- run: securock verify --format sarif --output securock.sarif
+  continue-on-error: true
+- uses: github/codeql-action/upload-sarif@v4
+  with:
+    sarif_file: securock.sarif
+```
 
 Machine-readable schemas live in the repository under
 [`schemas/`](https://github.com/securock/securock/tree/main/schemas)

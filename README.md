@@ -132,7 +132,8 @@ Cargo under [`examples/`](examples/).
 | `--profile` | Built-in policy profile: `default` or `strict` (not with `--policy`) |
 | `--lock` | Path to `securock.lock` (for `lock` / `diff` / `verify`) |
 | `--format json` | Stable JSON on `scan`, `diff`, `verify`, and `explain` |
-| `--format sarif` | SARIF 2.1.0 on `audit` and `doctor`, for GitHub code scanning |
+| `--format sarif` | SARIF 2.1.0 on every report command, for GitHub code scanning |
+| `--output` | Write the report to a file instead of stdout (also on exit `1`) |
 | `--fail-on` | `audit` and `doctor`. Exit `1` at or above this severity (default `high`) |
 | `--no-fail` | Always exit `0` |
 | Exit `0` | Success / no trust drift |
