@@ -2,5 +2,5 @@
 name = "securock-example"
 version = "0.1.0"
 dependencies = [
-  "idna==3.10",
+  "idna==3.19",
 ]

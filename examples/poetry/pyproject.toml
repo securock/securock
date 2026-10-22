@@ -6,4 +6,4 @@ authors = []
 
 [tool.poetry.dependencies]
 python = "^3.11"
-idna = "3.10"
+idna = "3.19"

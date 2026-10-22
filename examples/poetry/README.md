@@ -13,7 +13,7 @@ securock verify --offline
 policy treats unchecked vulnerabilities and malicious reports as
 `unknown`, so `lock` exits `1` unless `--no-fail` is set.
 `securock.lock` in this directory is that unknown snapshot for
-`idna@3.10`.
+`idna@3.19`.
 
 Simulate a dependency change:
 
