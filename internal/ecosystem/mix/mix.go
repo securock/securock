@@ -3,6 +3,7 @@ package mix
 import (
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"github.com/securock/securock/internal/ecosystem/core"
@@ -31,6 +32,7 @@ func (Ecosystem) Dependencies(path string) ([]core.Dependency, error) {
 	}
 
 	var deps []core.Dependency
+	needs := map[string][]string{}
 	rest := string(raw)
 	for {
 		name, kind, payload, next, ok := nextEntry(rest)
@@ -47,6 +49,7 @@ func (Ecosystem) Dependencies(path string) ([]core.Dependency, error) {
 			if version == "" {
 				continue
 			}
+			needs[name] = hexDependencies(payload)
 			registry := ""
 			if repo == "hexpm" && !hexRedirected() {
 				registry = "https://repo.hex.pm"
@@ -96,6 +99,7 @@ func (Ecosystem) Dependencies(path string) ([]core.Dependency, error) {
 			})
 		}
 	}
+	applyGraph(path, deps, needs)
 	return deps, nil
 }
 
@@ -181,6 +185,22 @@ func hexFields(payload string) (version, digest, repo string) {
 		repo = unquote(elems[6])
 	}
 	return version, digest, repo
+}
+
+var depTuple = regexp.MustCompile(`\{\s*:(\w+)\s*,`)
+
+// hexDependencies lists the application names in a hex entry's dependency list, the sixth
+// element, whose items look like {:plug, "~> 1.0", [hex: :plug, repo: "hexpm", optional: false]}.
+func hexDependencies(payload string) []string {
+	elems := topLevel(payload)
+	if len(elems) < 6 {
+		return nil
+	}
+	var out []string
+	for _, m := range depTuple.FindAllStringSubmatch(elems[5], -1) {
+		out = append(out, m[1])
+	}
+	return out
 }
 
 func topLevel(s string) []string {

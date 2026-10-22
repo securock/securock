@@ -35,7 +35,7 @@ func (Ecosystem) Dependencies(path string) ([]core.Dependency, error) {
 		if line == "" || strings.HasPrefix(line, "#") {
 			continue
 		}
-		coord, _, ok := strings.Cut(line, "=")
+		coord, configs, ok := strings.Cut(line, "=")
 		if !ok {
 			continue
 		}
@@ -54,9 +54,49 @@ func (Ecosystem) Dependencies(path string) ([]core.Dependency, error) {
 			SourceKind: core.SourceRegistry,
 			Name:       name,
 			Version:    version,
+			Scope:      scopeOf(configs),
 		})
 	}
 	return deps, nil
+}
+
+// scopeOf reads the configurations a dependency is locked for, such as
+// "compileClasspath,runtimeClasspath". A dependency on a runtime classpath ships with the
+// application; one that is only on test classpaths is development-only. Anything else, like
+// compile-only and annotation processor dependencies, is neither shipped nor a test
+// dependency, so the lockfile does not settle it.
+func scopeOf(configs string) string {
+	runtime, test, other := false, false, false
+	for _, config := range strings.Split(configs, ",") {
+		config = strings.ToLower(strings.TrimSpace(config))
+		if config == "" {
+			continue
+		}
+		switch {
+		case isTest(config):
+			test = true
+		case strings.HasSuffix(config, "runtimeclasspath"):
+			runtime = true
+		default:
+			other = true
+		}
+	}
+	switch {
+	case runtime:
+		return core.ScopeRuntime
+	case test && !other:
+		return core.ScopeDev
+	}
+	return ""
+}
+
+func isTest(config string) bool {
+	for _, prefix := range []string{"test", "androidtest", "debugandroidtest", "releaseunittest", "debugunittest"} {
+		if strings.HasPrefix(config, prefix) {
+			return true
+		}
+	}
+	return false
 }
 
 func mavenCoord(coord string) (name, version string, ok bool) {

@@ -52,6 +52,7 @@ func (Ecosystem) Dependencies(path string) ([]core.Dependency, error) {
 			Name:       name,
 			Version:    pkg.Version,
 			Digest:     core.NormalizeDigest(digest),
+			Scope:      scope(pkg.Dependency),
 		}
 		if kind == core.SourceGit {
 			desc := mapping(pkg.Description)
@@ -74,6 +75,21 @@ type pubPackage struct {
 	Source      string    `yaml:"source"`
 	Version     string    `yaml:"version"`
 	Description yaml.Node `yaml:"description"`
+	// Dependency is "direct main", "direct dev", "direct overridden", or "transitive".
+	Dependency string `yaml:"dependency"`
+}
+
+// scope reads how pub says the project depends on a package. pub records no edges and does
+// not say whether a transitive package comes from main or dev dependencies, so only direct
+// dependencies have a scope.
+func scope(dependency string) string {
+	switch dependency {
+	case "direct main", "direct overridden":
+		return core.ScopeRuntime
+	case "direct dev":
+		return core.ScopeDev
+	}
+	return ""
 }
 
 func classify(pkg pubPackage) (kind, registry, digest string) {
