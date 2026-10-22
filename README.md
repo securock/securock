@@ -120,6 +120,7 @@ Cargo under [`examples/`](examples/).
 | `securock diff`    | Show trust drift vs the lockfile                  |
 | `securock verify`  | Fail on trust-relevant drift                      |
 | `securock explain` | Explain why a package is trusted                  |
+| `securock audit`   | Report dependency findings by severity            |
 | `securock version` | Print the build version                           |
 
 | Flag / exit | Meaning |
@@ -130,6 +131,8 @@ Cargo under [`examples/`](examples/).
 | `--profile` | Built-in policy profile: `default` or `strict` (not with `--policy`) |
 | `--lock` | Path to `securock.lock` (for `lock` / `diff` / `verify`) |
 | `--format json` | Stable JSON on `scan`, `diff`, `verify`, and `explain` |
+| `--format sarif` | SARIF 2.1.0 on `audit`, for GitHub code scanning |
+| `--fail-on` | `audit` only. Exit `1` at or above this severity (default `high`) |
 | `--no-fail` | Always exit `0` |
 | Exit `0` | Success / no trust drift |
 | `1` | Trust violation |

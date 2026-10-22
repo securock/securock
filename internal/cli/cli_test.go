@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/securock/securock/internal/cli"
+	"github.com/securock/securock/schemas"
 )
 
 func TestScanOffline(t *testing.T) {
@@ -70,5 +71,46 @@ func TestExamples(t *testing.T) {
 				t.Fatalf("examples/%s verify: %v\n%s", name, err, out.String())
 			}
 		})
+	}
+}
+
+func TestAuditOffline(t *testing.T) {
+	isolateHome(t)
+	dir := filepath.Join("..", "ecosystem", "npm", "testdata")
+
+	text := runCLI(t, "audit", dir, "--offline", "--no-fail")
+	if !bytes.Contains(text, []byte("findings")) {
+		t.Fatalf("unexpected output:\n%s", text)
+	}
+
+	js := runCLI(t, "audit", dir, "--offline", "--no-fail", "--format", "json")
+	if err := schemas.Validate("audit-report.schema.json", js); err != nil {
+		t.Fatalf("audit json:\n%s\n%v", js, err)
+	}
+
+	sarif := runCLI(t, "audit", dir, "--offline", "--no-fail", "--format", "sarif")
+	if !bytes.Contains(sarif, []byte(`"version": "2.1.0"`)) {
+		t.Fatalf("unexpected sarif:\n%s", sarif)
+	}
+}
+
+func TestAuditFailOn(t *testing.T) {
+	isolateHome(t)
+	dir := filepath.Join("..", "ecosystem", "npm", "testdata")
+
+	root := cli.NewRoot("test", "none", "unknown")
+	root.SetOut(&bytes.Buffer{})
+	root.SetErr(&bytes.Buffer{})
+	root.SetArgs([]string{"audit", dir, "--offline", "--fail-on", "info"})
+	if err := root.Execute(); err == nil {
+		t.Fatal("expected a failure: offline scans always report unchecked evidence at info")
+	}
+
+	root = cli.NewRoot("test", "none", "unknown")
+	root.SetOut(&bytes.Buffer{})
+	root.SetErr(&bytes.Buffer{})
+	root.SetArgs([]string{"audit", dir, "--offline", "--fail-on", "urgent"})
+	if err := root.Execute(); err == nil {
+		t.Fatal("expected an error for an unknown severity")
 	}
 }
