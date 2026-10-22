@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/securock/securock/internal/ecosystem"
 	"github.com/securock/securock/internal/evidence"
@@ -221,4 +222,80 @@ func mustTestTarball(t *testing.T, name string, body []byte) []byte {
 		t.Fatal(err)
 	}
 	return buf.Bytes()
+}
+
+// pairGate holds each request until its partner has arrived, so lookups that run one after
+// the other time out.
+type pairGate struct {
+	a, b chan struct{}
+}
+
+func newPairGate() pairGate { return pairGate{a: make(chan struct{}), b: make(chan struct{})} }
+
+func (g pairGate) meet(first bool) bool {
+	mine, theirs := g.a, g.b
+	if !first {
+		mine, theirs = g.b, g.a
+	}
+	close(mine)
+	select {
+	case <-theirs:
+		return true
+	case <-time.After(2 * time.Second):
+		return false
+	}
+}
+
+func TestNPMLookupsOverlap(t *testing.T) {
+	// The HTTP cache lives under the user cache dir; keep it out of the real one.
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("XDG_CACHE_HOME", t.TempDir())
+
+	tarball := mustTestTarball(t, "package/index.js", []byte("module.exports = 1;\n"))
+	sum := sha512.Sum512(tarball)
+	digest := "sha512:" + hex.EncodeToString(sum[:])
+
+	meta, scan := newPairGate(), newPairGate()
+	var srvURL string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var ok bool
+		switch r.URL.Path {
+		case "/-/npm/v1/attestations/lap@1.0.0":
+			if ok = meta.meet(true); ok {
+				http.NotFound(w, r)
+			}
+		case "/lap/1.0.0":
+			if ok = meta.meet(false); ok {
+				w.Write([]byte(`{"dist":{"tarball":"` + srvURL + `/lap.tgz"},"license":"MIT"}`))
+			}
+		case "/lap":
+			if ok = scan.meet(true); ok {
+				w.Write([]byte(`{"time":{"1.0.0":"2020-01-02T03:04:05.000Z"}}`))
+			}
+		case "/lap.tgz":
+			if ok = scan.meet(false); ok {
+				w.Write(tarball)
+			}
+		default:
+			http.NotFound(w, r)
+			return
+		}
+		if !ok {
+			http.Error(w, "partner request never arrived", http.StatusGatewayTimeout)
+		}
+	}))
+	t.Cleanup(srv.Close)
+	srvURL = srv.URL
+
+	c := &evidence.NPM{HTTP: srv.Client(), Registry: srv.URL, Limit: 1}
+	rec := gotNPM(t, c, ecosystem.Dependency{Ecosystem: "npm", Name: "lap", Version: "1.0.0", Digest: digest})
+	if rec.Provenance != lockfile.EvidenceMissing {
+		t.Fatalf("provenance = %s", rec.Provenance)
+	}
+	if rec.Capabilities.State != lockfile.CapChecked {
+		t.Fatalf("capabilities = %+v", rec.Capabilities)
+	}
+	if rec.Health == nil || rec.Health.Released != "2020-01-02" || rec.Health.License != "MIT" {
+		t.Fatalf("health = %+v", rec.Health)
+	}
 }

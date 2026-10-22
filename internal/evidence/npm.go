@@ -100,7 +100,20 @@ func (c *NPM) Collect(ctx context.Context, deps []ecosystem.Dependency) (map[str
 }
 
 func (c *NPM) lookup(ctx context.Context, dep ecosystem.Dependency) Record {
-	prov, chain := c.attestations(ctx, dep)
+	// The attestation and version lookups are independent requests, so they overlap.
+	var (
+		prov  lockfile.EvidenceState
+		chain lockfile.ChainEvidence
+		wg    sync.WaitGroup
+	)
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		prov, chain = c.attestations(ctx, dep)
+	}()
+	meta, ok := c.versionMeta(ctx, dep)
+	wg.Wait()
+
 	rec := Record{
 		Provenance: prov,
 		Signature:  lockfile.EvidenceUnknown,
@@ -116,16 +129,20 @@ func (c *NPM) lookup(ctx context.Context, dep ecosystem.Dependency) Record {
 		Chain: chain,
 	}
 
-	meta, ok := c.versionMeta(ctx, dep)
 	if !ok {
 		return rec
 	}
 	rec.Signature = c.verifySignature(ctx, c.registryFor(dep), dep.Name, dep.Version, meta.Integrity, dep.Digest, meta.Signatures)
 	rec.Ownership = meta.Ownership
+	// The release date does not depend on the tarball, so it is looked up while the tarball
+	// downloads. Every return below waits for it first.
+	waitReleased := func() {}
 	if meta.Health != nil {
 		health := *meta.Health
-		health.Released = c.released(ctx, dep)
 		rec.Health = &health
+		released := make(chan string, 1)
+		go func() { released <- c.released(ctx, dep) }()
+		waitReleased = func() { health.Released = <-released }
 	}
 
 	findings := capability.FromMetadata(meta.Capability)
@@ -145,11 +162,13 @@ func (c *NPM) lookup(ctx context.Context, dep ecosystem.Dependency) Record {
 	default:
 		if err := c.scanTarball(ctx, dep, meta.Tarball, &findings); err != nil {
 			// Fail closed: a scan or digest error must not become CapChecked.
+			waitReleased()
 			return rec
 		}
 		rec.Capabilities = capability.Evidence(findings)
 		rec.Behavior = capability.Behavior(findings)
 	}
+	waitReleased()
 	return rec
 }
 
