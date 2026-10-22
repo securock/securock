@@ -2,6 +2,7 @@ package npm
 
 import (
 	"encoding/json"
+	"slices"
 	"strings"
 
 	"github.com/securock/securock/internal/ecosystem/core"
@@ -47,21 +48,45 @@ type packageLock struct {
 }
 
 type lockPackage struct {
-	Name      string `json:"name"`
-	Version   string `json:"version"`
-	Integrity string `json:"integrity"`
-	Resolved  string `json:"resolved"`
+	Name         string            `json:"name"`
+	Version      string            `json:"version"`
+	Integrity    string            `json:"integrity"`
+	Resolved     string            `json:"resolved"`
+	Dev          bool              `json:"dev"`
+	Optional     bool              `json:"optional"`
+	DevOptional  bool              `json:"devOptional"`
+	Dependencies map[string]string `json:"dependencies"`
+	// Optional and peer dependencies are installed when present, so they are edges too.
+	OptionalDependencies map[string]string `json:"optionalDependencies"`
+	PeerDependencies     map[string]string `json:"peerDependencies"`
 }
 
 type v1Dep struct {
-	Version      string           `json:"version"`
-	Integrity    string           `json:"integrity"`
-	Resolved     string           `json:"resolved"`
-	Dependencies map[string]v1Dep `json:"dependencies"`
+	Version      string            `json:"version"`
+	Integrity    string            `json:"integrity"`
+	Resolved     string            `json:"resolved"`
+	Dev          bool              `json:"dev"`
+	Optional     bool              `json:"optional"`
+	Requires     map[string]string `json:"requires"`
+	Dependencies map[string]v1Dep  `json:"dependencies"`
+}
+
+// scopeOf reads npm's own classification. The lockfile marks only the exceptions:
+// a package with no flag is installed for production.
+func scopeOf(dev, optional, devOptional bool) string {
+	switch {
+	case optional || devOptional:
+		return core.ScopeOptional
+	case dev:
+		return core.ScopeDev
+	default:
+		return core.ScopeRuntime
+	}
 }
 
 func fromPackages(packages map[string]lockPackage) []core.Dependency {
-	var deps []core.Dependency
+	// First pass: every installable entry, keyed by its path in the lockfile.
+	byKey := make(map[string]core.Dependency, len(packages))
 	for key, pkg := range packages {
 		if key == "" {
 			continue
@@ -74,7 +99,7 @@ func fromPackages(packages map[string]lockPackage) []core.Dependency {
 			continue
 		}
 		kind, registry := classifyResolved(pkg.Resolved)
-		deps = append(deps, core.Dependency{
+		byKey[key] = core.Dependency{
 			Ecosystem:  "npm",
 			Resolver:   "npm",
 			Registry:   registry,
@@ -82,18 +107,69 @@ func fromPackages(packages map[string]lockPackage) []core.Dependency {
 			Name:       name,
 			Version:    pkg.Version,
 			Digest:     core.NormalizeDigest(pkg.Integrity),
-		})
+			Scope:      scopeOf(pkg.Dev, pkg.Optional, pkg.DevOptional),
+		}
+	}
+
+	// Second pass: edges, resolved the way node does, from the package's own directory
+	// outward through the enclosing node_modules directories.
+	deps := make([]core.Dependency, 0, len(byKey))
+	for key, dep := range byKey {
+		pkg := packages[key]
+		var edges []string
+		for _, group := range []map[string]string{pkg.Dependencies, pkg.OptionalDependencies, pkg.PeerDependencies} {
+			for name := range group {
+				if target, ok := resolveInstalled(byKey, key, name); ok {
+					edges = append(edges, core.Identity(target))
+				}
+			}
+		}
+		dep.DependsOn = core.UnionIdentities(nil, edges)
+		deps = append(deps, dep)
 	}
 	return deps
 }
 
+// resolveInstalled finds the copy of name that code at path from would load: the nearest
+// node_modules/name walking up from the package's directory.
+func resolveInstalled(byKey map[string]core.Dependency, from, name string) (core.Dependency, bool) {
+	const marker = "node_modules/"
+	dir := from
+	for {
+		candidate := marker + name
+		if dir != "" {
+			candidate = dir + "/" + marker + name
+		}
+		if dep, ok := byKey[candidate]; ok {
+			return dep, true
+		}
+		if dir == "" {
+			return core.Dependency{}, false
+		}
+		// Step out of the enclosing node_modules/<pkg>, or out of a workspace directory.
+		if i := strings.LastIndex(dir, "/"+marker); i >= 0 {
+			dir = dir[:i]
+		} else {
+			dir = ""
+		}
+	}
+}
+
 func fromDependencies(deps map[string]v1Dep) []core.Dependency {
 	var out []core.Dependency
-	var walk func(map[string]v1Dep)
-	walk = func(tree map[string]v1Dep) {
+	var walk func(tree map[string]v1Dep, scope []map[string]v1Dep)
+	walk = func(tree map[string]v1Dep, scope []map[string]v1Dep) {
+		// scope holds the trees enclosing this one, nearest last, for resolving "requires".
+		scope = append(slices.Clone(scope), tree)
 		for name, dep := range tree {
 			if name != "" && dep.Version != "" {
 				kind, registry := classifyResolved(dep.Resolved)
+				var edges []string
+				for req := range dep.Requires {
+					if target, ok := resolveV1(append(slices.Clone(scope), dep.Dependencies), req); ok {
+						edges = append(edges, "npm:"+req+"@"+target.Version)
+					}
+				}
 				out = append(out, core.Dependency{
 					Ecosystem:  "npm",
 					Resolver:   "npm",
@@ -102,15 +178,27 @@ func fromDependencies(deps map[string]v1Dep) []core.Dependency {
 					Name:       name,
 					Version:    dep.Version,
 					Digest:     core.NormalizeDigest(dep.Integrity),
+					Scope:      scopeOf(dep.Dev, dep.Optional, false),
+					DependsOn:  core.UnionIdentities(nil, edges),
 				})
 			}
 			if len(dep.Dependencies) > 0 {
-				walk(dep.Dependencies)
+				walk(dep.Dependencies, scope)
 			}
 		}
 	}
-	walk(deps)
+	walk(deps, nil)
 	return out
+}
+
+// resolveV1 looks name up from the innermost enclosing tree outward.
+func resolveV1(scope []map[string]v1Dep, name string) (v1Dep, bool) {
+	for i := len(scope) - 1; i >= 0; i-- {
+		if dep, ok := scope[i][name]; ok && dep.Version != "" {
+			return dep, true
+		}
+	}
+	return v1Dep{}, false
 }
 
 func classifyResolved(resolved string) (kind, registry string) {

@@ -17,6 +17,8 @@ var (
 	capStates   = []CapState{CapUnknown, CapChecked}
 	filesystems = []FilesystemAccess{"", FilesystemNone, FilesystemRead, FilesystemWrite}
 	sourceKinds = []string{"", "registry", "workspace", "git", "file", "url"}
+	scopes      = []Scope{"", ScopeRuntime, ScopeDev, ScopeOptional}
+	reachStates = []Reachability{"", ReachUnknown, ReachYes, ReachNo}
 )
 
 func Validate(doc Document) error {
@@ -75,6 +77,17 @@ func validateArtifact(art Artifact) error {
 	for _, v := range art.Evidence.Vulnerabilities.Items {
 		if v.ID == "" {
 			return fmt.Errorf("missing vulnerability id")
+		}
+		if !slices.Contains(reachStates, v.Reachable) {
+			return fmt.Errorf("unknown reachability %q for %s", v.Reachable, v.ID)
+		}
+	}
+	if !slices.Contains(scopes, art.Scope) {
+		return fmt.Errorf("unknown scope %q", art.Scope)
+	}
+	for _, dep := range art.Dependencies {
+		if dep == "" {
+			return fmt.Errorf("missing dependency id")
 		}
 	}
 	if art.Evidence.Malicious.State == "" {

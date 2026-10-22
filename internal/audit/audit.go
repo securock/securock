@@ -2,6 +2,7 @@ package audit
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/securock/securock/internal/finding"
@@ -47,7 +48,8 @@ func artifact(art lockfile.Artifact, now time.Time) []finding.Finding {
 	switch ev.Vulnerabilities.State {
 	case lockfile.VulnChecked:
 		for _, v := range ev.Vulnerabilities.Items {
-			add("known-vulnerability:"+v.ID, finding.SeverityHigh, "Known vulnerability", v.ID, "Upgrade to a fixed version.")
+			sev, title, detail := vulnerability(v)
+			add("known-vulnerability:"+v.ID, sev, title, detail, "Upgrade to a fixed version.")
 		}
 	default:
 		add("vulnerability-unchecked", finding.SeverityInfo, "Vulnerabilities were not checked", "", "Run without --offline to query OSV.")
@@ -101,6 +103,22 @@ func health(art lockfile.Artifact, now time.Time, add func(id string, sev findin
 	}
 	if released, err := time.Parse("2006-01-02", h.Released); err == nil && now.Sub(released) > staleAfter {
 		add("stale-release", finding.SeverityLow, "Release is more than two years old", "published "+h.Released, "Check that the project is still maintained.")
+	}
+}
+
+// vulnerability ranks a known vulnerability. Reachability, when it was recorded, can only
+// lower the severity of one the lockfile shows to be development-only; unknown stays high.
+func vulnerability(v lockfile.Vulnerability) (finding.Severity, string, string) {
+	switch v.Reachable {
+	case lockfile.ReachNo:
+		return finding.SeverityLow, "Known vulnerability in a development-only dependency", v.ID + " (not part of the runtime dependencies)"
+	case lockfile.ReachYes:
+		if len(v.Via) > 1 {
+			return finding.SeverityHigh, "Known vulnerability", v.ID + " (reached via " + strings.Join(v.Via, " -> ") + ")"
+		}
+		return finding.SeverityHigh, "Known vulnerability", v.ID + " (runtime dependency)"
+	default:
+		return finding.SeverityHigh, "Known vulnerability", v.ID
 	}
 }
 

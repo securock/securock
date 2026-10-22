@@ -31,10 +31,11 @@ func newAuditCommand(opts *options) *cobra.Command {
 				return err
 			}
 			result, err := scanner.Scan(cmd.Context(), scanner.Options{
-				Path:    projectPath(args),
-				Offline: opts.offline,
-				Network: net,
-				Policy:  pol,
+				Path:         projectPath(args),
+				Offline:      opts.offline,
+				Network:      net,
+				Policy:       pol,
+				Reachability: opts.reachability,
 			})
 			if err != nil {
 				return opErr(err)

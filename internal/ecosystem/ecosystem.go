@@ -29,7 +29,7 @@ func Collect(path string) ([]Dependency, error) {
 		return nil, fmt.Errorf("no supported lockfile found in %s", path)
 	}
 
-	seen := make(map[string]string)
+	seen := make(map[string]int)
 	var deps []Dependency
 
 	for _, e := range ecosystems {
@@ -51,13 +51,17 @@ func Collect(path string) ([]Dependency, error) {
 				dep.Resolver = e.Name()
 			}
 			key := depKey(dep)
-			if prev, ok := seen[key]; ok {
-				if prev == dep.Digest {
-					continue
+			if i, ok := seen[key]; ok {
+				prev := &deps[i]
+				if prev.Digest != dep.Digest {
+					return nil, fmt.Errorf("artifact conflict detected\n\n%s\n\n%s\n%s", key, prev.Digest, dep.Digest)
 				}
-				return nil, fmt.Errorf("artifact conflict detected\n\n%s\n\n%s\n%s", key, prev, dep.Digest)
+				// The same artifact appears again, such as a nested copy: keep what both say.
+				prev.Scope = core.MergeScope(prev.Scope, dep.Scope)
+				prev.DependsOn = core.UnionIdentities(prev.DependsOn, dep.DependsOn)
+				continue
 			}
-			seen[key] = dep.Digest
+			seen[key] = len(deps)
 			deps = append(deps, dep)
 		}
 	}

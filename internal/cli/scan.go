@@ -36,10 +36,11 @@ func runScan(cmd *cobra.Command, opts *options, path string) error {
 	}
 
 	result, err := scanner.Scan(cmd.Context(), scanner.Options{
-		Path:    path,
-		Offline: opts.offline,
-		Network: net,
-		Policy:  pol,
+		Path:         path,
+		Offline:      opts.offline,
+		Network:      net,
+		Policy:       pol,
+		Reachability: opts.reachability,
 	})
 	if err != nil {
 		return opErr(err)

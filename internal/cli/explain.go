@@ -33,10 +33,11 @@ func newExplainCommand(opts *options) *cobra.Command {
 			}
 
 			result, err := scanner.Scan(cmd.Context(), scanner.Options{
-				Path:    path,
-				Offline: opts.offline,
-				Network: net,
-				Policy:  pol,
+				Path:         path,
+				Offline:      opts.offline,
+				Network:      net,
+				Policy:       pol,
+				Reachability: opts.reachability,
 			})
 			if err != nil {
 				return opErr(err)
