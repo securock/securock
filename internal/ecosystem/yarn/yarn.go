@@ -46,9 +46,10 @@ func berry(raw []byte) bool {
 type berryLock map[string]berryPkg
 
 type berryPkg struct {
-	Version    string `yaml:"version"`
-	Resolution string `yaml:"resolution"`
-	Checksum   string `yaml:"checksum"`
+	Version      string            `yaml:"version"`
+	Resolution   string            `yaml:"resolution"`
+	Checksum     string            `yaml:"checksum"`
+	Dependencies map[string]string `yaml:"dependencies"`
 }
 
 func berryDeps(project string, raw []byte) ([]core.Dependency, error) {
@@ -58,7 +59,7 @@ func berryDeps(project string, raw []byte) ([]core.Dependency, error) {
 	}
 
 	seen := map[string]struct{}{}
-	var deps []core.Dependency
+	var entries []entry
 	for key, pkg := range lock {
 		if key == "__metadata" || pkg.Version == "" {
 			continue
@@ -72,7 +73,11 @@ func berryDeps(project string, raw []byte) ([]core.Dependency, error) {
 			continue
 		}
 		id := name + "@" + pkg.Version
+		// Virtual and located copies of a package share its descriptors and dependencies.
+		e := entry{descriptors: descriptors(key), deps: pkg.Dependencies, berry: true}
 		if _, ok := seen[id]; ok {
+			e.duplicate = id
+			entries = append(entries, e)
 			continue
 		}
 		seen[id] = struct{}{}
@@ -82,7 +87,7 @@ func berryDeps(project string, raw []byte) ([]core.Dependency, error) {
 			// Yarn berry does not read .npmrc, so an unknown registry stays unknown.
 			registry = yarnrc.Registry(project, name, tarball)
 		}
-		deps = append(deps, core.Dependency{
+		e.dep = core.Dependency{
 			Ecosystem:  "npm",
 			Resolver:   "yarn",
 			Registry:   registry,
@@ -90,9 +95,10 @@ func berryDeps(project string, raw []byte) ([]core.Dependency, error) {
 			Name:       name,
 			Version:    pkg.Version,
 			Digest:     core.NormalizeDigest(checksum(pkg.Checksum)),
-		})
+		}
+		entries = append(entries, e)
 	}
-	return deps, nil
+	return build(project, entries), nil
 }
 
 func classicDeps(project string, raw []byte) ([]core.Dependency, error) {
@@ -100,15 +106,21 @@ func classicDeps(project string, raw []byte) ([]core.Dependency, error) {
 	sc.Buffer(make([]byte, 0, 64*1024), 1024*1024)
 
 	var (
-		deps      []core.Dependency
+		entries   []entry
 		name      string
 		version   string
 		resolved  string
 		integrity string
+		descs     []string
+		deps      map[string]string
+		inDeps    bool
 	)
+	reset := func() {
+		name, version, resolved, integrity, descs, deps, inDeps = "", "", "", "", nil, nil, false
+	}
 	flush := func() {
 		if name == "" || version == "" {
-			name, version, resolved, integrity = "", "", "", ""
+			reset()
 			return
 		}
 		kind, tarball := classifyResolved(resolved)
@@ -116,16 +128,20 @@ func classicDeps(project string, raw []byte) ([]core.Dependency, error) {
 		if kind == core.SourceRegistry {
 			registry = npmrc.Registry(project, name, tarball)
 		}
-		deps = append(deps, core.Dependency{
-			Ecosystem:  "npm",
-			Resolver:   "yarn",
-			Registry:   registry,
-			SourceKind: kind,
-			Name:       name,
-			Version:    version,
-			Digest:     core.NormalizeDigest(integrity),
+		entries = append(entries, entry{
+			descriptors: descs,
+			deps:        deps,
+			dep: core.Dependency{
+				Ecosystem:  "npm",
+				Resolver:   "yarn",
+				Registry:   registry,
+				SourceKind: kind,
+				Name:       name,
+				Version:    version,
+				Digest:     core.NormalizeDigest(integrity),
+			},
 		})
-		name, version, resolved, integrity = "", "", "", ""
+		reset()
 	}
 
 	for sc.Scan() {
@@ -137,12 +153,23 @@ func classicDeps(project string, raw []byte) ([]core.Dependency, error) {
 		if indent(line) == 0 && strings.HasSuffix(trim, ":") {
 			flush()
 			name, _ = parseLocator(strings.TrimSuffix(trim, ":"))
+			descs = descriptors(trim)
+			continue
+		}
+		if indent(line) == 4 && inDeps {
+			if depName, rng, ok := strings.Cut(trim, " "); ok {
+				if deps == nil {
+					deps = map[string]string{}
+				}
+				deps[unquote(depName)] = unquote(rng)
+			}
 			continue
 		}
 		if indent(line) != 2 {
 			continue
 		}
 		key, value, ok := strings.Cut(trim, " ")
+		inDeps = !ok && (trim == "dependencies:" || trim == "optionalDependencies:")
 		if !ok {
 			continue
 		}
@@ -157,7 +184,95 @@ func classicDeps(project string, raw []byte) ([]core.Dependency, error) {
 		}
 	}
 	flush()
-	return deps, sc.Err()
+	if err := sc.Err(); err != nil {
+		return nil, err
+	}
+	return build(project, entries), nil
+}
+
+// entry is one lockfile record before edges and scopes are worked out.
+type entry struct {
+	dep         core.Dependency
+	descriptors []string
+	deps        map[string]string
+	berry       bool
+	// duplicate is set for a second record of an artifact already seen: it adds descriptors
+	// and edges to that artifact but is not a new dependency.
+	duplicate string
+}
+
+// descriptors splits a lockfile header into the "name@range" descriptors it answers for.
+func descriptors(header string) []string {
+	header = strings.TrimSuffix(strings.TrimSpace(header), ":")
+	if i := strings.Index(header, "::"); i >= 0 && !strings.Contains(header[:i], ", ") {
+		header = header[:i]
+	}
+	var out []string
+	for _, part := range strings.Split(header, ", ") {
+		if d := unquote(part); d != "" {
+			out = append(out, d)
+		}
+	}
+	return out
+}
+
+// build turns records into dependencies with edges and scopes. Edges follow the descriptor
+// each dependency was requested with; scopes start from the direct dependencies listed in
+// package.json, which yarn.lock itself does not record.
+func build(project string, entries []entry) []core.Dependency {
+	var deps []core.Dependency
+	index := map[string]int{}
+	byDescriptor := map[string]int{}
+	owner := make([]int, len(entries))
+	for i, e := range entries {
+		at := -1
+		if e.duplicate != "" {
+			at = index["npm:"+e.duplicate]
+		} else {
+			at = len(deps)
+			index[core.Identity(e.dep)] = at
+			deps = append(deps, e.dep)
+		}
+		owner[i] = at
+		for _, d := range e.descriptors {
+			if _, ok := byDescriptor[d]; !ok {
+				byDescriptor[d] = at
+			}
+		}
+	}
+
+	for i, e := range entries {
+		var edges []string
+		for name, rng := range e.deps {
+			if j, ok := lookup(byDescriptor, name, rng); ok {
+				edges = append(edges, core.Identity(deps[j]))
+			}
+		}
+		deps[owner[i]].DependsOn = core.UnionIdentities(deps[owner[i]].DependsOn, edges)
+	}
+
+	roots := map[string]string{}
+	for _, group := range projectDependencies(project) {
+		for depName, rng := range group.deps {
+			if j, ok := lookup(byDescriptor, depName, rng); ok {
+				id := core.Identity(deps[j])
+				roots[id] = core.MergeScope(roots[id], group.scope)
+			}
+		}
+	}
+	core.ApplyScopes(deps, roots)
+	return deps
+}
+
+// lookup finds the artifact a dependency range was resolved to. Classic lockfiles write
+// name@range; berry writes name@npm:range for registry packages.
+func lookup(byDescriptor map[string]int, name, rng string) (int, bool) {
+	for _, d := range []string{name + "@" + rng, name + "@npm:" + rng} {
+		if j, ok := byDescriptor[d]; ok {
+			return j, true
+		}
+	}
+	return 0, false
 }
 
 func indent(line string) int {
