@@ -116,17 +116,32 @@ trust drift. It affects trust only through the policy rule
 `securock audit` turns health into findings, and adds a name check that
 needs no registry:
 
-| Finding              | Severity | When                                                  |
-| -------------------- | -------- | ----------------------------------------------------- |
-| `deprecated-package` | medium   | The release is deprecated or yanked                   |
-| `stale-release`      | low      | The release is more than two years old                |
-| `typosquat-suspect`  | medium   | npm or PyPI name within one edit of a popular package |
+| Finding              | Severity | When                                                   |
+| -------------------- | -------- | ------------------------------------------------------ |
+| `deprecated-package` | medium   | The release is deprecated or yanked                    |
+| `stale-release`      | low      | The release is more than two years old                 |
+| `typosquat-suspect`  | medium   | npm or PyPI name within one edit of a popular package  |
+| `recent-release`     | high     | Newer than `--min-release-age` (off unless you set it) |
 
 `typosquat-suspect` compares each name against a built-in list of popular
 packages (separator variants such as `lo-dash`, or one typo, swap, or
 missing letter). Scoped npm names are skipped. It is a signal to look at,
 not proof: a real package can have a name close to a popular one. Use
 `securock accept` to record that you checked.
+
+### Release cooldown
+
+A freshly published malicious version is usually caught within days, so waiting a little
+before adopting a release removes most of that risk. `securock audit --min-release-age 7d`
+reports every npm and PyPI release published more recently than that as a high finding
+(`recent-release`), so it fails `--fail-on high` by default. The age is a day count (`7d`)
+or a duration (`72h`).
+
+It is a report-time check, not a policy rule, on purpose: whether a release is "too new"
+changes as time passes, and trust status in the lockfile must not. The registry gives only
+the release day, so a release counts from the start of that day. A release whose date is
+unknown (offline, a private registry, an npm package with a very long history) is not
+flagged.
 
 ## Offline and private registries
 

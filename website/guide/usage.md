@@ -166,6 +166,9 @@ Both commands accept `--fail-on SEVERITY` (`critical`, `high`,
 `medium`, `low` or `info`; default `high`) and exit `1` when a finding
 is at or above it.
 
+`audit` also takes `--min-release-age 7d`, which reports releases newer than that as high
+findings; see [Release cooldown](/guide/evidence#release-cooldown).
+
 ## Shared flags
 
 | Flag             | Meaning                                                                                   |

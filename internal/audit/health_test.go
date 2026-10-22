@@ -1,6 +1,7 @@
 package audit_test
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -50,6 +51,46 @@ func TestHealthFindings(t *testing.T) {
 				if got[id] != sev {
 					t.Fatalf("%s: got %q, want %q (all: %v)", id, got[id], sev, got)
 				}
+			}
+		})
+	}
+}
+
+func TestRecentRelease(t *testing.T) {
+	now := time.Date(2026, 6, 15, 12, 0, 0, 0, time.UTC)
+	const week = 7 * 24 * time.Hour
+	tests := []struct {
+		name     string
+		min      time.Duration
+		health   *lockfile.HealthEvidence
+		want     bool
+		contains string
+	}{
+		{"off by default", 0, &lockfile.HealthEvidence{Released: "2026-06-15"}, false, ""},
+		{"published today", week, &lockfile.HealthEvidence{Released: "2026-06-15"}, true, "(0 days ago); minimum is 7 days"},
+		{"three days ago", week, &lockfile.HealthEvidence{Released: "2026-06-12"}, true, "(3 days ago)"},
+		{"exactly old enough", week, &lockfile.HealthEvidence{Released: "2026-06-08"}, false, ""},
+		{"old release", week, &lockfile.HealthEvidence{Released: "2024-01-01"}, false, ""},
+		{"unknown date is never flagged", week, &lockfile.HealthEvidence{License: "MIT"}, false, ""},
+		{"health not collected", week, nil, false, ""},
+		{"whole days read as days", 72 * time.Hour, &lockfile.HealthEvidence{Released: "2026-06-14"}, true, "(1 day ago); minimum is 3 days"},
+		{"part of a day keeps the duration", 36 * time.Hour, &lockfile.HealthEvidence{Released: "2026-06-15"}, true, "minimum is 36h0m0s"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			doc := artifact(func(a *lockfile.Artifact) { a.Evidence.Health = tt.health })
+			var got *finding.Finding
+			for _, f := range audit.RunWith(doc, audit.Options{Now: now, MinReleaseAge: tt.min}).Findings {
+				if f.ID == "recent-release" {
+					f := f
+					got = &f
+				}
+			}
+			if (got != nil) != tt.want {
+				t.Fatalf("finding = %+v, want %v", got, tt.want)
+			}
+			if got != nil && (got.Severity != finding.SeverityHigh || !strings.Contains(got.Detail, tt.contains)) {
+				t.Fatalf("got %+v, want detail containing %q", *got, tt.contains)
 			}
 		})
 	}

@@ -144,6 +144,7 @@ Cargo under [`examples/`](examples/).
 | `--format json` | Stable JSON on `scan`, `diff`, `verify`, and `explain` |
 | `--format sarif` | SARIF 2.1.0 on every report command, for GitHub code scanning |
 | `--output` | Write the report to a file instead of stdout (also on exit `1`) |
+| `--min-release-age` | `audit`. Report npm and PyPI releases newer than this, such as `7d` |
 | `--fail-on` | `audit` and `doctor`. Exit `1` at or above this severity (default `high`) |
 | `--exceptions` | Accepted-findings file (default `.securock/exceptions.yaml`) |
 | `--reachability` | Record package scope and dependencies; mark vulnerabilities reachable, unreachable, or unknown |

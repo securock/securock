@@ -21,14 +21,32 @@ func Run(doc lockfile.Document) finding.Report {
 
 // RunAt is Run with an explicit clock, for the age-based findings.
 func RunAt(doc lockfile.Document, now time.Time) finding.Report {
+	return RunWith(doc, Options{Now: now})
+}
+
+// Options tunes the findings that depend on time.
+type Options struct {
+	// Now is the clock; the zero value uses time.Now.
+	Now time.Time
+	// MinReleaseAge reports any release published more recently than this as a high
+	// finding. Zero turns the check off.
+	MinReleaseAge time.Duration
+}
+
+// RunWith is Run with options.
+func RunWith(doc lockfile.Document, opts Options) finding.Report {
+	if opts.Now.IsZero() {
+		opts.Now = time.Now()
+	}
 	var out []finding.Finding
 	for _, art := range doc.Artifacts {
-		out = append(out, artifact(art, now)...)
+		out = append(out, artifact(art, opts)...)
 	}
 	return finding.New("audit", out)
 }
 
-func artifact(art lockfile.Artifact, now time.Time) []finding.Finding {
+func artifact(art lockfile.Artifact, opts Options) []finding.Finding {
+	now := opts.Now
 	subject := art.ArtifactID()
 	ev := art.Evidence
 	var out []finding.Finding
@@ -66,6 +84,7 @@ func artifact(art lockfile.Artifact, now time.Time) []finding.Finding {
 	}
 
 	health(art, now, add)
+	recentRelease(art, opts, add)
 
 	if ev.Capabilities.State == lockfile.CapChecked {
 		caps := ev.Capabilities
@@ -120,6 +139,42 @@ func vulnerability(v lockfile.Vulnerability) (finding.Severity, string, string) 
 	default:
 		return finding.SeverityHigh, "Known vulnerability", v.ID
 	}
+}
+
+// recentRelease flags releases younger than the cooldown, which is how a freshly
+// published malicious version is kept out until the registry has had time to react.
+// The release day is all the registry gives, so a release is dated from the start of that
+// day; an unknown date is never flagged.
+func recentRelease(art lockfile.Artifact, opts Options, add func(id string, sev finding.Severity, title, detail, fix string)) {
+	if opts.MinReleaseAge <= 0 || art.Evidence.Health == nil {
+		return
+	}
+	released, err := time.Parse("2006-01-02", art.Evidence.Health.Released)
+	if err != nil {
+		return
+	}
+	age := opts.Now.UTC().Sub(released)
+	if age >= opts.MinReleaseAge {
+		return
+	}
+	days := max(int(age/(24*time.Hour)), 0)
+	add("recent-release", finding.SeverityHigh, "Release is newer than the minimum age",
+		fmt.Sprintf("published %s (%s ago); minimum is %s", art.Evidence.Health.Released, plural(days, "day"), formatAge(opts.MinReleaseAge)),
+		"Wait until the release is older, or pin the previous version.")
+}
+
+func formatAge(d time.Duration) string {
+	if d%(24*time.Hour) == 0 {
+		return plural(int(d/(24*time.Hour)), "day")
+	}
+	return d.String()
+}
+
+func plural(n int, unit string) string {
+	if n == 1 {
+		return fmt.Sprintf("%d %s", n, unit)
+	}
+	return fmt.Sprintf("%d %ss", n, unit)
 }
 
 func enabled(b *bool) bool {

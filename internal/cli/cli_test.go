@@ -138,3 +138,19 @@ func TestDoctor(t *testing.T) {
 		t.Fatal("expected a failure for a high severity finding")
 	}
 }
+
+func TestAuditMinReleaseAgeFlag(t *testing.T) {
+	isolateHome(t)
+	dir := filepath.Join("..", "ecosystem", "npm", "testdata")
+	runCLI(t, "audit", dir, "--offline", "--no-fail", "--min-release-age", "7d")
+	runCLI(t, "audit", dir, "--offline", "--no-fail", "--min-release-age", "72h")
+	for _, bad := range []string{"soon", "-3d", "xd", "-1h"} {
+		root := cli.NewRoot("test", "none", "unknown")
+		root.SetOut(&bytes.Buffer{})
+		root.SetErr(&bytes.Buffer{})
+		root.SetArgs([]string{"audit", dir, "--offline", "--no-fail", "--min-release-age", bad})
+		if err := root.Execute(); err == nil {
+			t.Fatalf("%q should be rejected", bad)
+		}
+	}
+}
