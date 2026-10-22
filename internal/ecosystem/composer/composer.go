@@ -2,6 +2,7 @@ package composer
 
 import (
 	"encoding/json"
+	"strings"
 
 	"github.com/securock/securock/internal/ecosystem/core"
 	"github.com/securock/securock/internal/network"
@@ -35,10 +36,20 @@ func (Ecosystem) Dependencies(path string) ([]core.Dependency, error) {
 	}
 
 	var deps []core.Dependency
+	var all []composerPackage
+	// Composer lists in packages-dev only what the project needs for development.
+	scopes := map[string]string{}
+	for _, pkg := range lock.Packages {
+		scopes[pkg.Name] = core.ScopeRuntime
+	}
+	for _, pkg := range lock.PackagesDev {
+		scopes[pkg.Name] = core.MergeScope(scopes[pkg.Name], core.ScopeDev)
+	}
 	for _, pkg := range append(lock.Packages, lock.PackagesDev...) {
 		if pkg.Name == "" || pkg.Version == "" {
 			continue
 		}
+		all = append(all, pkg)
 		kind, registry := classify(pkg)
 		dep := core.Dependency{
 			Ecosystem:  "packagist",
@@ -48,6 +59,7 @@ func (Ecosystem) Dependencies(path string) ([]core.Dependency, error) {
 			Name:       pkg.Name,
 			Version:    pkg.Version,
 			Digest:     core.NormalizeDigest(pkg.Dist.Shasum),
+			Scope:      scopes[pkg.Name],
 		}
 		if pkg.Dist.URL != "" {
 			dep.Artifact = pkg.Dist.URL
@@ -58,6 +70,19 @@ func (Ecosystem) Dependencies(path string) ([]core.Dependency, error) {
 			dep.Resolved = pkg.Source.Reference
 		}
 		deps = append(deps, dep)
+	}
+
+	byName := map[string][]string{}
+	for _, dep := range deps {
+		name := strings.ToLower(dep.Name)
+		byName[name] = append(byName[name], core.Identity(dep))
+	}
+	for i, pkg := range all {
+		var edges []string
+		for name := range pkg.Require {
+			edges = append(edges, byName[strings.ToLower(name)]...)
+		}
+		deps[i].DependsOn = core.UnionIdentities(nil, edges)
 	}
 	return deps, nil
 }
@@ -71,7 +96,9 @@ type composerPackage struct {
 	Name            string `json:"name"`
 	Version         string `json:"version"`
 	NotificationURL string `json:"notification-url"`
-	Dist            struct {
+	// Require also lists php, ext-* and lib-*, which are not packages and match nothing.
+	Require map[string]string `json:"require"`
+	Dist    struct {
 		Type   string `json:"type"`
 		URL    string `json:"url"`
 		Shasum string `json:"shasum"`

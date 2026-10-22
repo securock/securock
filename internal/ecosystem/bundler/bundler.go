@@ -34,12 +34,29 @@ func (Ecosystem) Dependencies(path string) ([]core.Dependency, error) {
 	section := ""
 	remote := ""
 	revision := ""
+	current := ""
+	needs := map[string][]string{}
+	var direct []string
 	for line := range strings.SplitSeq(string(raw), "\n") {
 		if header, ok := sectionHeader(line); ok {
 			section = header
 			remote = ""
 			revision = ""
+			current = ""
 			continue
+		}
+		if section == "DEPENDENCIES" {
+			if name := dependencyName(line); name != "" {
+				direct = append(direct, name)
+			}
+			continue
+		}
+		// A gem's own dependencies are listed under it, one level deeper than the gem.
+		if (section == "GEM" || section == "GIT" || section == "PATH") && current != "" {
+			if name := specDependency(line); name != "" {
+				needs[current] = append(needs[current], name)
+				continue
+			}
 		}
 		if trimmed := strings.TrimSpace(line); strings.HasPrefix(trimmed, "remote:") && (section == "GEM" || section == "GIT" || section == "PATH") {
 			remote = strings.TrimSpace(strings.TrimPrefix(trimmed, "remote:"))
@@ -57,6 +74,7 @@ func (Ecosystem) Dependencies(path string) ([]core.Dependency, error) {
 			continue
 		}
 		key := name + "@" + version
+		current = key
 		if _, dup := seen[key]; dup {
 			continue
 		}
@@ -77,7 +95,32 @@ func (Ecosystem) Dependencies(path string) ([]core.Dependency, error) {
 		}
 		deps = append(deps, dep)
 	}
+	applyGraph(path, deps, needs, direct)
 	return deps, nil
+}
+
+// dependencyName reads a DEPENDENCIES entry such as "  rack (>= 2.0)" or "  local-pkg!".
+func dependencyName(line string) string {
+	if !strings.HasPrefix(line, "  ") || strings.HasPrefix(line, "   ") {
+		return ""
+	}
+	name := strings.TrimSpace(line)
+	if i := strings.IndexAny(name, " ("); i >= 0 {
+		name = name[:i]
+	}
+	return strings.TrimSuffix(name, "!")
+}
+
+// specDependency reads a line under a gem in specs, such as "      rack (>= 3.0.0)".
+func specDependency(line string) string {
+	if len(line) <= 6 || line[:6] != "      " || line[6] == ' ' {
+		return ""
+	}
+	name := strings.TrimSpace(line)
+	if i := strings.Index(name, " "); i >= 0 {
+		name = name[:i]
+	}
+	return name
 }
 
 func sectionHeader(line string) (string, bool) {
