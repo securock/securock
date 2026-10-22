@@ -105,9 +105,12 @@ is recorded for npm-family packages and PyPI:
 
 `health` is omitted from the lockfile when the registry did not answer
 (offline, private registry, unsupported ecosystem), so absence means
-"not checked", never "healthy". For npm, `released` is also omitted for
-packages whose full package document exceeds the 2 MiB response limit,
-which is typical of packages with very long histories.
+"not checked", never "healthy". For npm, the release day comes from the
+package document. For packages whose document exceeds the 2 MiB response
+limit, which is typical of those with very long histories (`react`,
+`typescript`, `webpack`), it comes from one small
+[deps.dev](https://deps.dev) lookup instead, and only for packages from the
+public npm registry. If that fails too, `released` is omitted.
 
 Health is informational: a change in `released` or `license` is not
 trust drift. It affects trust only through the policy rule
@@ -140,8 +143,9 @@ or a duration (`72h`).
 It is a report-time check, not a policy rule, on purpose: whether a release is "too new"
 changes as time passes, and trust status in the lockfile must not. The registry gives only
 the release day, so a release counts from the start of that day. A release whose date is
-unknown (offline, a private registry, an npm package with a very long history) is not
-flagged.
+unknown (offline, or a registry that does not answer) cannot be judged: it is not flagged as
+recent, but `audit` reports it as an `info` finding, `release-date-unknown`, so that silence is
+not mistaken for "old enough".
 
 ## Offline and private registries
 

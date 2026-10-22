@@ -176,13 +176,22 @@ func upgradeAdvice(v lockfile.Vulnerability) string {
 // recentRelease flags releases younger than the cooldown, which is how a freshly
 // published malicious version is kept out until the registry has had time to react.
 // The release day is all the registry gives, so a release is dated from the start of that
-// day; an unknown date is never flagged.
+// day. A release whose date could not be found cannot be judged, and is reported as such.
 func recentRelease(art lockfile.Artifact, opts Options, add func(id string, sev finding.Severity, title, detail, fix string)) {
-	if opts.MinReleaseAge <= 0 || art.Evidence.Health == nil {
+	if opts.MinReleaseAge <= 0 {
 		return
 	}
-	released, err := time.Parse("2006-01-02", art.Evidence.Health.Released)
-	if err != nil {
+	var released time.Time
+	var err error
+	if art.Evidence.Health != nil {
+		released, err = time.Parse("2006-01-02", art.Evidence.Health.Released)
+	}
+	if art.Evidence.Health == nil || err != nil {
+		// Silence would read as "old enough". Only npm and PyPI have release dates to find.
+		if eco := art.Subject.Ecosystem; eco == "npm" || eco == "pypi" {
+			add("release-date-unknown", finding.SeverityInfo, "Release date is unknown, so the minimum age was not checked", "",
+				"Run without --offline, or check the release date yourself.")
+		}
 		return
 	}
 	age := opts.Now.UTC().Sub(released)

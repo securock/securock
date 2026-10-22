@@ -95,3 +95,42 @@ func TestRecentRelease(t *testing.T) {
 		})
 	}
 }
+
+func TestReleaseDateUnknownIsReportedWhenTheCooldownIsOn(t *testing.T) {
+	now := time.Date(2026, 6, 15, 12, 0, 0, 0, time.UTC)
+	tests := []struct {
+		name   string
+		eco    string
+		health *lockfile.HealthEvidence
+		min    time.Duration
+		want   bool
+	}{
+		{"npm without a date", "npm", &lockfile.HealthEvidence{License: "MIT"}, 7 * 24 * time.Hour, true},
+		{"npm without health", "npm", nil, 7 * 24 * time.Hour, true},
+		{"pypi without health", "pypi", nil, 7 * 24 * time.Hour, true},
+		{"a known date is not unknown", "npm", &lockfile.HealthEvidence{Released: "2020-01-01"}, 7 * 24 * time.Hour, false},
+		{"cooldown off", "npm", nil, 0, false},
+		{"other ecosystems never have release dates", "cargo", nil, 7 * 24 * time.Hour, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			doc := artifact(func(a *lockfile.Artifact) {
+				a.Subject.Ecosystem = tt.eco
+				a.Evidence.Health = tt.health
+			})
+			var got *finding.Finding
+			for _, f := range audit.RunWith(doc, audit.Options{Now: now, MinReleaseAge: tt.min}).Findings {
+				if f.ID == "release-date-unknown" {
+					f := f
+					got = &f
+				}
+			}
+			if (got != nil) != tt.want {
+				t.Fatalf("finding = %+v, want %v", got, tt.want)
+			}
+			if got != nil && got.Severity != finding.SeverityInfo {
+				t.Fatalf("severity = %s", got.Severity)
+			}
+		})
+	}
+}

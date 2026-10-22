@@ -31,6 +31,12 @@ type NPM struct {
 	Limit     int
 	// SkipTarball disables package source capability scanning.
 	SkipTarball bool
+	// DepsDev is the base URL of the deps.dev API, used only to date a release whose package
+	// document is too large to read. Empty turns the fallback off.
+	DepsDev string
+	// PublicHosts are the registry hosts deps.dev covers; a package from any other registry
+	// is never looked up there. Empty means the public npm registry and Yarn's mirror of it.
+	PublicHosts []string
 
 	keysOnce sync.Once
 	keys     *keyCache
@@ -44,6 +50,7 @@ func NewNPM() *NPM {
 		Registry:  "https://registry.npmjs.org",
 		UserAgent: "securock",
 		Limit:     8,
+		DepsDev:   "https://api.deps.dev",
 	}
 }
 
@@ -212,11 +219,25 @@ func (c *NPM) versionMeta(ctx context.Context, dep ecosystem.Dependency) (versio
 	}, true
 }
 
-// released returns the day this version was published. Only the full package document
-// carries publish times, and for packages with long histories it exceeds the response
-// size limit, in which case the date is simply left unknown.
+// released returns the day this version was published, or "" when it cannot be found.
+//
+// The full package document carries every publish time, but for packages with long
+// histories (react, typescript, webpack) it exceeds the response size limit. Those are
+// dated through deps.dev instead, a small per-version lookup, and only for packages from
+// the public registry. Anything that fails leaves the date unknown rather than guessed.
 func (c *NPM) released(ctx context.Context, dep ecosystem.Dependency) string {
-	endpoint := strings.TrimRight(c.registryFor(dep), "/") + "/" + encodeNPMName(dep.Name)
+	registry := c.registryFor(dep)
+	if day := c.packumentRelease(ctx, registry, dep); day != "" {
+		return day
+	}
+	if c.DepsDev != "" && c.publicHost(registry) {
+		return c.depsDevRelease(ctx, dep)
+	}
+	return ""
+}
+
+func (c *NPM) packumentRelease(ctx context.Context, registry string, dep ecosystem.Dependency) string {
+	endpoint := strings.TrimRight(registry, "/") + "/" + encodeNPMName(dep.Name)
 	res, err := c.get(ctx, endpoint)
 	if err != nil {
 		return ""
@@ -232,6 +253,42 @@ func (c *NPM) released(ctx context.Context, dep ecosystem.Dependency) string {
 		return ""
 	}
 	return day(parsed.Time[dep.Version])
+}
+
+func (c *NPM) depsDevRelease(ctx context.Context, dep ecosystem.Dependency) string {
+	endpoint := strings.TrimRight(c.DepsDev, "/") + "/v3/systems/npm/packages/" + url.PathEscape(dep.Name) + "/versions/" + url.PathEscape(dep.Version)
+	res, err := c.get(ctx, endpoint)
+	if err != nil {
+		return ""
+	}
+	defer res.Body.Close()
+	if res.StatusCode != http.StatusOK {
+		return ""
+	}
+	var parsed struct {
+		PublishedAt string `json:"publishedAt"`
+	}
+	if err := json.NewDecoder(res.Body).Decode(&parsed); err != nil {
+		return ""
+	}
+	return day(parsed.PublishedAt)
+}
+
+func (c *NPM) publicHost(registry string) bool {
+	u, err := url.Parse(registry)
+	if err != nil {
+		return false
+	}
+	hosts := c.PublicHosts
+	if len(hosts) == 0 {
+		hosts = []string{"registry.npmjs.org", "registry.yarnpkg.com"}
+	}
+	for _, h := range hosts {
+		if strings.EqualFold(u.Host, h) {
+			return true
+		}
+	}
+	return false
 }
 
 func (c *NPM) scanTarball(ctx context.Context, dep ecosystem.Dependency, tarball string, findings *capability.Findings) error {

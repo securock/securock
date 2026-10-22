@@ -129,3 +129,104 @@ func TestPyPIHealth(t *testing.T) {
 		}
 	}
 }
+
+func TestNPMReleaseFallsBackToDepsDevWhenThePackumentIsTooLarge(t *testing.T) {
+	var depsDevCalls int
+	registry := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/big/1.0.0", "/@scope/big/1.0.0", "/@scope%2Fbig/1.0.0":
+			w.Write([]byte(`{"dist":{},"license":"ISC"}`))
+		case "/big", "/@scope%2Fbig":
+			w.Write([]byte(`{"time":{"1.0.0":"2020-01-01T00:00:00Z"},"padding":"` + strings.Repeat("x", 3<<20) + `"}`))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	t.Cleanup(registry.Close)
+	depsDev := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		depsDevCalls++
+		switch r.URL.EscapedPath() {
+		case "/v3/systems/npm/packages/big/versions/1.0.0":
+			w.Write([]byte(`{"publishedAt":"2023-04-05T06:07:08Z"}`))
+		case "/v3/systems/npm/packages/@scope%2Fbig/versions/1.0.0":
+			w.Write([]byte(`{"publishedAt":"2024-05-06T00:00:00Z"}`))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	t.Cleanup(depsDev.Close)
+	host := strings.TrimPrefix(registry.URL, "http://")
+
+	collect := func(c *evidence.NPM, name string) *lockfile.HealthEvidence {
+		dep := ecosystem.Dependency{Ecosystem: "npm", Name: name, Version: "1.0.0"}
+		got, err := c.Collect(context.Background(), []ecosystem.Dependency{dep})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return got[evidence.Key(dep)].Health
+	}
+	base := func() *evidence.NPM {
+		return &evidence.NPM{HTTP: registry.Client(), Registry: registry.URL, SkipTarball: true, DepsDev: depsDev.URL, PublicHosts: []string{host}}
+	}
+
+	if h := collect(base(), "big"); h == nil || h.Released != "2023-04-05" || h.License != "ISC" {
+		t.Fatalf("big = %+v", h)
+	}
+	if h := collect(base(), "@scope/big"); h == nil || h.Released != "2024-05-06" {
+		t.Fatalf("a scoped name is escaped for deps.dev: %+v", h)
+	}
+
+	calls := depsDevCalls
+	private := base()
+	private.PublicHosts = []string{"registry.npmjs.org"}
+	if h := collect(private, "big"); h == nil || h.Released != "" {
+		t.Fatalf("a registry deps.dev does not cover is never looked up there: %+v", h)
+	}
+	off := base()
+	off.DepsDev = ""
+	if h := collect(off, "big"); h == nil || h.Released != "" {
+		t.Fatalf("an empty DepsDev turns the fallback off: %+v", h)
+	}
+	if depsDevCalls != calls {
+		t.Fatalf("deps.dev was called %d times when it should not have been", depsDevCalls-calls)
+	}
+
+	// deps.dev does not know the version either: the date stays unknown.
+	missing := base()
+	dep := ecosystem.Dependency{Ecosystem: "npm", Name: "big", Version: "9.9.9"}
+	got, err := missing.Collect(context.Background(), []ecosystem.Dependency{dep})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if h := got[evidence.Key(dep)].Health; h != nil && h.Released != "" {
+		t.Fatalf("health = %+v", h)
+	}
+}
+
+func TestNPMReleasePrefersThePackumentWhenItFits(t *testing.T) {
+	registry := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/small/1.0.0":
+			w.Write([]byte(`{"dist":{}}`))
+		case "/small":
+			w.Write([]byte(`{"time":{"1.0.0":"2019-02-03T00:00:00Z"}}`))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	t.Cleanup(registry.Close)
+	depsDev := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Errorf("deps.dev must not be called when the package document is readable: %s", r.URL)
+	}))
+	t.Cleanup(depsDev.Close)
+
+	c := &evidence.NPM{HTTP: registry.Client(), Registry: registry.URL, SkipTarball: true, DepsDev: depsDev.URL, PublicHosts: []string{strings.TrimPrefix(registry.URL, "http://")}}
+	dep := ecosystem.Dependency{Ecosystem: "npm", Name: "small", Version: "1.0.0"}
+	got, err := c.Collect(context.Background(), []ecosystem.Dependency{dep})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if h := got[evidence.Key(dep)].Health; h == nil || h.Released != "2019-02-03" {
+		t.Fatalf("health = %+v", h)
+	}
+}
