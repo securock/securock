@@ -16,6 +16,8 @@ securock verify [path]
 securock explain PACKAGE [path]
 securock audit [path]
 securock doctor [path]
+securock sbom export [path]
+securock sbom verify SBOM [path]
 securock version
 ```
 
@@ -34,7 +36,37 @@ verified. The CLI prints this as `trusted (under active policy)`.
 | `explain` | Print a trust checklist for one package                    |
 | `audit`   | Report dependency findings ranked by severity              |
 | `doctor`  | Check the project setup for security problems              |
+| `sbom`    | Export the lockfile as an SBOM, or verify an SBOM against it |
 | `version` | Print the build version                                    |
+
+### `sbom`
+
+`sbom export` turns `securock.lock` into a software bill of materials on
+stdout. It reads the lockfile, so run `securock lock` first and the SBOM
+describes exactly what you locked.
+
+```sh
+securock sbom export > bom.cdx.json                  # CycloneDX 1.6 (default)
+securock sbom export --spec spdx > bom.spdx.json     # SPDX 2.3
+securock sbom verify bom.cdx.json                    # compare against securock.lock
+```
+
+- Each package carries a Package URL (`purl`) and, when the lockfile
+  digest is a standard SHA-1/256/384/512, a `hashes` / `checksums` entry.
+  Other digests, such as Go's `h1`, are kept as `securock:digest`.
+- Trust evidence (status and reasons, provenance, signature, capabilities,
+  ownership, source-to-build chain) is written as `securock:*` component
+  properties in CycloneDX and as `securock:key=value` annotations in SPDX.
+- Known vulnerabilities and malicious-package reports from the lockfile
+  appear in the CycloneDX `vulnerabilities` list.
+- The output is deterministic. Timestamps are left out unless
+  `SOURCE_DATE_EPOCH` is set; SPDX, which requires a creation date, uses
+  the Unix epoch otherwise.
+- `sbom verify` reports a finding for each package that is missing,
+  unexpected, or differs in version, purl, digest, or trust status (and
+  for a policy digest mismatch in CycloneDX). It exits `1` on any
+  finding and supports `--format json` (`sbom-verify-report` schema).
+  It accepts SBOMs from other tools too, matching packages by purl.
 
 ### `scan` vs `verify`
 
@@ -111,7 +143,7 @@ securock audit --format sarif
 Machine-readable schemas live in the repository under
 [`schemas/`](https://github.com/securock/securock/tree/main/schemas)
 (`securock-lock`, `scan-report`, `diff-report`, `verify-report`,
-`audit-report`, `doctor-report`).
+`audit-report`, `doctor-report`, `sbom-verify-report`).
 
 ## Typical workflow
 

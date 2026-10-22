@@ -55,6 +55,8 @@ not trusted.
 - Default network mode is `public-only`: private registries,
   `GOPRIVATE` / `GONOPROXY` modules (including `go env -w`), and custom
   or ambiguous `GOPROXY` lists stay on-machine ([privacy](docs/privacy.md))
+- CycloneDX 1.6 / SPDX 2.3 SBOM export with trust evidence, and
+  `sbom verify` against the lockfile
 - GitHub Action that can run an attested release binary
 - JSON reports (`--format json`) with exit `0` / `1` / `2`
 
@@ -122,6 +124,7 @@ Cargo under [`examples/`](examples/).
 | `securock explain` | Explain why a package is trusted                  |
 | `securock audit`   | Report dependency findings by severity            |
 | `securock doctor`  | Check the project setup for security problems     |
+| `securock sbom`    | Export `securock.lock` as CycloneDX or SPDX, or verify one |
 | `securock version` | Print the build version                           |
 
 | Flag / exit | Meaning |
