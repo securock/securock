@@ -18,6 +18,8 @@ func newAcceptCommand(opts *options) *cobra.Command {
 		reason   string
 		approver string
 		expires  string
+
+		justification string
 	)
 	cmd := &cobra.Command{
 		Use:   "accept FINDING-ID [path]",
@@ -33,7 +35,10 @@ func newAcceptCommand(opts *options) *cobra.Command {
 			if err != nil {
 				return opErr(err)
 			}
-			e := pkgexceptions.Exception{ID: args[0], Subject: subject, Reason: reason, Approver: approver, Expires: until}
+			e := pkgexceptions.Exception{ID: args[0], Subject: subject, Reason: reason, Approver: approver, Expires: until, Justification: justification}
+			if err := pkgexceptions.Validate(pkgexceptions.Document{Version: pkgexceptions.SchemaVersion, Exceptions: []pkgexceptions.Exception{e}}); err != nil {
+				return opErr(err)
+			}
 			if e.Expired(now) {
 				return opErr(fmt.Errorf("--expires %s is in the past", until))
 			}
@@ -59,6 +64,7 @@ func newAcceptCommand(opts *options) *cobra.Command {
 	cmd.Flags().StringVar(&reason, "reason", "", "why the finding is acceptable (required)")
 	cmd.Flags().StringVar(&approver, "approver", "", "who approved the exception")
 	cmd.Flags().StringVar(&expires, "expires", "", "last day it applies: YYYY-MM-DD, or a number of days such as 90d (required)")
+	cmd.Flags().StringVar(&justification, "justification", "", "for a vulnerability, say it does not affect you instead of accepting the risk: "+strings.Join(pkgexceptions.Justifications, ", "))
 	_ = cmd.MarkFlagRequired("reason")
 	_ = cmd.MarkFlagRequired("expires")
 

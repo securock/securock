@@ -6,6 +6,7 @@ package exceptions
 
 import (
 	"fmt"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -36,7 +37,24 @@ type Exception struct {
 	Approver string `json:"approver,omitempty" yaml:"approver,omitempty"`
 	// Expires is the last day the exception applies, as YYYY-MM-DD in UTC.
 	Expires string `json:"expires" yaml:"expires"`
+	// Justification, for a known-vulnerability exception, says the package is not
+	// affected rather than that the risk is accepted. It is one of the OpenVEX
+	// justifications and shapes the VEX document: Reason becomes the impact statement.
+	Justification string `json:"justification,omitempty" yaml:"justification,omitempty"`
 }
+
+// Justifications are the reasons a vulnerability can be recorded as not affecting a product.
+var Justifications = []string{
+	"component_not_present",
+	"vulnerable_code_not_present",
+	"vulnerable_code_not_in_execute_path",
+	"vulnerable_code_cannot_be_controlled_by_adversary",
+	"inline_mitigations_already_exist",
+}
+
+// VulnerabilityPrefix starts the ID of an exception for a known vulnerability; the rest is
+// the advisory ID.
+const VulnerabilityPrefix = "known-vulnerability:"
 
 func (e Exception) key() string {
 	return e.ID + "\x00" + e.Subject
@@ -94,6 +112,14 @@ func Validate(doc Document) error {
 		}
 		if _, err := e.ExpiresAt(); err != nil {
 			return fmt.Errorf("%s (%s): %w", where, e.ID, err)
+		}
+		if e.Justification != "" {
+			if !strings.HasPrefix(e.ID, VulnerabilityPrefix) {
+				return fmt.Errorf("%s (%s): justification only applies to known-vulnerability exceptions", where, e.ID)
+			}
+			if !slices.Contains(Justifications, e.Justification) {
+				return fmt.Errorf("%s (%s): unknown justification %q", where, e.ID, e.Justification)
+			}
 		}
 		if seen[e.key()] {
 			return fmt.Errorf("%s: duplicate exception for %s", where, e.ID)

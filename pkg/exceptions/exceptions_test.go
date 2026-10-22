@@ -104,3 +104,32 @@ func TestCanonicalizeSorts(t *testing.T) {
 		t.Fatal("Canonicalize must not reorder its input")
 	}
 }
+
+func TestValidateJustification(t *testing.T) {
+	base := exceptions.Exception{ID: "known-vulnerability:GHSA-1", Reason: "r", Expires: "2026-12-31"}
+	tests := []struct {
+		name    string
+		mutate  func(*exceptions.Exception)
+		wantErr string
+	}{
+		{"none", func(*exceptions.Exception) {}, ""},
+		{"valid", func(e *exceptions.Exception) { e.Justification = "component_not_present" }, ""},
+		{"unknown", func(e *exceptions.Exception) { e.Justification = "because" }, "unknown justification"},
+		{"not a vulnerability", func(e *exceptions.Exception) {
+			e.ID, e.Justification = "capability:network", "component_not_present"
+		}, "only applies to known-vulnerability"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			e := base
+			tt.mutate(&e)
+			err := exceptions.Validate(exceptions.Document{Version: 1, Exceptions: []exceptions.Exception{e}})
+			switch {
+			case tt.wantErr == "" && err != nil:
+				t.Fatalf("unexpected error: %v", err)
+			case tt.wantErr != "" && (err == nil || !strings.Contains(err.Error(), tt.wantErr)):
+				t.Fatalf("got %v, want %q", err, tt.wantErr)
+			}
+		})
+	}
+}

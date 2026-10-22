@@ -60,6 +60,7 @@ func NewRoot(version, commit, date string) *cobra.Command {
 	root.AddCommand(newDoctorCommand(opts))
 	root.AddCommand(newSBOMCommand(opts))
 	root.AddCommand(newAcceptCommand(opts))
+	root.AddCommand(newVEXCommand(opts))
 	root.AddCommand(&cobra.Command{
 		Use:   "version",
 		Short: "Print the version",

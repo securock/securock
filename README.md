@@ -63,6 +63,7 @@ not trusted.
   typosquat-suspect names, and optional `health` and `licenses` policy gates
 - `audit --min-release-age` holds back releases that are too new
 - Vulnerabilities carry CVSS-derived severity and the version that fixes them
+- `vex export` turns accepted vulnerabilities into OpenVEX or CycloneDX VEX
 - `--reachability` marks each vulnerability reachable, unreachable (development-only), or
   unknown from the dependency graph, so `audit` stops failing on test tooling
 - GitHub Action that can run an attested release binary
@@ -134,6 +135,7 @@ Cargo under [`examples/`](examples/).
 | `securock doctor`  | Check the project setup for security problems     |
 | `securock sbom`    | Export `securock.lock` as CycloneDX or SPDX, or verify one |
 | `securock accept`  | Accept a finding until a date, with a reason      |
+| `securock vex`     | Export accepted vulnerabilities as OpenVEX or CycloneDX VEX |
 | `securock version` | Print the build version                           |
 
 | Flag / exit | Meaning |

@@ -19,6 +19,7 @@ securock doctor [path]
 securock sbom export [path]
 securock sbom verify SBOM [path]
 securock accept FINDING-ID [path]
+securock vex export [path]
 securock version
 ```
 
@@ -96,6 +97,10 @@ securock accept remove known-vulnerability:GHSA-xxxx-xxxx-xxxx --subject npm:lod
 - `--subject` limits the exception to one package. `npm:lodash@4.17.20`
   matches that artifact; `npm:lodash` matches any version. Without it, the
   exception covers every package with that finding.
+- For a vulnerability, `--justification` says it does not affect you rather than that you accept
+  the risk: `component_not_present`, `vulnerable_code_not_present`,
+  `vulnerable_code_not_in_execute_path`, `vulnerable_code_cannot_be_controlled_by_adversary`, or
+  `inline_mitigations_already_exist`. It only changes what [`vex export`](#vex) writes.
 - Accepting the same finding and package again renews it.
 - Exceptions live in `.securock/exceptions.yaml` (override with
   `--exceptions`). Commit the file and review it like code. It never
@@ -105,6 +110,26 @@ securock accept remove known-vulnerability:GHSA-xxxx-xxxx-xxxx --subject npm:lod
   (`suppressed` in JSON, `suppressions` in SARIF), and they do not count
   toward `--fail-on`. Once an exception expires the finding returns, with
   an `exception-expired` finding alongside it.
+
+### `vex`
+
+`vex export` writes the vulnerabilities you recorded with `accept` as a VEX document, so what
+you decided about an advisory can travel with the SBOM:
+
+```sh
+securock vex export --author "Security Team" > product.openvex.json            # OpenVEX 0.2.0
+securock vex export --author "Security Team" --spec cyclonedx > product.vex.json  # CycloneDX 1.6
+```
+
+- An exception with `--justification` becomes `not_affected`, with your reason as the impact
+  statement. Any other becomes `affected` with an action statement, `Risk accepted by alice
+until 2026-12-31: <reason>`: you are affected and have chosen to wait.
+- Packages are named by purl. An exception that names no package covers every package in
+  `securock.lock` that has the advisory; one with `--subject` covers only those.
+- Expired exceptions, exceptions for advisories not in `securock.lock`, and exceptions that are
+  not for a known vulnerability are left out. Packages with no purl (URL imports) are skipped.
+- `--author` is required: a VEX document says who vouches for it. The timestamp is the current
+  time, or `SOURCE_DATE_EPOCH` when set, which also makes the output reproducible.
 
 ### Severity and fixed versions
 
