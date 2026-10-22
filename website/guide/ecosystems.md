@@ -101,6 +101,22 @@ See [Privacy](/reference/privacy).
 | Mixed / non-npm             | `default`, then add digest / origin rules carefully |
 | Offline fixtures            | `--offline` and expect many `unknown` axes          |
 
+## Examples
+
+Offline walkthroughs for several resolvers live under
+[`examples/`](https://github.com/securock/securock/tree/main/examples):
+
+| Resolver | Directory |
+| -------- | --------- |
+| npm | [`examples/npm`](https://github.com/securock/securock/tree/main/examples/npm) |
+| pnpm | [`examples/pnpm`](https://github.com/securock/securock/tree/main/examples/pnpm) |
+| Yarn | [`examples/yarn`](https://github.com/securock/securock/tree/main/examples/yarn) |
+| Bun | [`examples/bun`](https://github.com/securock/securock/tree/main/examples/bun) |
+| uv | [`examples/uv`](https://github.com/securock/securock/tree/main/examples/uv) |
+| Poetry | [`examples/poetry`](https://github.com/securock/securock/tree/main/examples/poetry) |
+| Go | [`examples/go`](https://github.com/securock/securock/tree/main/examples/go) |
+| Cargo | [`examples/cargo`](https://github.com/securock/securock/tree/main/examples/cargo) |
+
 ## Next steps
 
 - [Evidence](/guide/evidence) — how to read each state

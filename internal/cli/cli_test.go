@@ -50,20 +50,25 @@ func TestLockAndVerify(t *testing.T) {
 	}
 }
 
-func TestExampleNPM(t *testing.T) {
+func TestExamples(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 	t.Setenv("USERPROFILE", home)
 	t.Setenv("npm_config_registry", "")
 	t.Setenv("NPM_CONFIG_REGISTRY", "")
 
-	dir := filepath.Join("..", "..", "examples", "npm")
-	root := cli.NewRoot("test", "none", "unknown")
-	out := &bytes.Buffer{}
-	root.SetOut(out)
-	root.SetErr(out)
-	root.SetArgs([]string{"verify", dir, "--offline"})
-	if err := root.Execute(); err != nil {
-		t.Fatalf("examples/npm verify: %v\n%s", err, out.String())
+	examples := []string{"npm", "pnpm", "yarn", "bun", "uv", "poetry", "go", "cargo"}
+	for _, name := range examples {
+		t.Run(name, func(t *testing.T) {
+			dir := filepath.Join("..", "..", "examples", name)
+			root := cli.NewRoot("test", "none", "unknown")
+			out := &bytes.Buffer{}
+			root.SetOut(out)
+			root.SetErr(out)
+			root.SetArgs([]string{"verify", dir, "--offline"})
+			if err := root.Execute(); err != nil {
+				t.Fatalf("examples/%s verify: %v\n%s", name, err, out.String())
+			}
+		})
 	}
 }

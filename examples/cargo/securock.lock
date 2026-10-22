@@ -1,0 +1,38 @@
+version: 2
+source:
+  ecosystems:
+    - cargo
+  resolvers:
+    - cargo
+policy:
+  digest: sha256:a7b760ed4719640b3b9c63f1441e3fda7a2d511fec8f731edbd4ac280367e5c1
+artifacts:
+  - subject:
+      ecosystem: cargo
+      name: cfg-if
+    version: 1.0.0
+    digest: sha256:baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd
+    source:
+      resolver: cargo
+      kind: registry
+      registry: https://github.com/rust-lang/crates.io-index
+    evidence:
+      provenance: unknown
+      signature: unknown
+      vulnerabilities:
+        state: unknown
+      malicious:
+        state: unknown
+      capabilities:
+        state: unknown
+      behavior:
+        state: unknown
+      ownership:
+        state: unknown
+      chain:
+        state: unknown
+    trust:
+      status: unknown
+      reasons:
+        - malicious reports not checked
+        - vulnerabilities not checked

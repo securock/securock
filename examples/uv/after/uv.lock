@@ -1,0 +1,7 @@
+version = 1
+
+[[package]]
+name = "idna"
+version = "3.7"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/idna-3.7.tar.gz", hash = "sha256:028ff3aadf0609c1fd27877c95ac6bd69f4a90c1b886cba9a430bf3e5b0e0e4a" }

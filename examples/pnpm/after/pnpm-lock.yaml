@@ -1,0 +1,6 @@
+lockfileVersion: '9.0'
+
+packages:
+  ms@2.1.2:
+    resolution:
+      integrity: sha512-sGkPx+VjBtmAbtP+ZtBiROz3s/j6kZtbq7kU1O1u3AzPGd/aspNLqKCqVklzORxCRg2qJqFUS8r+E/f9g==

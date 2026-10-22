@@ -79,3 +79,5 @@ language lockfile  →  securock.lock  →  bump deps  →  diff / verify
 - [Policy](/guide/policy) — tighten or customize what counts as trusted
 - [GitHub Action](/guide/action) — run the same loop in CI
 - [Ecosystems](/guide/ecosystems) — apply the loop to other package managers
+  ([examples/](https://github.com/securock/securock/tree/main/examples)
+  has pnpm, Yarn, Bun, uv, Poetry, Go, and Cargo fixtures)

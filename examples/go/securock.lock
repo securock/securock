@@ -1,0 +1,38 @@
+version: 2
+source:
+  ecosystems:
+    - go
+  resolvers:
+    - go
+policy:
+  digest: sha256:a7b760ed4719640b3b9c63f1441e3fda7a2d511fec8f731edbd4ac280367e5c1
+artifacts:
+  - subject:
+      ecosystem: go
+      name: rsc.io/quote
+    version: v1.5.2
+    digest: goh1:n4bQgYhMfWWaL+qgxVrQFaO/TxsrC4Is0V1sFbDwCgg=
+    source:
+      resolver: go
+      kind: registry
+      registry: https://proxy.golang.org
+    evidence:
+      provenance: unknown
+      signature: unknown
+      vulnerabilities:
+        state: unknown
+      malicious:
+        state: unknown
+      capabilities:
+        state: unknown
+      behavior:
+        state: unknown
+      ownership:
+        state: unknown
+      chain:
+        state: unknown
+    trust:
+      status: unknown
+      reasons:
+        - malicious reports not checked
+        - vulnerabilities not checked

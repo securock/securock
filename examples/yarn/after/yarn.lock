@@ -1,0 +1,6 @@
+# yarn lockfile v1
+
+ms@2.1.2:
+  version "2.1.2"
+  resolved "https://registry.npmjs.org/ms/-/ms-2.1.2.tgz"
+  integrity sha512-sGkPx+VjBtmAbtP+ZtBiROz3s/j6kZtbq7kU1O1u3AzPGd/aspNLqKCqVklzORxCRg2qJqFUS8r+E/f9g==

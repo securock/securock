@@ -1,0 +1,38 @@
+version: 2
+source:
+  ecosystems:
+    - npm
+  resolvers:
+    - yarn
+policy:
+  digest: sha256:a7b760ed4719640b3b9c63f1441e3fda7a2d511fec8f731edbd4ac280367e5c1
+artifacts:
+  - subject:
+      ecosystem: npm
+      name: ms
+    version: 2.1.3
+    digest: sha512-6FlzubTLZG3J2a/NVCAleEhjzq5oxgHyaCU9yYXvcLsvoVaHJq/s5xXI6/RXPrVu2FIqT1V6kELbXjI/NcLf4VQ==
+    source:
+      resolver: yarn
+      kind: registry
+      registry: https://registry.npmjs.org
+    evidence:
+      provenance: unknown
+      signature: unknown
+      vulnerabilities:
+        state: unknown
+      malicious:
+        state: unknown
+      capabilities:
+        state: unknown
+      behavior:
+        state: unknown
+      ownership:
+        state: unknown
+      chain:
+        state: unknown
+    trust:
+      status: unknown
+      reasons:
+        - malicious reports not checked
+        - vulnerabilities not checked

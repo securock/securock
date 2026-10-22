@@ -108,6 +108,9 @@ unchecked vulnerabilities and malicious reports as `unknown`, so the
 first `lock` needs `--no-fail`. The committed `securock.lock` in that
 directory is that snapshot.
 
+The same loop is available for pnpm, Yarn, Bun, uv, Poetry, Go, and
+Cargo under [`examples/`](examples/).
+
 ## Usage
 
 | Command            | What it does                                      |

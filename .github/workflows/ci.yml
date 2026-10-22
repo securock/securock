@@ -26,8 +26,11 @@ jobs:
         run: go vet ./...
       - name: Tidy
         run: go mod tidy && git diff --exit-code
-      - name: Example
-        run: go run ./cmd/securock verify --offline examples/npm
+      - name: Examples
+        run: |
+          for d in examples/*/; do
+            go run ./cmd/securock verify --offline "$d"
+          done
 
   govulncheck:
     runs-on: ubuntu-latest
@@ -57,10 +60,18 @@ jobs:
           go-version-file: go.mod
       - name: Version
         run: go run ./cmd/securock version
-      - name: Scan example
-        run: go run ./cmd/securock scan --offline --no-fail examples/npm
-      - name: Verify example
-        run: go run ./cmd/securock verify --offline examples/npm
+      - name: Scan examples
+        shell: bash
+        run: |
+          for d in examples/*/; do
+            go run ./cmd/securock scan --offline --no-fail "$d"
+          done
+      - name: Verify examples
+        shell: bash
+        run: |
+          for d in examples/*/; do
+            go run ./cmd/securock verify --offline "$d"
+          done
 
   release-snapshot:
     runs-on: ubuntu-latest

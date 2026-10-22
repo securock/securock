@@ -1,0 +1,39 @@
+version: 2
+source:
+  ecosystems:
+    - pypi
+  resolvers:
+    - uv
+policy:
+  digest: sha256:a7b760ed4719640b3b9c63f1441e3fda7a2d511fec8f731edbd4ac280367e5c1
+artifacts:
+  - subject:
+      ecosystem: pypi
+      name: idna
+    version: "3.10"
+    filename: idna-3.10.tar.gz
+    digest: sha256:9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08
+    source:
+      resolver: uv
+      kind: registry
+      registry: https://pypi.org
+    evidence:
+      provenance: unknown
+      signature: unknown
+      vulnerabilities:
+        state: unknown
+      malicious:
+        state: unknown
+      capabilities:
+        state: unknown
+      behavior:
+        state: unknown
+      ownership:
+        state: unknown
+      chain:
+        state: unknown
+    trust:
+      status: unknown
+      reasons:
+        - malicious reports not checked
+        - vulnerabilities not checked
