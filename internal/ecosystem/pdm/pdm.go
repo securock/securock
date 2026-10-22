@@ -67,7 +67,12 @@ func (Ecosystem) Dependencies(path string) ([]core.Dependency, error) {
 			deps = append(deps, dep)
 		}
 	}
+	core.ApplyPackageGraph(deps, packageKey, lock.graph(path))
 	return deps, nil
+}
+
+func packageKey(dep core.Dependency) string {
+	return core.NormalizePythonName(dep.Name) + "@" + dep.Version
 }
 
 type pdmLock struct {
@@ -82,6 +87,12 @@ type pdmPackage struct {
 	Git      string    `toml:"git"`
 	Revision string    `toml:"revision"`
 	Files    []pdmFile `toml:"files"`
+
+	// Groups lists the dependency groups that need the package: "default", an extra, or a
+	// development group. Dependencies are requirement strings, present when the lock was
+	// written with metadata.
+	Groups       []string `toml:"groups"`
+	Dependencies []string `toml:"dependencies"`
 }
 
 type pdmFile struct {
@@ -327,4 +338,44 @@ func stringValue(v any) string {
 func boolValue(v any) (bool, bool) {
 	b, ok := v.(bool)
 	return b, ok
+}
+
+// graph reads edges from the requirement strings and scopes from the groups. pdm's group
+// names are the project's own, so pyproject.toml says which are extras and which are
+// development; without it only "default" is understood.
+func (l pdmLock) graph(project string) core.PackageGraph {
+	g := core.PackageGraph{
+		Edges: map[string][]string{},
+		Fixed: map[string]string{},
+	}
+	byName := map[string][]string{}
+	for _, pkg := range l.Package {
+		if pkg.Name != "" && pkg.Version != "" {
+			name := core.NormalizePythonName(pkg.Name)
+			byName[name] = append(byName[name], name+"@"+pkg.Version)
+		}
+	}
+
+	kinds := groupScopes(project)
+	for _, pkg := range l.Package {
+		if pkg.Name == "" || pkg.Version == "" {
+			continue
+		}
+		key := core.NormalizePythonName(pkg.Name) + "@" + pkg.Version
+		for _, req := range pkg.Dependencies {
+			g.Edges[key] = append(g.Edges[key], byName[core.PythonRequirementName(req)]...)
+		}
+		scope := ""
+		for _, group := range pkg.Groups {
+			if group == "default" {
+				scope = core.MergeScope(scope, core.ScopeRuntime)
+			} else {
+				scope = core.MergeScope(scope, kinds[group])
+			}
+		}
+		if scope != "" {
+			g.Fixed[key] = scope
+		}
+	}
+	return g
 }
