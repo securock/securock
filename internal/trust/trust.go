@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/securock/securock/internal/ecosystem/core"
+	"github.com/securock/securock/internal/license"
 	"github.com/securock/securock/internal/typosquat"
 	"github.com/securock/securock/pkg/lockfile"
 	"github.com/securock/securock/pkg/policy"
@@ -87,6 +88,9 @@ func Evaluate(art *lockfile.Artifact, pol policy.Document) {
 			untrusted = append(untrusted, "deprecated release")
 		}
 	}
+	if pol.Rules.Licenses.Configured() {
+		untrusted, unknown = licenseVerdict(art, pol.Rules.Licenses, untrusted, unknown)
+	}
 	if pol.Rules.Health.DenyTyposquat() {
 		if target, ok := typosquat.Check(art.Subject.Ecosystem, art.Subject.Name); ok {
 			untrusted = append(untrusted, "possible typosquat of "+target)
@@ -104,6 +108,30 @@ func Evaluate(art *lockfile.Artifact, pol policy.Document) {
 		art.Trust.Status = lockfile.StatusTrusted
 		art.Trust.Reasons = nil
 	}
+}
+
+// licenseVerdict adds the reasons a package fails the license rule. Without health
+// evidence the license is unknown. A package that declares no license cannot pass an allow
+// list, but is not rejected by a deny list alone, since nothing known is denied.
+func licenseVerdict(art *lockfile.Artifact, rule policy.LicenseRule, untrusted, unknown []string) ([]string, []string) {
+	h := art.Evidence.Health
+	switch {
+	case h == nil:
+		return untrusted, append(unknown, "license not checked")
+	case h.License == "":
+		if len(rule.Allow) > 0 {
+			untrusted = append(untrusted, "license not declared")
+		}
+		return untrusted, unknown
+	}
+	verdict, hit := license.Check(h.License, rule.Allow, rule.Deny)
+	switch verdict {
+	case license.Denied:
+		untrusted = append(untrusted, "denied license: "+strings.Join(hit, ", "))
+	case license.NotAllowed:
+		untrusted = append(untrusted, "license not allowed: "+h.License)
+	}
+	return untrusted, unknown
 }
 
 func MarkUnknown(art *lockfile.Artifact, reason string) {

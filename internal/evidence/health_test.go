@@ -115,7 +115,7 @@ func TestPyPIHealth(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := []*lockfile.HealthEvidence{
-		{Released: "2021-02-04", Deprecated: "yanked: broken metadata", License: "MIT License"},
+		{Released: "2021-02-04", Deprecated: "yanked: broken metadata", License: "MIT"},
 		{Released: "2022-12-31", License: "BSD-3-Clause OR Apache-2.0"},
 		nil,
 	}

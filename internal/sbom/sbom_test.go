@@ -393,3 +393,68 @@ func TestParseRejectsOtherDocuments(t *testing.T) {
 		}
 	}
 }
+
+func TestLicenseExport(t *testing.T) {
+	doc := fixture(t)
+	doc.Artifacts[0].Evidence.Health = &lockfile.HealthEvidence{License: "MIT OR Apache-2.0"} // react
+	doc.Artifacts[1].Evidence.Health = &lockfile.HealthEvidence{License: "Custom Terms 1.0"}  // lodash
+	// the Go and url artifacts have no health evidence
+
+	var bom struct {
+		Components []struct {
+			BOMRef   string `json:"bom-ref"`
+			Licenses []struct {
+				Expression string `json:"expression"`
+				License    *struct {
+					Name string `json:"name"`
+				} `json:"license"`
+			} `json:"licenses"`
+		} `json:"components"`
+	}
+	if err := json.Unmarshal(cdx(t, doc, sbom.Options{}), &bom); err != nil {
+		t.Fatal(err)
+	}
+	for _, c := range bom.Components {
+		switch c.BOMRef {
+		case "npm:react@19.1.0":
+			if len(c.Licenses) != 1 || c.Licenses[0].Expression != "MIT OR Apache-2.0" {
+				t.Fatalf("react licenses = %+v", c.Licenses)
+			}
+		case "npm:lodash@4.17.20":
+			if len(c.Licenses) != 1 || c.Licenses[0].License == nil || c.Licenses[0].License.Name != "Custom Terms 1.0" {
+				t.Fatalf("a license that is not SPDX is exported as a name: %+v", c.Licenses)
+			}
+		default:
+			if len(c.Licenses) != 0 {
+				t.Fatalf("%s: nothing to say without evidence: %+v", c.BOMRef, c.Licenses)
+			}
+		}
+	}
+
+	var spdxDoc struct {
+		Packages []struct {
+			Name            string `json:"name"`
+			LicenseDeclared string `json:"licenseDeclared"`
+			Annotations     []struct{ Comment string }
+		} `json:"packages"`
+	}
+	if err := json.Unmarshal(spdx(t, doc, sbom.Options{}), &spdxDoc); err != nil {
+		t.Fatal(err)
+	}
+	declared := map[string]string{}
+	for _, p := range spdxDoc.Packages {
+		declared[p.Name] = p.LicenseDeclared
+		if p.Name == "lodash" {
+			found := false
+			for _, a := range p.Annotations {
+				found = found || a.Comment == "securock:license=Custom Terms 1.0"
+			}
+			if !found {
+				t.Fatalf("the raw license must stay available as an annotation: %+v", p.Annotations)
+			}
+		}
+	}
+	if declared["react"] != "MIT OR Apache-2.0" || declared["lodash"] != "NOASSERTION" || declared["github.com/Gorilla/mux"] != "NOASSERTION" {
+		t.Fatalf("licenseDeclared = %v", declared)
+	}
+}

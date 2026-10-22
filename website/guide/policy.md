@@ -119,6 +119,38 @@ status must not change just because time passed, so `securock audit`
 reports `stale-release` instead. See
 [Release health](/guide/evidence#release-health).
 
+### License gates
+
+```yaml
+version: 1
+rules:
+  require_no_vulnerabilities: true
+  licenses:
+    deny:
+      - AGPL-*
+      - GPL-*
+    allow:
+      - MIT
+      - Apache-2.0
+      - BSD-3-Clause
+```
+
+| Rule    | Effect                                                              |
+| ------- | ------------------------------------------------------------------- |
+| `deny`  | A package whose license is on the list is `untrusted`               |
+| `allow` | When set, a package whose license is not on the list is `untrusted` |
+
+Entries are SPDX identifiers, compared without regard to case. A trailing `*` matches a
+prefix, so `GPL-*` covers every GPL version. A dual-licensed package passes if any alternative
+does: `MIT OR GPL-3.0-only` passes a rule denying `GPL-*`, while `MIT AND GPL-3.0-only` does
+not. `deny` wins over `allow`.
+
+Licenses are read from the registry (see [Release health](/guide/evidence#release-health)), so
+the rule applies to npm and PyPI. Other ecosystems have no license evidence, which makes them
+`unknown` under any license rule. A package that declares no license fails an `allow` list but
+is not rejected by a `deny` list alone. Deprecated spellings are normalized (`GPL-3.0` is
+`GPL-3.0-only`), as are common PyPI classifier names such as `MIT License`.
+
 ### Provenance origin allowlists
 
 To require verified provenance from an expected origin:

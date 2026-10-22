@@ -6,6 +6,7 @@ import (
 	"time"
 	"unicode"
 
+	"github.com/securock/securock/internal/license"
 	"github.com/securock/securock/pkg/lockfile"
 )
 
@@ -52,13 +53,13 @@ func npmDeprecated(raw json.RawMessage) string {
 func npmLicense(raw json.RawMessage) string {
 	var text string
 	if err := json.Unmarshal(raw, &text); err == nil {
-		return clip(text)
+		return license.NormalizeExpression(clip(text))
 	}
 	var obj struct {
 		Type string `json:"type"`
 	}
 	if err := json.Unmarshal(raw, &obj); err == nil {
-		return clip(obj.Type)
+		return license.NormalizeExpression(clip(obj.Type))
 	}
 	return ""
 }
@@ -67,15 +68,15 @@ func npmLicense(raw json.RawMessage) string {
 // classifier, since the license field is often the whole license text.
 func pypiLicense(expression, text string, classifiers []string) string {
 	if e := clip(expression); e != "" {
-		return e
+		return license.NormalizeExpression(e)
 	}
 	if t := clip(text); t != "" && len(t) <= 100 && !strings.ContainsAny(strings.TrimSpace(text), "\n\r") {
-		return t
+		return license.NormalizeExpression(t)
 	}
 	for _, c := range classifiers {
 		if rest, ok := strings.CutPrefix(c, "License :: "); ok {
 			parts := strings.Split(rest, " :: ")
-			return clip(parts[len(parts)-1])
+			return license.NormalizeExpression(clip(parts[len(parts)-1]))
 		}
 	}
 	return ""

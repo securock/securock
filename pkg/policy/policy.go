@@ -50,7 +50,20 @@ type Rules struct {
 	Capabilities             CapabilityRule    `json:"capabilities,omitempty" yaml:"capabilities,omitempty"`
 	Ownership                OwnershipRule     `json:"ownership,omitempty" yaml:"ownership,omitempty"`
 	Health                   HealthRule        `json:"health,omitempty" yaml:"health,omitempty"`
+	Licenses                 LicenseRule       `json:"licenses,omitempty" yaml:"licenses,omitempty"`
 }
+
+// LicenseRule restricts packages by their declared license. Entries are SPDX identifiers;
+// a trailing * matches a prefix, so "GPL-*" covers every GPL version. A package that offers
+// a choice (MIT OR GPL-3.0-only) passes if any alternative passes.
+type LicenseRule struct {
+	// Allow, when set, lets through only packages whose license is on the list.
+	Allow []string `json:"allow,omitempty" yaml:"allow,omitempty"`
+	// Deny rejects packages whose license is on the list, whatever Allow says.
+	Deny []string `json:"deny,omitempty" yaml:"deny,omitempty"`
+}
+
+func (r LicenseRule) Configured() bool { return len(r.Allow) > 0 || len(r.Deny) > 0 }
 
 type EvidenceRule struct {
 	Minimum             string   `json:"minimum,omitempty" yaml:"minimum,omitempty"`
@@ -221,6 +234,12 @@ type canonicalRules struct {
 	Capabilities             *canonicalCapRule   `json:"capabilities,omitempty"`
 	Ownership                *canonicalOwnerRule `json:"ownership,omitempty"`
 	Health                   *canonicalHealth    `json:"health,omitempty"`
+	Licenses                 *canonicalLicenses  `json:"licenses,omitempty"`
+}
+
+type canonicalLicenses struct {
+	Allow []string `json:"allow,omitempty"`
+	Deny  []string `json:"deny,omitempty"`
 }
 
 type canonicalHealth struct {
@@ -275,6 +294,7 @@ func canonical(doc Document) canonicalDocument {
 			Capabilities:             canonicalCapabilities(doc.Rules.Capabilities),
 			Ownership:                canonicalOwnership(doc.Rules.Ownership),
 			Health:                   canonicalHealthRule(doc.Rules.Health),
+			Licenses:                 canonicalLicenseRule(doc.Rules.Licenses),
 		},
 	}
 }
@@ -338,6 +358,13 @@ func canonicalOwnership(rule OwnershipRule) *canonicalOwnerRule {
 		MaintainerAdded:   rule.MaintainerAdded,
 		MaintainerRemoved: rule.MaintainerRemoved,
 	}
+}
+
+func canonicalLicenseRule(rule LicenseRule) *canonicalLicenses {
+	if !rule.Configured() {
+		return nil
+	}
+	return &canonicalLicenses{Allow: sortedCompact(rule.Allow), Deny: sortedCompact(rule.Deny)}
 }
 
 func canonicalHealthRule(rule HealthRule) *canonicalHealth {

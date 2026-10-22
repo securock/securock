@@ -5,6 +5,7 @@ import (
 	"io"
 	"strings"
 
+	"github.com/securock/securock/internal/license"
 	"github.com/securock/securock/pkg/lockfile"
 )
 
@@ -50,8 +51,19 @@ type cdxComponent struct {
 	Name       string        `json:"name"`
 	Version    string        `json:"version,omitempty"`
 	PURL       string        `json:"purl,omitempty"`
+	Licenses   []cdxLicense  `json:"licenses,omitempty"`
 	Hashes     []cdxHash     `json:"hashes,omitempty"`
 	Properties []cdxProperty `json:"properties,omitempty"`
+}
+
+// cdxLicense is either an SPDX expression or, for a license that is not one, a name.
+type cdxLicense struct {
+	Expression string      `json:"expression,omitempty"`
+	License    *cdxLicName `json:"license,omitempty"`
+}
+
+type cdxLicName struct {
+	Name string `json:"name"`
 }
 
 type cdxVuln struct {
@@ -76,6 +88,13 @@ func WriteCycloneDX(w io.Writer, doc lockfile.Document, opts Options) error {
 	out := make([]cdxComponent, 0, len(comps))
 	for _, c := range comps {
 		cc := cdxComponent{BOMRef: c.ID, Type: "library", Name: c.Name, Version: c.Version, PURL: c.PURL}
+		switch {
+		case c.License == "":
+		case license.IsSPDX(c.License):
+			cc.Licenses = []cdxLicense{{Expression: license.NormalizeExpression(c.License)}}
+		default:
+			cc.Licenses = []cdxLicense{{License: &cdxLicName{Name: c.License}}}
+		}
 		for _, h := range c.Hashes {
 			cc.Hashes = append(cc.Hashes, cdxHash{Alg: cdxAlg(h.Alg), Content: h.Hex})
 		}

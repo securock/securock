@@ -59,6 +59,10 @@ securock sbom verify bom.cdx.json                    # compare against securock.
 - Trust evidence (status and reasons, provenance, signature, capabilities,
   ownership, source-to-build chain) is written as `securock:*` component
   properties in CycloneDX and as `securock:key=value` annotations in SPDX.
+- Licenses recorded as release health are exported: a license expression made of known SPDX
+  identifiers becomes a CycloneDX `expression` / SPDX `licenseDeclared`; any other text is a
+  CycloneDX license name and stays out of `licenseDeclared`. The raw text is always kept as
+  `securock:license`.
 - Known vulnerabilities and malicious-package reports from the lockfile
   appear in the CycloneDX `vulnerabilities` list.
 - The output is deterministic. Timestamps are left out unless

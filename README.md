@@ -60,7 +60,8 @@ not trusted.
 - `accept` records reviewed findings with a reason and expiry in
   `.securock/exceptions.yaml`; `audit` suppresses them until they lapse
 - Release health (deprecated, release day, license) for npm and PyPI,
-  typosquat-suspect names, and optional `health` policy gates
+  typosquat-suspect names, and optional `health` and `licenses` policy gates
+- `audit --min-release-age` holds back releases that are too new
 - `--reachability` marks each vulnerability reachable, unreachable (development-only), or
   unknown from the dependency graph, so `audit` stops failing on test tooling
 - GitHub Action that can run an attested release binary

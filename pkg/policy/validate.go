@@ -49,6 +49,29 @@ func Validate(doc Document) error {
 	if err := validateHealthRule(doc.Rules.Health); err != nil {
 		return err
 	}
+	if err := validateLicenseRule(doc.Rules.Licenses); err != nil {
+		return err
+	}
+	return nil
+}
+
+func validateLicenseRule(rule LicenseRule) error {
+	for _, pair := range []struct {
+		name    string
+		entries []string
+	}{{"allow", rule.Allow}, {"deny", rule.Deny}} {
+		for _, entry := range pair.entries {
+			entry = strings.TrimSpace(entry)
+			switch {
+			case entry == "":
+				return fmt.Errorf("licenses %s entry must not be empty", pair.name)
+			case strings.ContainsAny(entry, " \t()"):
+				return fmt.Errorf("licenses %s entry %q must be one SPDX identifier, not an expression", pair.name, entry)
+			case strings.Contains(strings.TrimSuffix(entry, "*"), "*"):
+				return fmt.Errorf("licenses %s entry %q: * is only allowed at the end", pair.name, entry)
+			}
+		}
+	}
 	return nil
 }
 

@@ -53,6 +53,7 @@ type component struct {
 	Name       string
 	Version    string
 	PURL       string
+	License    string
 	Hashes     []hash
 	Properties []property
 }
@@ -65,12 +66,20 @@ func components(doc lockfile.Document) []component {
 			Name:       a.Subject.Name,
 			Version:    a.Version,
 			PURL:       PURL(a),
+			License:    declaredLicense(a),
 			Hashes:     hashes(a.Digest),
 			Properties: properties(a),
 		})
 	}
 	sort.SliceStable(out, func(i, j int) bool { return out[i].ID < out[j].ID })
 	return out
+}
+
+func declaredLicense(a lockfile.Artifact) string {
+	if a.Evidence.Health == nil {
+		return ""
+	}
+	return a.Evidence.Health.License
 }
 
 // hashes maps a lock digest to standard algorithms. It accepts "alg:hex" and the SRI form
@@ -118,6 +127,7 @@ func properties(a lockfile.Artifact) []property {
 	add("artifact", a.ArtifactID())
 	add("digest", a.Digest)
 	add("filename", a.Filename)
+	add("license", declaredLicense(a))
 	add("source.resolver", a.Source.Resolver)
 	add("source.kind", a.Source.Kind)
 	add("source.registry", a.Source.Registry)

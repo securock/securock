@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/securock/securock/internal/license"
 	"github.com/securock/securock/pkg/lockfile"
 )
 
@@ -96,6 +97,11 @@ func WriteSPDX(w io.Writer, doc lockfile.Document, opts Options) error {
 			LicenseConcluded: noAssertion,
 			LicenseDeclared:  noAssertion,
 			CopyrightText:    noAssertion,
+		}
+		// SPDX only accepts known identifiers here; any other text stays in the
+		// securock:license annotation and the declared license is not asserted.
+		if license.IsSPDX(c.License) {
+			p.LicenseDeclared = license.NormalizeExpression(c.License)
 		}
 		for _, h := range c.Hashes {
 			p.Checksums = append(p.Checksums, spdxChecksum{Algorithm: strings.ToUpper(h.Alg), Value: h.Hex})
