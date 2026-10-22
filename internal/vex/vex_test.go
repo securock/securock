@@ -3,6 +3,7 @@ package vex_test
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"strings"
 	"testing"
 	"time"
@@ -132,13 +133,14 @@ func TestOpenVEXLeavesOutWhatDoesNotApply(t *testing.T) {
 	expired := ex("known-vulnerability:GHSA-1", "", "")
 	expired.Expires = "2020-01-01"
 	out := openvex(t, accepted(
+		ex("known-vulnerability:GHSA-2", "", ""), // the one that applies
 		expired,
-		ex("known-vulnerability:GHSA-9", "", ""), // not in the lockfile
+		ex("known-vulnerability:GHSA-9", "", ""),          // not in the lockfile
 		ex("known-vulnerability:GHSA-2", "npm:react", ""), // react does not have it
 		ex("capability:network", "", ""),                  // not a vulnerability
 		ex("missing-digest", "", ""),
 	), vex.Options{})
-	if len(out.Statements) != 0 {
+	if len(out.Statements) != 1 || out.Statements[0].Vulnerability.Name != "GHSA-2" {
 		t.Fatalf("statements = %+v", out.Statements)
 	}
 }
@@ -162,11 +164,8 @@ func TestNowDecidesWhichExceptionsAreActive(t *testing.T) {
 	e.Expires = "2026-06-30"
 	var buf bytes.Buffer
 	opts := vex.Options{Author: "a", Time: stamp, Now: time.Date(2026, 7, 1, 0, 0, 0, 0, time.UTC)}
-	if err := vex.WriteOpenVEX(&buf, lock(), accepted(e), opts); err != nil {
-		t.Fatal(err)
-	}
-	if strings.Contains(buf.String(), "GHSA-2") {
-		t.Fatalf("an expired exception must not be exported:\n%s", buf.String())
+	if err := vex.WriteOpenVEX(&buf, lock(), accepted(e), opts); !errors.Is(err, vex.ErrNothingToExport) {
+		t.Fatalf("an expired exception must not be exported: %v\n%s", err, buf.String())
 	}
 }
 
@@ -229,3 +228,5 @@ func TestCycloneDXVEX(t *testing.T) {
 		t.Fatalf("affected = %+v", affected)
 	}
 }
+
+func jsonUnmarshal(b []byte, v any) error { return json.Unmarshal(b, v) }

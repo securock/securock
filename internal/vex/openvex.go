@@ -45,6 +45,9 @@ func WriteOpenVEX(w io.Writer, lock lockfile.Document, accepted exceptions.Docum
 		return errors.New("a VEX document needs an author")
 	}
 	stmts := statements(lock, accepted, opts.clock())
+	if len(stmts) == 0 {
+		return ErrNothingToExport
+	}
 	doc := openVEX{
 		Context:    "https://openvex.dev/ns/v0.2.0",
 		Author:     opts.Author,
@@ -60,7 +63,7 @@ func WriteOpenVEX(w io.Writer, lock lockfile.Document, accepted exceptions.Docum
 			Timestamp:     opts.stamp(),
 		}
 		for _, p := range s.Products {
-			st.Products = append(st.Products, openVEXProduct{ID: p})
+			st.Products = append(st.Products, openVEXProduct{ID: p.PURL})
 		}
 		if s.NotAffected {
 			st.Status, st.Justification, st.ImpactStatement = "not_affected", s.Justification, s.Detail
@@ -68,7 +71,7 @@ func WriteOpenVEX(w io.Writer, lock lockfile.Document, accepted exceptions.Docum
 			st.Status, st.ActionStatement = "affected", s.Detail
 		}
 		doc.Statements = append(doc.Statements, st)
-		id = append(id, s.Vulnerability, st.Status, strings.Join(s.Products, ","))
+		id = append(id, s.Vulnerability, st.Status, productKey(s.Products))
 	}
 	doc.ID = "https://securock.dev/vex/" + documentID(id...)
 	enc := json.NewEncoder(w)

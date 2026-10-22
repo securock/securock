@@ -86,10 +86,11 @@ func TestVEXExport(t *testing.T) {
 func TestVEXExportErrors(t *testing.T) {
 	dir := vulnerableProject(t)
 	for name, args := range map[string][]string{
-		"no author":      {"vex", "export", dir},
-		"unknown spec":   {"vex", "export", dir, "--author", "a", "--spec", "csaf"},
-		"no lockfile":    {"vex", "export", t.TempDir(), "--author", "a"},
-		"bad exceptions": {"vex", "export", dir, "--author", "a", "--exceptions", filepath.Join(dir, "securock.lock")},
+		"no author":        {"vex", "export", dir},
+		"unknown spec":     {"vex", "export", dir, "--author", "a", "--spec", "csaf"},
+		"no lockfile":      {"vex", "export", t.TempDir(), "--author", "a"},
+		"bad exceptions":   {"vex", "export", dir, "--author", "a", "--exceptions", filepath.Join(dir, "securock.lock")},
+		"nothing accepted": {"vex", "export", dir, "--author", "a"},
 	} {
 		t.Run(name, func(t *testing.T) {
 			if _, err := runCLIErr(t, args...); err == nil {

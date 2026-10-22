@@ -4,7 +4,9 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/securock/securock/internal/finding"
 	"github.com/securock/securock/internal/lock"
@@ -32,7 +34,8 @@ func newSBOMExportCommand(opts *options) *cobra.Command {
 		Short: "Write securock.lock as a CycloneDX or SPDX SBOM",
 		Long: "Write securock.lock as a CycloneDX 1.6 or SPDX 2.3 JSON SBOM on stdout.\n" +
 			"Trust evidence is carried as securock:* properties (CycloneDX) or annotations (SPDX).\n" +
-			"The output is deterministic. Set SOURCE_DATE_EPOCH to stamp a creation time.",
+			"CycloneDX has no timestamp and the output is deterministic; SPDX needs a creation time and\n" +
+			"uses the current time. Set SOURCE_DATE_EPOCH to stamp either one and make both reproducible.",
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			write, err := sbomWriter(spec)
@@ -43,10 +46,13 @@ func newSBOMExportCommand(opts *options) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			o := sbom.Options{
-				ToolVersion: toolVersion(cmd),
-				Created:     sbom.CreatedFromEnv(os.Getenv),
+			created := sbom.CreatedFromEnv(os.Getenv)
+			if created.IsZero() && strings.EqualFold(spec, sbom.SpecSPDX) {
+				// SPDX requires a creation time. Say when the document was made unless the
+				// caller asks for a reproducible one with SOURCE_DATE_EPOCH.
+				created = time.Now()
 			}
+			o := sbom.Options{ToolVersion: toolVersion(cmd), Created: created}
 			if err := write(cmd.OutOrStdout(), doc, o); err != nil {
 				return opErr(err)
 			}
@@ -76,7 +82,7 @@ func newSBOMVerifyCommand(opts *options) *cobra.Command {
 				return err
 			}
 
-			report := sbom.Verify(locked, doc)
+			report := sbom.Verify(locked, doc).WithLocation(filepath.ToSlash(args[0]))
 			if err := finding.Write(cmd.OutOrStdout(), report, opts.format); err != nil {
 				return opErr(err)
 			}

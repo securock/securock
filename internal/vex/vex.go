@@ -8,6 +8,7 @@ package vex
 
 import (
 	"crypto/sha256"
+	"errors"
 	"fmt"
 	"sort"
 	"strings"
@@ -17,6 +18,10 @@ import (
 	"github.com/securock/securock/pkg/exceptions"
 	"github.com/securock/securock/pkg/lockfile"
 )
+
+// ErrNothingToExport means no active exception names an advisory present in the lockfile.
+// An OpenVEX document must have at least one statement, and an empty VEX says nothing.
+var ErrNothingToExport = errors.New("no accepted vulnerability applies to the packages in securock.lock; record one with securock accept")
 
 const (
 	SpecOpenVEX   = "openvex"
@@ -33,10 +38,17 @@ type Options struct {
 	ToolVersion string
 }
 
+// product is a package a statement is about, named by its purl.
+type product struct {
+	PURL    string
+	Name    string
+	Version string
+}
+
 // statement is one decision about one advisory, across every package it applies to.
 type statement struct {
 	Vulnerability string
-	Products      []string
+	Products      []product
 	NotAffected   bool
 	Justification string
 	// Detail is the impact statement for not_affected, the action statement otherwise.
@@ -52,18 +64,18 @@ func statements(lock lockfile.Document, doc exceptions.Document, now time.Time) 
 		if !ok || e.Expired(now) {
 			continue
 		}
-		products := map[string]bool{}
+		products := map[string]product{}
 		for _, a := range lock.Artifacts {
 			purl := sbom.PURL(a)
 			if purl == "" || !e.Matches(e.ID, a.ArtifactID()) || !hasVulnerability(a, vuln) {
 				continue
 			}
-			products[purl] = true
+			products[purl] = product{PURL: purl, Name: a.Subject.Name, Version: a.Version}
 		}
 		if len(products) == 0 {
 			continue
 		}
-		s := statement{Vulnerability: vuln, Products: sortedKeys(products)}
+		s := statement{Vulnerability: vuln, Products: sortedProducts(products)}
 		if e.Justification != "" {
 			s.NotAffected, s.Justification, s.Detail = true, e.Justification, e.Reason
 		} else {
@@ -75,7 +87,7 @@ func statements(lock lockfile.Document, doc exceptions.Document, now time.Time) 
 		if out[i].Vulnerability != out[j].Vulnerability {
 			return out[i].Vulnerability < out[j].Vulnerability
 		}
-		return strings.Join(out[i].Products, ",") < strings.Join(out[j].Products, ",")
+		return productKey(out[i].Products) < productKey(out[j].Products)
 	})
 	return out
 }
@@ -97,13 +109,21 @@ func actionStatement(e exceptions.Exception) string {
 	return fmt.Sprintf("Risk accepted%s until %s: %s", by, e.Expires, e.Reason)
 }
 
-func sortedKeys(m map[string]bool) []string {
-	out := make([]string, 0, len(m))
-	for k := range m {
-		out = append(out, k)
+func sortedProducts(m map[string]product) []product {
+	out := make([]product, 0, len(m))
+	for _, p := range m {
+		out = append(out, p)
 	}
-	sort.Strings(out)
+	sort.Slice(out, func(i, j int) bool { return out[i].PURL < out[j].PURL })
 	return out
+}
+
+func productKey(ps []product) string {
+	keys := make([]string, len(ps))
+	for i, p := range ps {
+		keys[i] = p.PURL
+	}
+	return strings.Join(keys, ",")
 }
 
 func (o Options) clock() time.Time {

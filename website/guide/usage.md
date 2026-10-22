@@ -66,14 +66,15 @@ securock sbom verify bom.cdx.json                    # compare against securock.
   `securock:license`.
 - Known vulnerabilities and malicious-package reports from the lockfile
   appear in the CycloneDX `vulnerabilities` list.
-- The output is deterministic. Timestamps are left out unless
-  `SOURCE_DATE_EPOCH` is set; SPDX, which requires a creation date, uses
-  the Unix epoch otherwise.
+- CycloneDX output is deterministic: it has no timestamp. SPDX requires a creation time and
+  uses the current time. Set `SOURCE_DATE_EPOCH` to stamp either format with a fixed time and
+  make both reproducible.
 - `sbom verify` reports a finding for each package that is missing,
   unexpected, or differs in version, purl, digest, or trust status (and
   for a policy digest mismatch in CycloneDX). It exits `1` on any
   finding and supports `--format json` (`sbom-verify-report` schema).
-  It accepts SBOMs from other tools too, matching packages by purl.
+  It accepts SBOMs from other tools too, matching packages by purl. In SARIF output, results
+  point at the SBOM file.
 
 ### `accept`
 
@@ -127,7 +128,11 @@ until 2026-12-31: <reason>`: you are affected and have chosen to wait.
 - Packages are named by purl. An exception that names no package covers every package in
   `securock.lock` that has the advisory; one with `--subject` covers only those.
 - Expired exceptions, exceptions for advisories not in `securock.lock`, and exceptions that are
-  not for a known vulnerability are left out. Packages with no purl (URL imports) are skipped.
+  not for a known vulnerability are left out. Packages with no purl (URL imports) are skipped. If
+  nothing is left, the command fails instead of writing an empty document, since an OpenVEX
+  document needs at least one statement.
+- In the CycloneDX form, each affected package is declared as a component with its purl as
+  `bom-ref`, so every reference resolves within the document.
 - `--author` is required: a VEX document says who vouches for it. The timestamp is the current
   time, or `SOURCE_DATE_EPOCH` when set, which also makes the output reproducible.
 

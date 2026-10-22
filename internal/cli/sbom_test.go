@@ -26,6 +26,8 @@ func lockedDenoProject(t *testing.T) string {
 
 func TestSBOMExportAndVerify(t *testing.T) {
 	dir := lockedDenoProject(t)
+	// SPDX stamps the current time unless asked for a reproducible document.
+	t.Setenv("SOURCE_DATE_EPOCH", "1781515800")
 
 	for _, spec := range []string{"cyclonedx", "spdx"} {
 		t.Run(spec, func(t *testing.T) {
@@ -104,5 +106,40 @@ func TestSBOMErrors(t *testing.T) {
 				t.Fatal("expected an error")
 			}
 		})
+	}
+}
+
+func TestSBOMTimestamps(t *testing.T) {
+	dir := lockedDenoProject(t)
+
+	t.Setenv("SOURCE_DATE_EPOCH", "")
+	cdx := runCLI(t, "sbom", "export", dir)
+	if bytes.Contains(cdx, []byte(`"timestamp"`)) {
+		t.Fatalf("CycloneDX has no timestamp by default, so the export stays deterministic:\n%s", cdx)
+	}
+	spdx := runCLI(t, "sbom", "export", dir, "--spec", "spdx")
+	if bytes.Contains(spdx, []byte("1970-01-01")) || !bytes.Contains(spdx, []byte(`"created": "20`)) {
+		t.Fatalf("SPDX says when it was made unless asked otherwise:\n%s", spdx)
+	}
+
+	t.Setenv("SOURCE_DATE_EPOCH", "1781515800")
+	for _, spec := range []string{"cyclonedx", "spdx"} {
+		if a, b := runCLI(t, "sbom", "export", dir, "--spec", spec), runCLI(t, "sbom", "export", dir, "--spec", spec); !bytes.Equal(a, b) || !bytes.Contains(a, []byte("2026-06-15T09:30:00Z")) {
+			t.Fatalf("%s must be reproducible and use SOURCE_DATE_EPOCH:\n%s", spec, a)
+		}
+	}
+}
+
+func TestSBOMVerifySARIFPointsAtTheSBOM(t *testing.T) {
+	dir := lockedDenoProject(t)
+	raw := runCLI(t, "sbom", "export", dir)
+	file := filepath.Join(t.TempDir(), "bom.json")
+	stale := strings.ReplaceAll(string(raw), "esm.sh/preact", "esm.sh/preacx")
+	if err := os.WriteFile(file, []byte(stale), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	out := runCLI(t, "sbom", "verify", file, dir, "--format", "sarif", "--no-fail")
+	if !bytes.Contains(out, []byte(`"uri": "`+filepath.ToSlash(file)+`"`)) {
+		t.Fatalf("SARIF results should point at the SBOM:\n%s", out)
 	}
 }
