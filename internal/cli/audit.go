@@ -1,7 +1,10 @@
 package cli
 
 import (
+	"time"
+
 	"github.com/securock/securock/internal/audit"
+	"github.com/securock/securock/internal/exceptions"
 	"github.com/securock/securock/internal/finding"
 	"github.com/securock/securock/internal/policy"
 	"github.com/securock/securock/internal/scanner"
@@ -37,7 +40,12 @@ func newAuditCommand(opts *options) *cobra.Command {
 				return opErr(err)
 			}
 
-			report := audit.Run(result.Document).WithLocation(reportLocation(projectPath(args), opts.lockPath))
+			path := projectPath(args)
+			accepted, err := exceptions.Load(exceptions.Path(path, opts.exceptions))
+			if err != nil {
+				return opErr(err)
+			}
+			report := exceptions.Apply(audit.Run(result.Document), accepted, time.Now().UTC()).WithLocation(reportLocation(path, opts.lockPath))
 			if err := finding.Write(cmd.OutOrStdout(), report, opts.format); err != nil {
 				return opErr(err)
 			}

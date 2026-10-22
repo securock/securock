@@ -18,6 +18,7 @@ securock audit [path]
 securock doctor [path]
 securock sbom export [path]
 securock sbom verify SBOM [path]
+securock accept FINDING-ID [path]
 securock version
 ```
 
@@ -27,17 +28,18 @@ verified. The CLI prints this as `trusted (under active policy)`.
 
 ## Commands
 
-| Command   | What it does                                               |
-| --------- | ---------------------------------------------------------- |
-| `scan`    | Inspect the current tree under the active policy (default) |
-| `lock`    | Write a deterministic `securock.lock`                      |
-| `diff`    | Show trust drift versus the lockfile                       |
-| `verify`  | Fail on trust-relevant drift versus the lockfile           |
-| `explain` | Print a trust checklist for one package                    |
-| `audit`   | Report dependency findings ranked by severity              |
-| `doctor`  | Check the project setup for security problems              |
+| Command   | What it does                                                 |
+| --------- | ------------------------------------------------------------ |
+| `scan`    | Inspect the current tree under the active policy (default)   |
+| `lock`    | Write a deterministic `securock.lock`                        |
+| `diff`    | Show trust drift versus the lockfile                         |
+| `verify`  | Fail on trust-relevant drift versus the lockfile             |
+| `explain` | Print a trust checklist for one package                      |
+| `audit`   | Report dependency findings ranked by severity                |
+| `doctor`  | Check the project setup for security problems                |
 | `sbom`    | Export the lockfile as an SBOM, or verify an SBOM against it |
-| `version` | Print the build version                                    |
+| `accept`  | Accept a finding until a date, with a reason                 |
+| `version` | Print the build version                                      |
 
 ### `sbom`
 
@@ -67,6 +69,38 @@ securock sbom verify bom.cdx.json                    # compare against securock.
   for a policy digest mismatch in CycloneDX). It exits `1` on any
   finding and supports `--format json` (`sbom-verify-report` schema).
   It accepts SBOMs from other tools too, matching packages by purl.
+
+### `accept`
+
+`accept` records a finding you reviewed and decided to live with, so
+`audit` stops failing on it until the date you give. Use the finding id
+that `audit` prints.
+
+```sh
+securock accept known-vulnerability:GHSA-xxxx-xxxx-xxxx \
+  --subject npm:lodash \
+  --reason "only used in a build script, tracked in ENG-142" \
+  --approver alice --expires 90d
+
+securock accept list          # active and expired exceptions
+securock accept remove known-vulnerability:GHSA-xxxx-xxxx-xxxx --subject npm:lodash
+```
+
+- `--reason` and `--expires` are required. `--expires` is a date
+  (`2026-12-31`, the last day it applies, in UTC) or a number of days such
+  as `90d`.
+- `--subject` limits the exception to one package. `npm:lodash@4.17.20`
+  matches that artifact; `npm:lodash` matches any version. Without it, the
+  exception covers every package with that finding.
+- Accepting the same finding and package again renews it.
+- Exceptions live in `.securock/exceptions.yaml` (override with
+  `--exceptions`). Commit the file and review it like code. It never
+  changes `securock.lock` or any trust status; see
+  [Trust model](/reference/trust-model#accepted-findings).
+- `audit` keeps accepted findings in its output, marked suppressed
+  (`suppressed` in JSON, `suppressions` in SARIF), and they do not count
+  toward `--fail-on`. Once an exception expires the finding returns, with
+  an `exception-expired` finding alongside it.
 
 ### `scan` vs `verify`
 
@@ -102,16 +136,17 @@ is at or above it.
 
 ## Shared flags
 
-| Flag        | Meaning                                                      |
-| ----------- | ------------------------------------------------------------ |
-| `--network` | `public-only` (default), `offline`, or `allow-all`           |
-| `--offline` | Skip remote lookups; remote evidence stays `unknown`         |
-| `--policy`  | Path to a policy file                                        |
-| `--profile` | Built-in policy: `default` or `strict` (not with `--policy`) |
-| `--lock`    | Path to `securock.lock` (for `lock` / `diff` / `verify`)     |
-| `--format`  | `text` (default), `json`, or `sarif`                         |
-| `--output`  | Write the report to a file instead of stdout                 |
-| `--no-fail` | Always exit `0`                                              |
+| Flag           | Meaning                                                          |
+| -------------- | ---------------------------------------------------------------- |
+| `--network`    | `public-only` (default), `offline`, or `allow-all`               |
+| `--offline`    | Skip remote lookups; remote evidence stays `unknown`             |
+| `--policy`     | Path to a policy file                                            |
+| `--profile`    | Built-in policy: `default` or `strict` (not with `--policy`)     |
+| `--lock`       | Path to `securock.lock` (for `lock` / `diff` / `verify`)         |
+| `--format`     | `text` (default), `json`, or `sarif`                             |
+| `--output`     | Write the report to a file instead of stdout                     |
+| `--exceptions` | Path to the accepted-findings file (`accept`, `audit`, `doctor`) |
+| `--no-fail`    | Always exit `0`                                                  |
 
 `--offline` records vulnerability, malicious, capability, behavior,
 ownership, provenance, signature, and chain evidence as `unknown`.

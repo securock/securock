@@ -210,3 +210,86 @@ func TestWriteRejectsUnknownFormat(t *testing.T) {
 		t.Fatal("expected error")
 	}
 }
+
+func suppressedSample() finding.Report {
+	r := sample()
+	for i := range r.Findings {
+		if r.Findings[i].ID == "malicious-package:MAL-1" {
+			r.Findings[i].Suppressed = &finding.Suppression{Reason: "false positive", Approver: "alice", Expires: "2026-12-31"}
+		}
+	}
+	return r
+}
+
+func TestSuppressedFindingsDoNotCount(t *testing.T) {
+	r := suppressedSample()
+	if got := r.AtLeast(finding.SeverityCritical); got != 0 {
+		t.Fatalf("AtLeast critical = %d, want 0", got)
+	}
+	if got := r.AtLeast(finding.SeverityInfo); got != 2 {
+		t.Fatalf("AtLeast info = %d, want 2", got)
+	}
+	if got := r.Count()[finding.SeverityCritical]; got != 0 {
+		t.Fatalf("Count critical = %d, want 0", got)
+	}
+	if got := r.Suppressed(); got != 1 {
+		t.Fatalf("Suppressed = %d, want 1", got)
+	}
+}
+
+func TestSuppressedFindingsInTextAndJSON(t *testing.T) {
+	var text bytes.Buffer
+	finding.WriteText(&text, suppressedSample())
+	for _, want := range []string{"2 findings (", "1 suppressed", "[critical, suppressed]", "accepted until 2026-12-31: false positive (alice)"} {
+		if !bytes.Contains(text.Bytes(), []byte(want)) {
+			t.Fatalf("text output missing %q:\n%s", want, text.String())
+		}
+	}
+
+	var js bytes.Buffer
+	if err := finding.WriteJSON(&js, suppressedSample()); err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Contains(js.Bytes(), []byte(`"suppressed": {`)) || !bytes.Contains(js.Bytes(), []byte(`"reason": "false positive"`)) {
+		t.Fatalf("json output missing the suppression:\n%s", js.String())
+	}
+	if bytes.Count(js.Bytes(), []byte(`"suppressed"`)) != 1 {
+		t.Fatalf("only the accepted finding should carry a suppression:\n%s", js.String())
+	}
+}
+
+func TestSARIFSuppressions(t *testing.T) {
+	var buf bytes.Buffer
+	if err := finding.WriteSARIF(&buf, suppressedSample()); err != nil {
+		t.Fatal(err)
+	}
+	var log struct {
+		Runs []struct {
+			Results []struct {
+				RuleID       string `json:"ruleId"`
+				Suppressions []struct {
+					Kind          string `json:"kind"`
+					Status        string `json:"status"`
+					Justification string `json:"justification"`
+				} `json:"suppressions"`
+			} `json:"results"`
+		} `json:"runs"`
+	}
+	if err := json.Unmarshal(buf.Bytes(), &log); err != nil {
+		t.Fatal(err)
+	}
+	var withSuppression int
+	for _, res := range log.Runs[0].Results {
+		if len(res.Suppressions) == 0 {
+			continue
+		}
+		withSuppression++
+		s := res.Suppressions[0]
+		if res.RuleID != "malicious-package" || s.Kind != "external" || s.Status != "accepted" || s.Justification != "false positive (accepted until 2026-12-31 by alice)" {
+			t.Fatalf("suppression: %+v on %s", s, res.RuleID)
+		}
+	}
+	if withSuppression != 1 {
+		t.Fatalf("results with suppressions = %d, want 1", withSuppression)
+	}
+}

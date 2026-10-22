@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/securock/securock/internal/doctor"
 	"github.com/securock/securock/internal/finding"
@@ -97,5 +98,69 @@ func TestLockAndPolicy(t *testing.T) {
 	}
 	if _, ok := has(report, "rulesets-missing"); !ok {
 		t.Fatalf("rulesets-missing not reported: %v", ids(report))
+	}
+}
+
+func TestExceptions(t *testing.T) {
+	clock := func() time.Time { return time.Date(2026, 6, 15, 9, 0, 0, 0, time.UTC) }
+	body := `version: 1
+exceptions:
+  - id: known-vulnerability:GHSA-old
+    subject: npm:old
+    reason: waiting on upstream
+    approver: alice
+    expires: 2026-06-14
+  - id: known-vulnerability:GHSA-soon
+    reason: waiting on upstream
+    approver: alice
+    expires: 2026-06-20
+  - id: capability:network
+    reason: needed for telemetry
+    expires: 2027-01-01
+`
+	dir := t.TempDir()
+	write(t, dir, ".securock/exceptions.yaml", body)
+	report := doctor.Run(doctor.Options{Root: dir, Now: clock})
+
+	want := map[string]finding.Severity{
+		"exception-expired":     finding.SeverityMedium,
+		"exception-expiring":    finding.SeverityLow,
+		"exception-no-approver": finding.SeverityInfo,
+	}
+	for id, sev := range want {
+		f, ok := has(report, id)
+		if !ok || f.Severity != sev {
+			t.Fatalf("%s: got %+v (found %v) in %v", id, f, ok, ids(report))
+		}
+	}
+	if f, _ := has(report, "exception-expired"); f.Subject != "npm:old" || !strings.Contains(f.Detail, "GHSA-old") {
+		t.Fatalf("expired finding: %+v", f)
+	}
+	if n := countID(report, "exception-expired") + countID(report, "exception-expiring") + countID(report, "exception-no-approver"); n != 3 {
+		t.Fatalf("each problem should be reported once, got %d in %v", n, ids(report))
+	}
+}
+
+func countID(r finding.Report, id string) int {
+	n := 0
+	for _, f := range r.Findings {
+		if f.ID == id {
+			n++
+		}
+	}
+	return n
+}
+
+func TestExceptionsOverrideAndInvalid(t *testing.T) {
+	dir := t.TempDir()
+	write(t, dir, "custom.yaml", "version: 1\nexceptions:\n  - id: a\n    reason: r\n    expires: nonsense\n")
+	report := doctor.Run(doctor.Options{Root: dir, ExceptionsPath: "custom.yaml"})
+	if f, ok := has(report, "exceptions-invalid"); !ok || f.Severity != finding.SeverityHigh {
+		t.Fatalf("got %+v in %v", f, ids(report))
+	}
+
+	clean := doctor.Run(doctor.Options{Root: t.TempDir()})
+	if _, ok := has(clean, "exception"); ok {
+		t.Fatalf("no exceptions file should produce no exception findings: %v", ids(clean))
 	}
 }

@@ -8,7 +8,9 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"time"
 
+	"github.com/securock/securock/internal/exceptions"
 	"github.com/securock/securock/internal/finding"
 	"github.com/securock/securock/internal/lock"
 	"github.com/securock/securock/internal/policy"
@@ -19,7 +21,14 @@ type Options struct {
 	LockPath   string
 	PolicyPath string
 	Profile    string
+	// ExceptionsPath overrides the accepted-findings file.
+	ExceptionsPath string
+	// Now is the clock for expiry checks; the zero value uses time.Now.
+	Now func() time.Time
 }
+
+// expiringSoon is how far ahead doctor warns about an exception that is about to lapse.
+const expiringSoon = 14 * 24 * time.Hour
 
 // Run checks the project setup around securock rather than the dependencies themselves.
 func Run(opts Options) finding.Report {
@@ -29,6 +38,7 @@ func Run(opts Options) finding.Report {
 	var out []finding.Finding
 	out = append(out, checkLock(opts)...)
 	out = append(out, checkPolicy(opts)...)
+	out = append(out, checkExceptions(opts)...)
 	out = append(out, checkRegistryConfig(opts.Root)...)
 	out = append(out, checkWorkflows(opts.Root)...)
 	out = append(out, checkRulesets(opts.Root)...)
@@ -59,6 +69,44 @@ func checkPolicy(opts Options) []finding.Finding {
 		return []finding.Finding{{ID: "policy-default", Severity: finding.SeverityInfo, Title: "The default profile is in use", Detail: "strict additionally requires provenance, signature and digest", Remediation: "Pass --profile strict or --policy to tighten it."}}
 	}
 	return nil
+}
+
+func checkExceptions(opts Options) []finding.Finding {
+	now := time.Now
+	if opts.Now != nil {
+		now = opts.Now
+	}
+	at := now().UTC()
+
+	path := exceptions.Path(opts.Root, opts.ExceptionsPath)
+	doc, err := exceptions.Load(path)
+	if err != nil {
+		return []finding.Finding{{ID: "exceptions-invalid", Severity: finding.SeverityHigh, Title: "Accepted findings cannot be read", Detail: err.Error(), Subject: path, Remediation: "Fix the file, or remove it and accept findings again with securock accept."}}
+	}
+
+	var out []finding.Finding
+	for _, e := range doc.Exceptions {
+		switch end, _ := e.ExpiresAt(); {
+		case e.Expired(at):
+			out = append(out, exceptions.ExpiredFinding(e))
+		case end.Sub(at) <= expiringSoon:
+			out = append(out, finding.Finding{
+				ID: "exception-expiring", Severity: finding.SeverityLow, Title: "An accepted finding expires soon",
+				Detail:      e.ID + " expires on " + e.Expires,
+				Subject:     e.Subject,
+				Remediation: "Fix the finding, or renew it with securock accept.",
+			})
+		}
+		if e.Approver == "" {
+			out = append(out, finding.Finding{
+				ID: "exception-no-approver", Severity: finding.SeverityInfo, Title: "An accepted finding has no approver",
+				Detail:      e.ID,
+				Subject:     e.Subject,
+				Remediation: "Renew it with securock accept --approver.",
+			})
+		}
+	}
+	return out
 }
 
 var (

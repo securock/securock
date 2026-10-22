@@ -39,6 +39,16 @@ type Finding struct {
 	Detail      string   `json:"detail,omitempty"`
 	Subject     string   `json:"subject,omitempty"`
 	Remediation string   `json:"remediation,omitempty"`
+
+	// Suppressed is set when the finding has been accepted. Suppressed findings stay in
+	// the report but do not count toward severity totals or --fail-on.
+	Suppressed *Suppression `json:"suppressed,omitempty"`
+}
+
+type Suppression struct {
+	Reason   string `json:"reason"`
+	Approver string `json:"approver,omitempty"`
+	Expires  string `json:"expires"`
 }
 
 type Report struct {
@@ -72,20 +82,33 @@ func New(tool string, findings []Finding) Report {
 	return Report{Tool: tool, Findings: findings}
 }
 
-// Count returns the number of findings at each severity.
+// Count returns the number of unsuppressed findings at each severity.
 func (r Report) Count() map[Severity]int {
 	out := make(map[Severity]int, len(order))
 	for _, f := range r.Findings {
-		out[f.Severity]++
+		if f.Suppressed == nil {
+			out[f.Severity]++
+		}
 	}
 	return out
 }
 
-// AtLeast returns the number of findings at or above the threshold.
+// AtLeast returns the number of unsuppressed findings at or above the threshold.
 func (r Report) AtLeast(threshold Severity) int {
 	n := 0
 	for _, f := range r.Findings {
-		if f.Severity.Rank() >= threshold.Rank() {
+		if f.Suppressed == nil && f.Severity.Rank() >= threshold.Rank() {
+			n++
+		}
+	}
+	return n
+}
+
+// Suppressed returns the number of accepted findings.
+func (r Report) Suppressed() int {
+	n := 0
+	for _, f := range r.Findings {
+		if f.Suppressed != nil {
 			n++
 		}
 	}

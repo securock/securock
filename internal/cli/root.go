@@ -21,6 +21,8 @@ type options struct {
 	profile  string
 	noFail   bool
 	output   string
+
+	exceptions string
 }
 
 func NewRoot(version, commit, date string) *cobra.Command {
@@ -43,6 +45,7 @@ func NewRoot(version, commit, date string) *cobra.Command {
 	root.PersistentFlags().StringVar(&opts.policy, "policy", "", "path to a policy file")
 	root.PersistentFlags().StringVar(&opts.profile, "profile", "", "built-in policy profile: default or strict")
 	root.PersistentFlags().StringVar(&opts.output, "output", "", "write the report to this file instead of stdout")
+	root.PersistentFlags().StringVar(&opts.exceptions, "exceptions", "", "path to the accepted-findings file (default .securock/exceptions.yaml in the project)")
 	root.PersistentFlags().BoolVar(&opts.noFail, "no-fail", false, "always exit 0")
 
 	root.AddCommand(newScanCommand(opts))
@@ -53,6 +56,7 @@ func NewRoot(version, commit, date string) *cobra.Command {
 	root.AddCommand(newAuditCommand(opts))
 	root.AddCommand(newDoctorCommand(opts))
 	root.AddCommand(newSBOMCommand(opts))
+	root.AddCommand(newAcceptCommand(opts))
 	root.AddCommand(&cobra.Command{
 		Use:   "version",
 		Short: "Print the version",
