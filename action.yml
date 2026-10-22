@@ -9,7 +9,7 @@ inputs:
     description: Project directory
     default: "."
   command:
-    description: "scan, verify, diff, both (diff+verify), or all (scan+diff+verify)"
+    description: "scan, verify, diff, audit, both (diff+verify), or all (scan+diff+verify)"
     default: all
   policy:
     description: Path to a policy file (mutually exclusive with profile)
@@ -20,6 +20,18 @@ inputs:
   offline:
     description: Skip remote vulnerability lookups
     default: "false"
+  reachability:
+    description: Pass --reachability, so vulnerabilities in development-only dependencies are marked and lowered by audit
+    default: "false"
+  min-release-age:
+    description: "audit only: report releases newer than this as high findings, such as 7d (npm and PyPI)"
+    default: ""
+  sarif:
+    description: Upload an audit report to GitHub code scanning (needs security-events write permission)
+    default: "false"
+  sbom:
+    description: Write the lockfile as a CycloneDX SBOM and return its path in the sbom-file output
+    default: "false"
   comment:
     description: Comment a trust report on pull requests
     default: "true"
@@ -29,6 +41,13 @@ inputs:
   version:
     description: Securock release tag to install. Empty uses a v* action ref, otherwise builds from source.
     default: ""
+outputs:
+  sarif-file:
+    description: Path of the SARIF report, when sarif is enabled
+    value: ${{ steps.run.outputs.sarif-file }}
+  sbom-file:
+    description: Path of the CycloneDX SBOM, when sbom is enabled
+    value: ${{ steps.run.outputs.sbom-file }}
 runs:
   using: composite
   steps:
@@ -98,8 +117,19 @@ runs:
         OFFLINE: ${{ inputs.offline }}
         POLICY: ${{ inputs.policy }}
         PROFILE: ${{ inputs.profile }}
+        REACHABILITY: ${{ inputs.reachability }}
+        MIN_RELEASE_AGE: ${{ inputs.min-release-age }}
+        SARIF_FILE: ${{ inputs.sarif == 'true' && format('{0}/securock.sarif', runner.temp) || '' }}
+        SBOM_FILE: ${{ inputs.sbom == 'true' && format('{0}/securock.cdx.json', runner.temp) || '' }}
         SECUROCK_REPORT: ${{ runner.temp }}/securock-report.txt
       run: "${{ github.action_path }}/action/run.sh"
+    - name: Upload SARIF to code scanning
+      if: ${{ always() && inputs.sarif == 'true' && steps.run.outputs.sarif-file != '' }}
+      continue-on-error: true
+      uses: github/codeql-action/upload-sarif@6f2ac81f5cd81fe351a197ba0b00d91d03cd2aee # v4.39.0
+      with:
+        sarif_file: ${{ steps.run.outputs.sarif-file }}
+        category: securock
     - name: Comment trust report
       if: ${{ always() && inputs.comment == 'true' && github.event_name == 'pull_request' && steps.run.outcome != 'skipped' }}
       continue-on-error: true

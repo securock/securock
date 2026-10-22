@@ -6,8 +6,13 @@ workdir="${WORKDIR:-.}"
 offline="${OFFLINE:-false}"
 policy="${POLICY:-}"
 profile="${PROFILE:-}"
+reachability="${REACHABILITY:-false}"
+min_release_age="${MIN_RELEASE_AGE:-}"
+sarif_file="${SARIF_FILE:-}"
+sbom_file="${SBOM_FILE:-}"
 report="${SECUROCK_REPORT:?SECUROCK_REPORT is required}"
 
+origin="$PWD"
 cd "$workdir"
 
 if [ -n "$policy" ] && [ -n "$profile" ]; then
@@ -25,6 +30,15 @@ if [ -n "$policy" ]; then
 fi
 if [ -n "$profile" ]; then
   flags+=(--profile "$profile")
+fi
+if [ "$reachability" = "true" ]; then
+  flags+=(--reachability)
+fi
+
+# Flags only audit understands.
+audit_flags=()
+if [ -n "$min_release_age" ]; then
+  audit_flags+=(--min-release-age "$min_release_age")
 fi
 
 : >"$report"
@@ -56,6 +70,9 @@ case "$command" in
   verify)
     run_cmd "securock verify" securock verify
     ;;
+  audit)
+    run_cmd "securock audit" securock audit ${audit_flags[@]+"${audit_flags[@]}"}
+    ;;
   both)
     # Drift-only path for callers that intentionally skip current-state
     # policy checks (for example offline fixtures with unknown evidence).
@@ -76,6 +93,27 @@ case "$command" in
     exit 1
     ;;
 esac
+
+# Optional artifacts. They are written from the directory the job started in, so paths in
+# the SARIF report are relative to the repository root, which code scanning needs.
+if [ -n "$sarif_file" ]; then
+  # --no-fail: the report is for code scanning; the audit step above decides pass or fail.
+  if (cd "$origin" && securock audit "$workdir" --format sarif --output "$sarif_file" --no-fail \
+      ${flags[@]+"${flags[@]}"} ${audit_flags[@]+"${audit_flags[@]}"}) >>"$report" 2>&1; then
+    echo "sarif-file=$sarif_file" >>"$GITHUB_OUTPUT"
+  else
+    echo "securock audit --format sarif failed" >>"$report"
+    failed=true
+  fi
+fi
+if [ -n "$sbom_file" ]; then
+  if securock sbom export ${flags[@]+"${flags[@]}"} >"$sbom_file" 2>>"$report"; then
+    echo "sbom-file=$sbom_file" >>"$GITHUB_OUTPUT"
+  else
+    echo "securock sbom export failed" >>"$report"
+    failed=true
+  fi
+fi
 
 cat "$report"
 

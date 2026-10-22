@@ -35,16 +35,51 @@ branch and is not the security-first default.
 
 ## Inputs
 
-| Input     | Default                | Description                                                                   |
-| --------- | ---------------------- | ----------------------------------------------------------------------------- |
-| `path`    | `.`                    | Project directory to scan                                                     |
-| `command` | `all`                  | `all`, `scan`, `diff`, `verify`, or `both`                                    |
-| `policy`  | _(empty)_              | Path to a policy file (`--policy`; exclusive with `profile`)                  |
-| `profile` | _(empty)_              | Built-in profile `default` or `strict` (`--profile`)                          |
-| `offline` | `false`                | Pass `--offline` to the CLI                                                   |
-| `comment` | `true`                 | Comment a trust report on pull requests                                       |
-| `token`   | Actions `github.token` | Token for PR comments and attested release downloads                          |
-| `version` | _(empty)_              | Release tag to install; empty uses a `v*` action ref, else builds from source |
+| Input             | Default                | Description                                                                   |
+| ----------------- | ---------------------- | ----------------------------------------------------------------------------- |
+| `path`            | `.`                    | Project directory to scan                                                     |
+| `command`         | `all`                  | `all`, `scan`, `diff`, `verify`, `audit`, or `both`                           |
+| `policy`          | _(empty)_              | Path to a policy file (`--policy`; exclusive with `profile`)                  |
+| `profile`         | _(empty)_              | Built-in profile `default` or `strict` (`--profile`)                          |
+| `offline`         | `false`                | Pass `--offline` to the CLI                                                   |
+| `reachability`    | `false`                | Pass `--reachability` ([Usage](/guide/usage#reachability))                    |
+| `min-release-age` | _(empty)_              | `audit` only: report releases newer than this, such as `7d`                   |
+| `sarif`           | `false`                | Upload an audit report to code scanning (needs `security-events: write`)      |
+| `sbom`            | `false`                | Write a CycloneDX SBOM and return its path in the `sbom-file` output          |
+| `comment`         | `true`                 | Comment a trust report on pull requests                                       |
+| `token`           | Actions `github.token` | Token for PR comments and attested release downloads                          |
+| `version`         | _(empty)_              | Release tag to install; empty uses a `v*` action ref, else builds from source |
+
+### Code scanning, SBOM, and the cooldown
+
+```yaml
+permissions:
+  contents: read
+  security-events: write
+
+steps:
+  - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+  - id: securock
+    uses: securock/securock@COMMIT_SHA
+    with:
+      command: audit
+      reachability: "true"
+      min-release-age: 7d
+      sarif: "true"
+      sbom: "true"
+  - uses: actions/upload-artifact@COMMIT_SHA
+    with:
+      name: sbom
+      path: ${{ steps.securock.outputs.sbom-file }}
+```
+
+- `command: audit` fails the job on findings at or above `high`, like `securock audit`.
+- `sarif: "true"` runs `securock audit --format sarif` from the repository root, so locations
+  match the repository, and uploads it to code scanning. The upload never fails the job on its
+  own. The report is also returned in the `sarif-file` output.
+- `sbom: "true"` runs `securock sbom export`, so `securock.lock` must exist.
+- `min-release-age` and `command: audit` are the only way to pass the audit-only flag; other
+  commands ignore it.
 
 ### `command` modes
 
@@ -53,6 +88,7 @@ branch and is not the security-first default.
 | `all` (default)            | `scan` + `diff` + `verify` |
 | `both`                     | `diff` + `verify` only     |
 | `scan` / `diff` / `verify` | That single command        |
+| `audit`                    | `securock audit` only      |
 
 Default `all` fails CI on **current** policy violations (`scan`) and on
 **trust drift** (`verify`). Use `both` when you only want drift checks
