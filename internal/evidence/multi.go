@@ -2,6 +2,7 @@ package evidence
 
 import (
 	"context"
+	"sync"
 
 	"github.com/securock/securock/internal/ecosystem"
 )
@@ -23,15 +24,30 @@ func (m *Multi) Collect(ctx context.Context, deps []ecosystem.Dependency) (map[s
 	if m == nil {
 		return out, nil
 	}
-	for _, c := range m.Collectors {
+
+	// The collectors talk to different registries, so they run together. Results are
+	// merged in collector order afterwards, which keeps "earlier wins" and the reported
+	// error independent of timing.
+	got := make([]map[string]Record, len(m.Collectors))
+	errs := make([]error, len(m.Collectors))
+	var wg sync.WaitGroup
+	for i, c := range m.Collectors {
 		if c == nil {
 			continue
 		}
-		got, err := c.Collect(ctx, deps)
-		if err != nil {
-			return nil, err
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			got[i], errs[i] = c.Collect(ctx, deps)
+		}()
+	}
+	wg.Wait()
+
+	for i := range m.Collectors {
+		if errs[i] != nil {
+			return nil, errs[i]
 		}
-		for k, rec := range got {
+		for k, rec := range got[i] {
 			if _, exists := out[k]; exists {
 				continue
 			}
