@@ -117,3 +117,41 @@ func TestExplainHealth(t *testing.T) {
 		})
 	}
 }
+
+func TestExplainReachability(t *testing.T) {
+	doc := lockfile.Document{Artifacts: []lockfile.Artifact{{
+		Subject: lockfile.Subject{Ecosystem: "npm", Name: "shared"},
+		Version: "1.0.0",
+		Evidence: lockfile.Evidence{
+			Vulnerabilities: lockfile.VulnEvidence{
+				State: lockfile.VulnChecked,
+				Items: []lockfile.Vulnerability{
+					{ID: "V-DIRECT", Reachable: lockfile.ReachYes},
+					{ID: "V-VIA", Reachable: lockfile.ReachYes, Via: []string{"npm:app@1.0.0", "npm:shared@1.0.0"}},
+					{ID: "V-DEV", Reachable: lockfile.ReachNo},
+					{ID: "V-UNKNOWN", Reachable: lockfile.ReachUnknown},
+					{ID: "V-NOTRECORDED"},
+				},
+			},
+		},
+	}}}
+	res, err := explain.Find(doc, "shared")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var buf bytes.Buffer
+	explain.Write(&buf, res)
+	for _, want := range []string{
+		"V-DIRECT reachable at runtime (direct runtime dependency)",
+		"V-VIA reachable at runtime via npm:app@1.0.0 -> npm:shared@1.0.0",
+		"V-DEV not reachable: development dependency only",
+		"V-UNKNOWN reachability unknown",
+	} {
+		if !strings.Contains(buf.String(), want) {
+			t.Fatalf("missing %q in:\n%s", want, buf.String())
+		}
+	}
+	if strings.Contains(buf.String(), "V-NOTRECORDED reach") {
+		t.Fatalf("nothing should be said when reachability was not recorded:\n%s", buf.String())
+	}
+}

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/securock/securock/internal/ecosystem/core"
@@ -44,75 +45,191 @@ func (Ecosystem) Dependencies(path string) ([]core.Dependency, error) {
 		return nil, err
 	}
 
-	seen := map[string]struct{}{}
-	var deps []core.Dependency
-	for _, pkg := range lock.Packages {
-		name, version, tarball, integrity := parsePackage(pkg)
-		if name == "" || version == "" {
-			continue
-		}
-		id := name + "@" + version
-		if _, ok := seen[id]; ok {
-			continue
-		}
-		seen[id] = struct{}{}
-		kind := classify(version, tarball)
-		registry := ""
-		if kind == core.SourceRegistry {
-			registry = npmrc.Registry(path, name, tarball)
-		}
-		deps = append(deps, core.Dependency{
-			Ecosystem:  "npm",
-			Resolver:   "bun",
-			Registry:   registry,
-			SourceKind: kind,
-			Name:       name,
-			Version:    version,
-			Digest:     core.NormalizeDigest(integrity),
-		})
+	keys := make([]string, 0, len(lock.Packages))
+	for key := range lock.Packages {
+		keys = append(keys, key)
 	}
+	sort.Strings(keys)
+
+	seen := map[string]int{}
+	byKey := map[string]int{}
+	pending := map[string]map[string]string{}
+	var deps []core.Dependency
+	for _, key := range keys {
+		pkg := parsePackage(lock.Packages[key])
+		if pkg.name == "" || pkg.version == "" {
+			continue
+		}
+		id := pkg.name + "@" + pkg.version
+		at, ok := seen[id]
+		if !ok {
+			kind := classify(pkg.version, pkg.tarball)
+			registry := ""
+			if kind == core.SourceRegistry {
+				registry = npmrc.Registry(path, pkg.name, pkg.tarball)
+			}
+			at = len(deps)
+			seen[id] = at
+			deps = append(deps, core.Dependency{
+				Ecosystem:  "npm",
+				Resolver:   "bun",
+				Registry:   registry,
+				SourceKind: kind,
+				Name:       pkg.name,
+				Version:    pkg.version,
+				Digest:     core.NormalizeDigest(pkg.integrity),
+			})
+		}
+		byKey[key] = at
+		// Nested copies of one version each have their own dependencies; keep them all.
+		for name, rng := range pkg.dependencies {
+			if pending[key] == nil {
+				pending[key] = map[string]string{}
+			}
+			pending[key][name] = rng
+		}
+	}
+
+	for key, group := range pending {
+		var edges []string
+		for name := range group {
+			if target, ok := resolve(byKey, key, name); ok {
+				edges = append(edges, core.Identity(deps[target]))
+			}
+		}
+		at := byKey[key]
+		deps[at].DependsOn = core.UnionIdentities(deps[at].DependsOn, edges)
+	}
+
+	roots := map[string]string{}
+	for workspace, ws := range lock.Workspaces {
+		for scope, group := range map[string]map[string]string{
+			core.ScopeRuntime:  mergeMaps(ws.Dependencies, ws.PeerDependencies),
+			core.ScopeOptional: ws.OptionalDependencies,
+			core.ScopeDev:      ws.DevDependencies,
+		} {
+			for name := range group {
+				target, ok := byKey[workspace+"/"+name]
+				if !ok {
+					target, ok = byKey[name]
+				}
+				if ok {
+					id := core.Identity(deps[target])
+					roots[id] = core.MergeScope(roots[id], scope)
+				}
+			}
+		}
+	}
+	core.ApplyScopes(deps, roots)
 	return deps, nil
 }
 
 type bunLock struct {
-	Packages map[string]json.RawMessage `json:"packages"`
+	Workspaces map[string]bunWorkspace    `json:"workspaces"`
+	Packages   map[string]json.RawMessage `json:"packages"`
 }
 
-func parsePackage(raw json.RawMessage) (name, version, tarball, integrity string) {
+type bunWorkspace struct {
+	Dependencies         map[string]string `json:"dependencies"`
+	DevDependencies      map[string]string `json:"devDependencies"`
+	OptionalDependencies map[string]string `json:"optionalDependencies"`
+	PeerDependencies     map[string]string `json:"peerDependencies"`
+}
+
+type bunPackage struct {
+	name, version, tarball, integrity string
+	dependencies                      map[string]string
+}
+
+func mergeMaps(maps ...map[string]string) map[string]string {
+	out := map[string]string{}
+	for _, m := range maps {
+		for k, v := range m {
+			out[k] = v
+		}
+	}
+	return out
+}
+
+// resolve finds the copy of name a package at key would load. Bun keys a nested copy as
+// "parent/name", so the search starts under the package and walks outward.
+func resolve(byKey map[string]int, from, name string) (int, bool) {
+	path := splitKey(from)
+	for {
+		candidate := name
+		if len(path) > 0 {
+			candidate = strings.Join(path, "/") + "/" + name
+		}
+		if at, ok := byKey[candidate]; ok {
+			return at, true
+		}
+		if len(path) == 0 {
+			return 0, false
+		}
+		path = path[:len(path)-1]
+	}
+}
+
+// splitKey splits a nested key into package names; a scope and its name stay together.
+func splitKey(key string) []string {
+	parts := strings.Split(key, "/")
+	var out []string
+	for i := 0; i < len(parts); i++ {
+		if strings.HasPrefix(parts[i], "@") && i+1 < len(parts) {
+			out = append(out, parts[i]+"/"+parts[i+1])
+			i++
+			continue
+		}
+		out = append(out, parts[i])
+	}
+	return out
+}
+
+func parsePackage(raw json.RawMessage) bunPackage {
 	raw = bytes.TrimSpace(raw)
 	if len(raw) == 0 {
-		return "", "", "", ""
+		return bunPackage{}
 	}
 	if raw[0] == '"' {
 		var s string
 		if json.Unmarshal(raw, &s) != nil {
-			return "", "", "", ""
+			return bunPackage{}
 		}
 		name, version := splitLocator(s)
-		return name, version, "", ""
+		return bunPackage{name: name, version: version}
 	}
 	var parts []json.RawMessage
 	if json.Unmarshal(raw, &parts) != nil || len(parts) == 0 {
-		return "", "", "", ""
+		return bunPackage{}
 	}
 	var locator string
 	if json.Unmarshal(parts[0], &locator) != nil {
-		return "", "", "", ""
+		return bunPackage{}
 	}
-	name, version = splitLocator(locator)
+	var pkg bunPackage
+	pkg.name, pkg.version = splitLocator(locator)
 	for _, part := range parts[1:] {
+		var meta struct {
+			Dependencies         map[string]string `json:"dependencies"`
+			OptionalDependencies map[string]string `json:"optionalDependencies"`
+			PeerDependencies     map[string]string `json:"peerDependencies"`
+		}
+		if json.Unmarshal(part, &meta) == nil && (meta.Dependencies != nil || meta.OptionalDependencies != nil || meta.PeerDependencies != nil) {
+			pkg.dependencies = mergeMaps(meta.Dependencies, meta.OptionalDependencies, meta.PeerDependencies)
+			continue
+		}
 		var s string
 		if json.Unmarshal(part, &s) != nil {
 			continue
 		}
 		switch {
 		case strings.HasPrefix(s, "https://") || strings.HasPrefix(s, "http://"):
-			tarball = s
+			pkg.tarball = s
 		case strings.HasPrefix(s, "sha256-") || strings.HasPrefix(s, "sha512-") || strings.HasPrefix(s, "sha1-") || strings.HasPrefix(s, "sha256:") || strings.HasPrefix(s, "sha512:"):
-			integrity = s
+			pkg.integrity = s
 		}
 	}
-	return name, version, tarball, integrity
+	return pkg
 }
 
 func splitLocator(locator string) (name, version string) {

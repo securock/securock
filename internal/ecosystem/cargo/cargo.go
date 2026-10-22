@@ -2,6 +2,7 @@ package cargo
 
 import (
 	"net/url"
+	"slices"
 	"strings"
 
 	"github.com/pelletier/go-toml/v2"
@@ -37,15 +38,66 @@ func (Ecosystem) Dependencies(path string) ([]core.Dependency, error) {
 	}
 
 	var deps []core.Dependency
+	var packages []cargoPackage
 	for _, pkg := range lock.Package {
 		if pkg.Name == "" || pkg.Version == "" || pkg.Source == "" {
 			continue
 		}
 		if dep, ok := cargoDep(pkg); ok {
 			deps = append(deps, dep)
+			packages = append(packages, pkg)
 		}
 	}
+	applyGraph(path, deps, packages)
 	return deps, nil
+}
+
+// applyGraph records edges from Cargo.lock and scopes from the direct dependencies
+// declared in Cargo.toml, because Cargo.lock merges normal, build, and dev dependencies.
+func applyGraph(project string, deps []core.Dependency, packages []cargoPackage) {
+	byName := map[string][]string{}
+	for _, dep := range deps {
+		byName[dep.Name] = append(byName[dep.Name], core.Identity(dep))
+	}
+	index := map[string]int{}
+	for i, dep := range deps {
+		index[core.Identity(dep)] = i
+	}
+	for i, pkg := range packages {
+		var edges []string
+		for _, ref := range pkg.Dependencies {
+			edges = append(edges, resolveRef(ref, byName)...)
+		}
+		deps[i].DependsOn = core.UnionIdentities(nil, edges)
+	}
+
+	roots := map[string]string{}
+	for scope, names := range manifestDependencies(project) {
+		for _, name := range names {
+			for _, id := range byName[name] {
+				roots[id] = core.MergeScope(roots[id], scope)
+			}
+		}
+	}
+	core.ApplyScopes(deps, roots)
+}
+
+// resolveRef finds the packages a Cargo.lock dependency entry names. An entry is
+// "name", "name version", or "name version (source)"; the version is left out when the
+// name is unique.
+func resolveRef(ref string, byName map[string][]string) []string {
+	fields := strings.Fields(ref)
+	if len(fields) == 0 {
+		return nil
+	}
+	if len(fields) >= 2 {
+		id := "cargo:" + fields[0] + "@" + fields[1]
+		if slices.Contains(byName[fields[0]], id) {
+			return []string{id}
+		}
+		return nil
+	}
+	return byName[fields[0]]
 }
 
 func cargoDep(pkg cargoPackage) (core.Dependency, bool) {
@@ -92,8 +144,9 @@ type cargoLock struct {
 }
 
 type cargoPackage struct {
-	Name     string `toml:"name"`
-	Version  string `toml:"version"`
-	Source   string `toml:"source"`
-	Checksum string `toml:"checksum"`
+	Name         string   `toml:"name"`
+	Version      string   `toml:"version"`
+	Source       string   `toml:"source"`
+	Checksum     string   `toml:"checksum"`
+	Dependencies []string `toml:"dependencies"`
 }

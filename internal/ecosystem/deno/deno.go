@@ -52,12 +52,15 @@ func (Ecosystem) Dependencies(path string) ([]core.Dependency, error) {
 
 	seen := map[string]struct{}{}
 	var deps []core.Dependency
+	// edges holds each package's declared dependencies until every package is known.
+	edges := map[string][]string{}
 	for key, pkg := range npmPkgs {
 		name, version := splitNameVersion(key)
 		if name == "" || version == "" {
 			continue
 		}
 		id := "npm:" + name + "@" + version
+		edges[id] = append(edges[id], pkg.Dependencies...)
 		if _, ok := seen[id]; ok {
 			continue
 		}
@@ -77,6 +80,7 @@ func (Ecosystem) Dependencies(path string) ([]core.Dependency, error) {
 		if name == "" || version == "" {
 			continue
 		}
+		edges["jsr:"+name+"@"+version] = append(edges["jsr:"+name+"@"+version], pkg.Dependencies...)
 		deps = append(deps, core.Dependency{
 			Ecosystem:  "jsr",
 			Resolver:   "deno",
@@ -123,7 +127,81 @@ func (Ecosystem) Dependencies(path string) ([]core.Dependency, error) {
 			Digest:     digest,
 		})
 	}
+	specifiers := lock.Specifiers
+	if len(specifiers) == 0 && lock.Packages != nil {
+		specifiers = lock.Packages.Specifiers
+	}
+	applyGraph(deps, edges, specifiers, lock.workspaceDependencies())
 	return deps, nil
+}
+
+// applyGraph records each package's dependencies and marks the workspace's direct
+// dependencies as runtime roots. Deno has no development-only dependencies, so every
+// package a root reaches is a runtime package.
+func applyGraph(deps []core.Dependency, edges map[string][]string, specifiers map[string]string, rootSpecs []string) {
+	index := map[string]int{}
+	byName := map[string][]string{}
+	for i, dep := range deps {
+		if dep.Ecosystem != "npm" && dep.Ecosystem != "jsr" {
+			continue
+		}
+		id := core.Identity(dep)
+		index[id] = i
+		byName[dep.Ecosystem+":"+dep.Name] = append(byName[dep.Ecosystem+":"+dep.Name], id)
+	}
+
+	// resolveSpec turns "npm:react@19" or "jsr:@std/assert@1" into an artifact identity.
+	resolveSpec := func(spec string) (string, bool) {
+		version, ok := specifiers[spec]
+		if !ok {
+			return "", false
+		}
+		scheme, rest, _ := strings.Cut(spec, ":")
+		name, _ := splitAtVersion(rest)
+		if name == "" {
+			name = rest
+		}
+		id := scheme + ":" + name + "@" + stripPeerContext(version)
+		_, found := index[id]
+		return id, found
+	}
+
+	for id, items := range edges {
+		self, ok := index[id]
+		if !ok {
+			continue
+		}
+		scheme := strings.SplitN(id, ":", 2)[0]
+		var out []string
+		for _, item := range items {
+			if strings.HasPrefix(item, "npm:") || strings.HasPrefix(item, "jsr:") {
+				if target, ok := resolveSpec(item); ok {
+					out = append(out, target)
+				}
+				continue
+			}
+			// An npm package lists its dependencies by name, or by name@version when
+			// more than one version is locked.
+			if name, version := splitNameVersion(item); name != "" && version != "" {
+				if _, ok := index[scheme+":"+name+"@"+version]; ok {
+					out = append(out, scheme+":"+name+"@"+version)
+				}
+				continue
+			}
+			if candidates := byName[scheme+":"+item]; len(candidates) == 1 {
+				out = append(out, candidates[0])
+			}
+		}
+		deps[self].DependsOn = core.UnionIdentities(deps[self].DependsOn, out)
+	}
+
+	roots := map[string]string{}
+	for _, spec := range rootSpecs {
+		if id, ok := resolveSpec(spec); ok {
+			roots[id] = core.ScopeRuntime
+		}
+	}
+	core.ApplyScopes(deps, roots)
 }
 
 func supportedVersion(v string) error {
@@ -138,21 +216,49 @@ func supportedVersion(v string) error {
 }
 
 type denoLock struct {
-	Version   string             `json:"version"`
-	NPM       map[string]denoPkg `json:"npm"`
-	JSR       map[string]denoPkg `json:"jsr"`
-	Remote    map[string]string  `json:"remote"`
-	Redirects map[string]string  `json:"redirects"`
-	Packages  *denoV3Packages    `json:"packages"`
+	Version    string             `json:"version"`
+	Specifiers map[string]string  `json:"specifiers"`
+	NPM        map[string]denoPkg `json:"npm"`
+	JSR        map[string]denoPkg `json:"jsr"`
+	Remote     map[string]string  `json:"remote"`
+	Redirects  map[string]string  `json:"redirects"`
+	Packages   *denoV3Packages    `json:"packages"`
+	Workspace  denoWorkspace      `json:"workspace"`
 }
 
 type denoV3Packages struct {
-	NPM map[string]denoPkg `json:"npm"`
-	JSR map[string]denoPkg `json:"jsr"`
+	Specifiers map[string]string  `json:"specifiers"`
+	NPM        map[string]denoPkg `json:"npm"`
+	JSR        map[string]denoPkg `json:"jsr"`
 }
 
 type denoPkg struct {
-	Integrity string `json:"integrity"`
+	Integrity    string   `json:"integrity"`
+	Dependencies []string `json:"dependencies"`
+}
+
+// denoWorkspace lists what the project and its members import directly.
+type denoWorkspace struct {
+	Dependencies []string `json:"dependencies"`
+	PackageJSON  struct {
+		Dependencies []string `json:"dependencies"`
+	} `json:"packageJson"`
+	Members map[string]struct {
+		Dependencies []string `json:"dependencies"`
+		PackageJSON  struct {
+			Dependencies []string `json:"dependencies"`
+		} `json:"packageJson"`
+	} `json:"members"`
+}
+
+func (l denoLock) workspaceDependencies() []string {
+	w := l.Workspace
+	out := append(append([]string(nil), w.Dependencies...), w.PackageJSON.Dependencies...)
+	for _, member := range w.Members {
+		out = append(out, member.Dependencies...)
+		out = append(out, member.PackageJSON.Dependencies...)
+	}
+	return out
 }
 
 func splitNameVersion(key string) (name, version string) {

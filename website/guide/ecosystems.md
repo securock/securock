@@ -59,6 +59,37 @@ npm collection verifies registry ECDSA signatures against
 trusted root. Both require the lockfile digest to match the signed
 artifact before emitting `verified`.
 
+## Reachability
+
+`--reachability` ([Usage](/guide/usage#reachability)) needs two things from the lockfile: how each
+package enters the project (its scope) and what each package depends on. What each resolver can read:
+
+| Resolver | Scope comes from                                                 | Dependency edges                              |
+| -------- | ---------------------------------------------------------------- | --------------------------------------------- |
+| npm      | `dev`, `optional` and `devOptional` flags                        | `dependencies` of each package                |
+| pnpm     | `importers` (direct dependencies), spread along the graph        | `snapshots`, or `packages` in older lockfiles |
+| yarn     | `package.json` of the project and workspaces, spread along edges | `dependencies` of each entry                  |
+| bun      | `workspaces` (direct dependencies), spread along the graph       | dependency map of each package                |
+| deno     | `workspace` imports, spread along the graph (all runtime)        | `dependencies` of each package                |
+| uv       | project and workspace member: dependencies, extras, dev groups   | `dependencies` of each package                |
+| poetry   | `groups`, or `category`, or `pyproject.toml` for older lockfiles | `[package.dependencies]`                      |
+| pdm      | `groups`, with `pyproject.toml` saying which are extras or dev   | `dependencies` requirement strings            |
+| cargo    | `Cargo.toml` of the project and workspace members                | `dependencies` of each package                |
+| composer | `packages` is runtime, `packages-dev` is dev                     | `require` of each package                     |
+| bundler  | `DEPENDENCIES`, with the `Gemfile` marking dev and test groups   | gems listed under each spec                   |
+| nuget    | `Direct` packages are runtime                                    | `dependencies` within each target framework   |
+| pub      | `direct main`, `direct dev`, `direct overridden`                 | not recorded                                  |
+| mix      | `mix.exs`, where `only: :dev` or `:test` marks dev               | dependency list of each hex entry             |
+| gradle   | the configurations a dependency is locked for                    | not recorded                                  |
+| go       | not recorded                                                     | not recorded                                  |
+| swiftpm  | not recorded                                                     | not recorded                                  |
+
+Where a lockfile records neither, vulnerabilities stay `unknown`. Where the scope comes from a
+manifest (`package.json`, `Cargo.toml`, `pyproject.toml`, `Gemfile`, `mix.exs`) and the manifest is
+missing, scopes stay `unknown` as well. Go modules are the notable gap: `go.mod` does not say which
+modules a package actually imports, so reachability for Go needs call-graph analysis such as
+`govulncheck`, which Securock does not do.
+
 ## Caveats by ecosystem
 
 ### Deno
@@ -106,16 +137,16 @@ See [Privacy](/reference/privacy).
 Offline walkthroughs for several resolvers live under
 [`examples/`](https://github.com/securock/securock/tree/main/examples):
 
-| Resolver | Directory |
-| -------- | --------- |
-| npm | [`examples/npm`](https://github.com/securock/securock/tree/main/examples/npm) |
-| pnpm | [`examples/pnpm`](https://github.com/securock/securock/tree/main/examples/pnpm) |
-| Yarn | [`examples/yarn`](https://github.com/securock/securock/tree/main/examples/yarn) |
-| Bun | [`examples/bun`](https://github.com/securock/securock/tree/main/examples/bun) |
-| uv | [`examples/uv`](https://github.com/securock/securock/tree/main/examples/uv) |
-| Poetry | [`examples/poetry`](https://github.com/securock/securock/tree/main/examples/poetry) |
-| Go | [`examples/go`](https://github.com/securock/securock/tree/main/examples/go) |
-| Cargo | [`examples/cargo`](https://github.com/securock/securock/tree/main/examples/cargo) |
+| Resolver | Directory                                                                           |
+| -------- | ----------------------------------------------------------------------------------- |
+| npm      | [`examples/npm`](https://github.com/securock/securock/tree/main/examples/npm)       |
+| pnpm     | [`examples/pnpm`](https://github.com/securock/securock/tree/main/examples/pnpm)     |
+| Yarn     | [`examples/yarn`](https://github.com/securock/securock/tree/main/examples/yarn)     |
+| Bun      | [`examples/bun`](https://github.com/securock/securock/tree/main/examples/bun)       |
+| uv       | [`examples/uv`](https://github.com/securock/securock/tree/main/examples/uv)         |
+| Poetry   | [`examples/poetry`](https://github.com/securock/securock/tree/main/examples/poetry) |
+| Go       | [`examples/go`](https://github.com/securock/securock/tree/main/examples/go)         |
+| Cargo    | [`examples/cargo`](https://github.com/securock/securock/tree/main/examples/cargo)   |
 
 ## Next steps
 

@@ -50,7 +50,13 @@
         "digest": { "type": "string" },
         "source": { "$ref": "#/$defs/artifactSource" },
         "evidence": { "$ref": "#/$defs/evidence" },
-        "trust": { "$ref": "#/$defs/trust" }
+        "trust": { "$ref": "#/$defs/trust" },
+        "scope": { "enum": ["runtime", "dev", "optional"] },
+        "dependencies": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true
+        }
       },
       "if": {
         "properties": {
@@ -159,7 +165,12 @@
       "required": ["id"],
       "additionalProperties": false,
       "properties": {
-        "id": { "type": "string", "minLength": 1 }
+        "id": { "type": "string", "minLength": 1 },
+        "reachable": { "enum": ["yes", "no", "unknown"] },
+        "via": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        }
       }
     },
     "behavior": {

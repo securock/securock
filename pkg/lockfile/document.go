@@ -68,7 +68,30 @@ type Artifact struct {
 	Source   ArtifactSource `json:"source,omitempty" yaml:"source,omitempty"`
 	Evidence Evidence       `json:"evidence" yaml:"evidence"`
 	Trust    Trust          `json:"trust" yaml:"trust"`
+
+	// Scope and Dependencies are recorded only by scans run with --reachability.
+	// Scope says how the package enters the project; empty means the lockfile does not say.
+	Scope Scope `json:"scope,omitempty" yaml:"scope,omitempty"`
+	// Dependencies lists the artifact IDs this package depends on directly.
+	Dependencies []string `json:"dependencies,omitempty" yaml:"dependencies,omitempty"`
 }
+
+type Scope string
+
+const (
+	ScopeRuntime  Scope = "runtime"
+	ScopeDev      Scope = "dev"
+	ScopeOptional Scope = "optional"
+)
+
+// Reachability says whether a vulnerable package is part of what runs in production.
+type Reachability string
+
+const (
+	ReachUnknown Reachability = "unknown"
+	ReachYes     Reachability = "yes"
+	ReachNo      Reachability = "no"
+)
 
 type Evidence struct {
 	Provenance      EvidenceState      `json:"provenance" yaml:"provenance"`
@@ -91,6 +114,11 @@ type VulnEvidence struct {
 
 type Vulnerability struct {
 	ID string `json:"id" yaml:"id"`
+
+	// Reachable and Via are recorded only by scans run with --reachability.
+	// Via is the dependency path from a runtime package to this one, when it is not direct.
+	Reachable Reachability `json:"reachable,omitempty" yaml:"reachable,omitempty"`
+	Via       []string     `json:"via,omitempty" yaml:"via,omitempty"`
 }
 
 // MaliciousEvidence records OpenSSF Malicious Packages / OSV MAL-* reports.

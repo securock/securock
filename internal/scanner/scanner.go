@@ -10,6 +10,7 @@ import (
 	"github.com/securock/securock/internal/network"
 	"github.com/securock/securock/internal/osv"
 	"github.com/securock/securock/internal/provenance"
+	"github.com/securock/securock/internal/reachability"
 	"github.com/securock/securock/internal/trust"
 	"github.com/securock/securock/pkg/lockfile"
 	"github.com/securock/securock/pkg/policy"
@@ -22,6 +23,11 @@ type Options struct {
 	Policy   policy.Document
 	Client   osv.Client
 	Evidence evidence.Collector
+
+	// Reachability records each package's scope and dependencies and marks every
+	// vulnerability reachable, unreachable, or unknown. Off by default so the lockfile
+	// stays small.
+	Reachability bool
 }
 
 type Result struct {
@@ -175,6 +181,10 @@ func Scan(ctx context.Context, opts Options) (*Result, error) {
 				art.Evidence.Malicious.Reports = malware
 			}
 		}
+		if opts.Reachability {
+			art.Scope = lockfile.Scope(dep.Scope)
+			art.Dependencies = dep.DependsOn
+		}
 		trust.Evaluate(&art, opts.Policy)
 		doc.Artifacts = append(doc.Artifacts, art)
 		doc.Source.Ecosystems = append(doc.Source.Ecosystems, dep.Ecosystem)
@@ -184,6 +194,9 @@ func Scan(ctx context.Context, opts Options) (*Result, error) {
 	}
 
 	lockfile.Canonicalize(&doc)
+	if opts.Reachability {
+		reachability.Annotate(&doc)
+	}
 	return &Result{Document: doc}, nil
 }
 

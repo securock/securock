@@ -225,3 +225,67 @@ func TestScanRecordsHealthFromEvidence(t *testing.T) {
 		t.Fatalf("react found %d times", withHealth)
 	}
 }
+
+const reachabilityLock = `{
+  "lockfileVersion": 3,
+  "packages": {
+    "": {},
+    "node_modules/app-lib": { "version": "1.0.0", "resolved": "https://registry.npmjs.org/app-lib/-/app-lib-1.0.0.tgz", "dependencies": { "shared": "^1" } },
+    "node_modules/shared": { "version": "1.0.0", "resolved": "https://registry.npmjs.org/shared/-/shared-1.0.0.tgz" },
+    "node_modules/jest": { "version": "29.0.0", "resolved": "https://registry.npmjs.org/jest/-/jest-29.0.0.tgz", "dev": true }
+  }
+}`
+
+func TestScanReachability(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "package-lock.json"), []byte(reachabilityLock), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	vulns := fakeOSV{vulns: map[string][]lockfile.Vulnerability{
+		"npm:shared@1.0.0": {{ID: "GHSA-shared"}},
+		"npm:jest@29.0.0":  {{ID: "GHSA-jest"}},
+	}}
+
+	scan := func(reach bool) lockfile.Document {
+		result, err := scanner.Scan(context.Background(), scanner.Options{
+			Path:         dir,
+			Policy:       policy.Default(),
+			Client:       vulns,
+			Evidence:     fakeEvidence{},
+			Reachability: reach,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return result.Document
+	}
+
+	off := scan(false)
+	for _, art := range off.Artifacts {
+		if art.Scope != "" || len(art.Dependencies) != 0 {
+			t.Fatalf("%s: scope and dependencies must be left out by default: %+v", art.Subject.Name, art)
+		}
+		for _, v := range art.Evidence.Vulnerabilities.Items {
+			if v.Reachable != "" || v.Via != nil {
+				t.Fatalf("%s: reachability must be left out by default: %+v", art.Subject.Name, v)
+			}
+		}
+	}
+
+	on := scan(true)
+	byName := map[string]lockfile.Artifact{}
+	for _, art := range on.Artifacts {
+		byName[art.Subject.Name] = art
+	}
+	if got := byName["app-lib"]; got.Scope != lockfile.ScopeRuntime || len(got.Dependencies) != 1 || got.Dependencies[0] != "npm:shared@1.0.0" {
+		t.Fatalf("app-lib = %+v", got)
+	}
+	shared := byName["shared"].Evidence.Vulnerabilities.Items[0]
+	if shared.Reachable != lockfile.ReachYes || len(shared.Via) != 2 || shared.Via[0] != "npm:app-lib@1.0.0" {
+		t.Fatalf("shared vulnerability = %+v", shared)
+	}
+	jest := byName["jest"].Evidence.Vulnerabilities.Items[0]
+	if byName["jest"].Scope != lockfile.ScopeDev || jest.Reachable != lockfile.ReachNo {
+		t.Fatalf("jest = %+v, vulnerability %+v", byName["jest"], jest)
+	}
+}

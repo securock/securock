@@ -188,6 +188,21 @@ func writeCapabilities(w io.Writer, caps lockfile.CapabilityEvidence) {
 	}
 }
 
+func writeReachability(w io.Writer, v lockfile.Vulnerability) {
+	switch v.Reachable {
+	case lockfile.ReachYes:
+		if len(v.Via) > 1 {
+			fmt.Fprintf(w, "  %s reachable at runtime via %s\n", v.ID, strings.Join(v.Via, " -> "))
+		} else {
+			fmt.Fprintf(w, "  %s reachable at runtime (direct runtime dependency)\n", v.ID)
+		}
+	case lockfile.ReachNo:
+		fmt.Fprintf(w, "  %s not reachable: development dependency only\n", v.ID)
+	case lockfile.ReachUnknown:
+		fmt.Fprintf(w, "  %s reachability unknown\n", v.ID)
+	}
+}
+
 func writeVulns(w io.Writer, vulns lockfile.VulnEvidence) {
 	switch vulns.State {
 	case lockfile.VulnChecked:
@@ -199,6 +214,9 @@ func writeVulns(w io.Writer, vulns lockfile.VulnEvidence) {
 				ids = append(ids, v.ID)
 			}
 			fmt.Fprintf(w, "✗ known vulnerabilities (%s)\n", strings.Join(ids, ", "))
+			for _, v := range vulns.Items {
+				writeReachability(w, v)
+			}
 		}
 	default:
 		fmt.Fprintln(w, "? vulnerabilities not checked")

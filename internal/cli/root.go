@@ -23,6 +23,8 @@ type options struct {
 	output   string
 
 	exceptions string
+
+	reachability bool
 }
 
 func NewRoot(version, commit, date string) *cobra.Command {
@@ -46,6 +48,7 @@ func NewRoot(version, commit, date string) *cobra.Command {
 	root.PersistentFlags().StringVar(&opts.profile, "profile", "", "built-in policy profile: default or strict")
 	root.PersistentFlags().StringVar(&opts.output, "output", "", "write the report to this file instead of stdout")
 	root.PersistentFlags().StringVar(&opts.exceptions, "exceptions", "", "path to the accepted-findings file (default .securock/exceptions.yaml in the project)")
+	root.PersistentFlags().BoolVar(&opts.reachability, "reachability", false, "record package scope and dependencies, and mark each vulnerability reachable, unreachable, or unknown")
 	root.PersistentFlags().BoolVar(&opts.noFail, "no-fail", false, "always exit 0")
 
 	root.AddCommand(newScanCommand(opts))

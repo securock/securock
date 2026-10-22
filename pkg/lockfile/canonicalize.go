@@ -71,6 +71,8 @@ func Canonicalize(doc *Document) {
 		slices.Sort(art.Evidence.Ownership.Maintainers)
 		art.Evidence.Ownership.Maintainers = compactSorted(art.Evidence.Ownership.Maintainers)
 		slices.Sort(art.Trust.Reasons)
+		slices.Sort(art.Dependencies)
+		art.Dependencies = compactSorted(art.Dependencies)
 	}
 }
 

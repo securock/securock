@@ -66,18 +66,85 @@ func (Ecosystem) Dependencies(path string) ([]core.Dependency, error) {
 			deps = append(deps, dep)
 		}
 	}
+	core.ApplyPackageGraph(deps, packageKey, lock.graph())
 	return deps, nil
+}
+
+func packageKey(dep core.Dependency) string {
+	return core.NormalizePythonName(dep.Name) + "@" + dep.Version
 }
 
 type uvLock struct {
 	Package []uvPackage `toml:"package"`
 }
 
+// graph reads dependencies from the lockfile. The project itself, and any workspace
+// member, appear as packages with a local source; what they declare is what the project
+// asks for: dependencies are runtime, extras optional, and dependency groups development.
+func (l uvLock) graph() core.PackageGraph {
+	g := core.PackageGraph{Edges: map[string][]string{}, Roots: map[string]string{}}
+	byName := map[string][]string{}
+	for _, pkg := range l.Package {
+		if pkg.Name != "" && pkg.Version != "" {
+			name := core.NormalizePythonName(pkg.Name)
+			byName[name] = append(byName[name], name+"@"+pkg.Version)
+		}
+	}
+	resolve := func(dep uvDependency) []string {
+		name := core.NormalizePythonName(dep.Name)
+		if dep.Version != "" {
+			return []string{name + "@" + dep.Version}
+		}
+		return byName[name]
+	}
+
+	for _, pkg := range l.Package {
+		if pkg.Name == "" || pkg.Version == "" {
+			continue
+		}
+		key := core.NormalizePythonName(pkg.Name) + "@" + pkg.Version
+		for _, dep := range pkg.Dependencies {
+			g.Edges[key] = append(g.Edges[key], resolve(dep)...)
+		}
+		if !pkg.Source.local() {
+			continue
+		}
+		for _, dep := range pkg.Dependencies {
+			for _, target := range resolve(dep) {
+				g.Roots[target] = core.MergeScope(g.Roots[target], core.ScopeRuntime)
+			}
+		}
+		for _, group := range pkg.OptionalDependencies {
+			for _, dep := range group {
+				for _, target := range resolve(dep) {
+					g.Roots[target] = core.MergeScope(g.Roots[target], core.ScopeOptional)
+				}
+			}
+		}
+		for _, group := range pkg.DevDependencies {
+			for _, dep := range group {
+				for _, target := range resolve(dep) {
+					g.Roots[target] = core.MergeScope(g.Roots[target], core.ScopeDev)
+				}
+			}
+		}
+	}
+	return g
+}
+
+type uvDependency struct {
+	Name    string `toml:"name"`
+	Version string `toml:"version"`
+}
+
 type uvPackage struct {
-	Name    string   `toml:"name"`
-	Version string   `toml:"version"`
-	Source  uvSource `toml:"source"`
-	SDist   *struct {
+	Name                 string                    `toml:"name"`
+	Version              string                    `toml:"version"`
+	Source               uvSource                  `toml:"source"`
+	Dependencies         []uvDependency            `toml:"dependencies"`
+	OptionalDependencies map[string][]uvDependency `toml:"optional-dependencies"`
+	DevDependencies      map[string][]uvDependency `toml:"dev-dependencies"`
+	SDist                *struct {
 		URL  string `toml:"url"`
 		Hash string `toml:"hash"`
 	} `toml:"sdist"`
@@ -95,6 +162,12 @@ type uvSource struct {
 	Directory string `toml:"directory"`
 	Editable  string `toml:"editable"`
 	URL       string `toml:"url"`
+	Virtual   string `toml:"virtual"`
+}
+
+// local reports whether the package is the project itself or a workspace member.
+func (s uvSource) local() bool {
+	return s.Virtual != "" || s.Editable != ""
 }
 
 func classify(src uvSource) (kind, registry string) {
