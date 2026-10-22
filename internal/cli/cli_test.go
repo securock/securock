@@ -154,3 +154,23 @@ func TestAuditMinReleaseAgeFlag(t *testing.T) {
 		}
 	}
 }
+
+func TestExamplesExportAndVerifyAnSBOM(t *testing.T) {
+	isolateHome(t)
+	for _, name := range []string{"npm", "pnpm", "yarn", "bun", "uv", "poetry", "go", "cargo"} {
+		t.Run(name, func(t *testing.T) {
+			dir := filepath.Join("..", "..", "examples", name)
+			for _, spec := range []string{"cyclonedx", "spdx"} {
+				bom := runCLI(t, "sbom", "export", dir, "--spec", spec)
+				file := filepath.Join(t.TempDir(), spec+".json")
+				if err := os.WriteFile(file, bom, 0o644); err != nil {
+					t.Fatal(err)
+				}
+				out := runCLI(t, "sbom", "verify", file, dir, "--format", "json")
+				if !bytes.Contains(out, []byte(`"findings": []`)) {
+					t.Fatalf("%s %s: %s", name, spec, out)
+				}
+			}
+		})
+	}
+}
