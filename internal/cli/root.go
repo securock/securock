@@ -33,7 +33,7 @@ func NewRoot(version, commit, date string) *cobra.Command {
 
 	root.PersistentFlags().BoolVar(&opts.offline, "offline", false, "skip remote lookups")
 	root.PersistentFlags().StringVar(&opts.network, "network", "", "network mode: public-only, offline, or allow-all")
-	root.PersistentFlags().StringVar(&opts.format, "format", "text", "output format: text or json (audit also supports sarif)")
+	root.PersistentFlags().StringVar(&opts.format, "format", "text", "output format: text or json (audit and doctor also support sarif)")
 	root.PersistentFlags().StringVar(&opts.lockPath, "lock", "", "path to securock.lock")
 	root.PersistentFlags().StringVar(&opts.policy, "policy", "", "path to a policy file")
 	root.PersistentFlags().StringVar(&opts.profile, "profile", "", "built-in policy profile: default or strict")
@@ -45,6 +45,7 @@ func NewRoot(version, commit, date string) *cobra.Command {
 	root.AddCommand(newVerifyCommand(opts))
 	root.AddCommand(newExplainCommand(opts))
 	root.AddCommand(newAuditCommand(opts))
+	root.AddCommand(newDoctorCommand(opts))
 	root.AddCommand(&cobra.Command{
 		Use:   "version",
 		Short: "Print the version",

@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://securock.dev/schema/doctor-report.schema.json",
+  "title": "securock doctor report",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["tool", "findings"],
+  "properties": {
+    "tool": { "type": "string" },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "severity", "title"],
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "severity": { "enum": ["critical", "high", "medium", "low", "info"] },
+          "title": { "type": "string", "minLength": 1 },
+          "detail": { "type": "string" },
+          "subject": { "type": "string" },
+          "remediation": { "type": "string" }
+        }
+      }
+    }
+  }
+}
