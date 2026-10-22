@@ -8,10 +8,10 @@
     "docs:preview": "vitepress preview"
   },
   "devDependencies": {
-    "vitepress": "^1.6.4",
+    "vitepress": "2.0.0-alpha.20",
     "wrangler": "^4.151.3"
   },
-  "overrides": {
-    "vite": "6.4.3"
+  "engines": {
+    "node": "^20.19.0 || >=22.12.0"
   }
 }
