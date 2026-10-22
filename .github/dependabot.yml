@@ -8,6 +8,10 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    groups:
+      codeql-action:
+        patterns:
+          - github/codeql-action/*
   - package-ecosystem: npm
     directory: /website
     schedule:
