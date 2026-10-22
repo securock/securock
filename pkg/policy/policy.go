@@ -49,6 +49,7 @@ type Rules struct {
 	Malicious                MaliciousRule     `json:"malicious,omitempty" yaml:"malicious,omitempty"`
 	Capabilities             CapabilityRule    `json:"capabilities,omitempty" yaml:"capabilities,omitempty"`
 	Ownership                OwnershipRule     `json:"ownership,omitempty" yaml:"ownership,omitempty"`
+	Health                   HealthRule        `json:"health,omitempty" yaml:"health,omitempty"`
 }
 
 type EvidenceRule struct {
@@ -95,6 +96,21 @@ type OwnershipRule struct {
 	MaintainerAdded   ChangeAction `json:"maintainer_added,omitempty" yaml:"maintainer_added,omitempty"`
 	MaintainerRemoved ChangeAction `json:"maintainer_removed,omitempty" yaml:"maintainer_removed,omitempty"`
 }
+
+// HealthRule restricts packages by what the registry reports about the release.
+// Each field is "allow" (or empty) or "deny".
+type HealthRule struct {
+	// Deprecated denies releases the maintainers marked deprecated, or that PyPI yanked.
+	Deprecated string `json:"deprecated,omitempty" yaml:"deprecated,omitempty"`
+	// Typosquat denies package names that look like a misspelling of a popular package.
+	Typosquat string `json:"typosquat,omitempty" yaml:"typosquat,omitempty"`
+}
+
+func (r HealthRule) DenyDeprecated() bool { return r.Deprecated == "deny" }
+
+func (r HealthRule) DenyTyposquat() bool { return r.Typosquat == "deny" }
+
+func (r HealthRule) Configured() bool { return r.Deprecated != "" || r.Typosquat != "" }
 
 func Default() Document {
 	return Document{
@@ -204,6 +220,12 @@ type canonicalRules struct {
 	Malicious                *canonicalVulnRule  `json:"malicious,omitempty"`
 	Capabilities             *canonicalCapRule   `json:"capabilities,omitempty"`
 	Ownership                *canonicalOwnerRule `json:"ownership,omitempty"`
+	Health                   *canonicalHealth    `json:"health,omitempty"`
+}
+
+type canonicalHealth struct {
+	Deprecated string `json:"deprecated,omitempty"`
+	Typosquat  string `json:"typosquat,omitempty"`
 }
 
 type canonicalEvidence struct {
@@ -252,6 +274,7 @@ func canonical(doc Document) canonicalDocument {
 			Malicious:                canonicalMalicious(doc.Rules.Malicious),
 			Capabilities:             canonicalCapabilities(doc.Rules.Capabilities),
 			Ownership:                canonicalOwnership(doc.Rules.Ownership),
+			Health:                   canonicalHealthRule(doc.Rules.Health),
 		},
 	}
 }
@@ -315,6 +338,13 @@ func canonicalOwnership(rule OwnershipRule) *canonicalOwnerRule {
 		MaintainerAdded:   rule.MaintainerAdded,
 		MaintainerRemoved: rule.MaintainerRemoved,
 	}
+}
+
+func canonicalHealthRule(rule HealthRule) *canonicalHealth {
+	if !rule.Configured() {
+		return nil
+	}
+	return &canonicalHealth{Deprecated: rule.Deprecated, Typosquat: rule.Typosquat}
 }
 
 func canonicalRegistries(in map[string][]string) map[string][]string {

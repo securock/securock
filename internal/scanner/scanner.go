@@ -164,6 +164,7 @@ func Scan(ctx context.Context, opts Options) (*Result, error) {
 			if rec.Chain.State != "" {
 				art.Evidence.Chain = rec.Chain
 			}
+			art.Evidence.Health = rec.Health
 		}
 		if allowed[key] {
 			art.Evidence.Vulnerabilities.State = lockfile.VulnChecked

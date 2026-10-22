@@ -92,6 +92,42 @@ Digest comes from the language lockfile. OSV runs when
 `public-only` can prove a public origin. Provenance, signature,
 capability, behavior, ownership, and chain usually stay `unknown`.
 
+## Release health
+
+Health describes the release itself rather than who published it. It
+is recorded for npm-family packages and PyPI:
+
+| Field        | Source                                                                   |
+| ------------ | ------------------------------------------------------------------------ |
+| `released`   | Publish day (`YYYY-MM-DD`). npm: the package document; PyPI: file upload |
+| `deprecated` | The maintainers' deprecation message, or `yanked` and its reason on PyPI |
+| `license`    | Declared license, preferably an SPDX expression                          |
+
+`health` is omitted from the lockfile when the registry did not answer
+(offline, private registry, unsupported ecosystem), so absence means
+"not checked", never "healthy". For npm, `released` is also omitted for
+packages whose full package document exceeds the 2 MiB response limit,
+which is typical of packages with very long histories.
+
+Health is informational: a change in `released` or `license` is not
+trust drift. It affects trust only through the policy rule
+[`health`](/guide/policy#health-and-typosquat-gates).
+
+`securock audit` turns health into findings, and adds a name check that
+needs no registry:
+
+| Finding              | Severity | When                                                  |
+| -------------------- | -------- | ----------------------------------------------------- |
+| `deprecated-package` | medium   | The release is deprecated or yanked                   |
+| `stale-release`      | low      | The release is more than two years old                |
+| `typosquat-suspect`  | medium   | npm or PyPI name within one edit of a popular package |
+
+`typosquat-suspect` compares each name against a built-in list of popular
+packages (separator variants such as `lo-dash`, or one typo, swap, or
+missing letter). Scoped npm names are skipped. It is a signal to look at,
+not proof: a real package can have a name close to a popular one. Use
+`securock accept` to record that you checked.
+
 ## Offline and private registries
 
 `--offline` leaves remote evidence `unknown`. Private registries are

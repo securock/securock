@@ -97,6 +97,28 @@ When ownership rules are omitted, any ownership change remains trust
 drift. When any ownership action is set, unset actions default to
 `deny` (fail-closed).
 
+### Health and typosquat gates
+
+```yaml
+version: 1
+rules:
+  require_no_vulnerabilities: true
+  health:
+    deprecated: deny
+    typosquat: deny
+```
+
+| Rule         | Effect when `deny`                                                           |
+| ------------ | ---------------------------------------------------------------------------- |
+| `deprecated` | Deprecated or yanked releases are `untrusted`; unchecked health is `unknown` |
+| `typosquat`  | Names within one edit of a popular npm or PyPI package are `untrusted`       |
+
+Both default to allow and are not part of the `default` or `strict`
+profiles. Only the age of a release is left out on purpose: trust
+status must not change just because time passed, so `securock audit`
+reports `stale-release` instead. See
+[Release health](/guide/evidence#release-health).
+
 ### Provenance origin allowlists
 
 To require verified provenance from an expected origin:

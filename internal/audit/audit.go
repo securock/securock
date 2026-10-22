@@ -2,22 +2,32 @@ package audit
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/securock/securock/internal/finding"
+	"github.com/securock/securock/internal/typosquat"
 	"github.com/securock/securock/pkg/lockfile"
 )
+
+// staleAfter is how long after its release a version is reported as stale.
+const staleAfter = 2 * 365 * 24 * time.Hour
 
 // Run turns the evidence recorded for each artifact into severity-ranked findings.
 // Unchecked evidence is reported as info: absence of a check is not a defect.
 func Run(doc lockfile.Document) finding.Report {
+	return RunAt(doc, time.Now())
+}
+
+// RunAt is Run with an explicit clock, for the age-based findings.
+func RunAt(doc lockfile.Document, now time.Time) finding.Report {
 	var out []finding.Finding
 	for _, art := range doc.Artifacts {
-		out = append(out, artifact(art)...)
+		out = append(out, artifact(art, now)...)
 	}
 	return finding.New("audit", out)
 }
 
-func artifact(art lockfile.Artifact) []finding.Finding {
+func artifact(art lockfile.Artifact, now time.Time) []finding.Finding {
 	subject := art.ArtifactID()
 	ev := art.Evidence
 	var out []finding.Finding
@@ -53,6 +63,8 @@ func artifact(art lockfile.Artifact) []finding.Finding {
 		add("missing-signature", finding.SeverityLow, "No signature", "", "Prefer signed releases.")
 	}
 
+	health(art, now, add)
+
 	if ev.Capabilities.State == lockfile.CapChecked {
 		caps := ev.Capabilities
 		if enabled(caps.InstallScripts) {
@@ -72,6 +84,24 @@ func artifact(art lockfile.Artifact) []finding.Finding {
 		}
 	}
 	return out
+}
+
+// health reports what the registry says about the release, plus a name check that
+// needs no registry. Findings here are signals to look at, not proof of a problem.
+func health(art lockfile.Artifact, now time.Time, add func(id string, sev finding.Severity, title, detail, fix string)) {
+	if target, ok := typosquat.Check(art.Subject.Ecosystem, art.Subject.Name); ok {
+		add("typosquat-suspect", finding.SeverityMedium, "Name resembles a popular package", "similar to "+target, "Check that this is the package you meant to install.")
+	}
+	h := art.Evidence.Health
+	if h == nil {
+		return
+	}
+	if h.Deprecated != "" {
+		add("deprecated-package", finding.SeverityMedium, "Release is deprecated", h.Deprecated, "Move to a maintained version or an alternative.")
+	}
+	if released, err := time.Parse("2006-01-02", h.Released); err == nil && now.Sub(released) > staleAfter {
+		add("stale-release", finding.SeverityLow, "Release is more than two years old", "published "+h.Released, "Check that the project is still maintained.")
+	}
 }
 
 func enabled(b *bool) bool {

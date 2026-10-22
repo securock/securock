@@ -59,6 +59,8 @@ not trusted.
   `sbom verify` against the lockfile
 - `accept` records reviewed findings with a reason and expiry in
   `.securock/exceptions.yaml`; `audit` suppresses them until they lapse
+- Release health (deprecated, release day, license) for npm and PyPI,
+  typosquat-suspect names, and optional `health` policy gates
 - GitHub Action that can run an attested release binary
 - JSON reports (`--format json`) with exit `0` / `1` / `2`
 
