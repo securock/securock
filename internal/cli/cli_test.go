@@ -114,3 +114,27 @@ func TestAuditFailOn(t *testing.T) {
 		t.Fatal("expected an error for an unknown severity")
 	}
 }
+
+func TestDoctor(t *testing.T) {
+	isolateHome(t)
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, ".npmrc"), []byte("registry=http://example.com/\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	js := runCLI(t, "doctor", dir, "--no-fail", "--format", "json")
+	if err := schemas.Validate("doctor-report.schema.json", js); err != nil {
+		t.Fatalf("doctor json:\n%s\n%v", js, err)
+	}
+	if !bytes.Contains(js, []byte("registry-insecure-http")) {
+		t.Fatalf("missing finding:\n%s", js)
+	}
+
+	root := cli.NewRoot("test", "none", "unknown")
+	root.SetOut(&bytes.Buffer{})
+	root.SetErr(&bytes.Buffer{})
+	root.SetArgs([]string{"doctor", dir})
+	if err := root.Execute(); err == nil {
+		t.Fatal("expected a failure for a high severity finding")
+	}
+}

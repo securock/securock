@@ -14,6 +14,8 @@ securock lock [path]
 securock diff [path]
 securock verify [path]
 securock explain PACKAGE [path]
+securock audit [path]
+securock doctor [path]
 securock version
 ```
 
@@ -30,6 +32,8 @@ verified. The CLI prints this as `trusted (under active policy)`.
 | `diff`    | Show trust drift versus the lockfile                       |
 | `verify`  | Fail on trust-relevant drift versus the lockfile           |
 | `explain` | Print a trust checklist for one package                    |
+| `audit`   | Report dependency findings ranked by severity              |
+| `doctor`  | Check the project setup for security problems              |
 | `version` | Print the build version                                    |
 
 ### `scan` vs `verify`
@@ -50,6 +54,20 @@ then `verify`.
 chain, ownership, capabilities, vulnerabilities, and malicious-package
 checks for one subject under the active policy.
 
+`audit` turns scan evidence into findings: malicious packages are
+`critical`, known vulnerabilities are `high`, and missing digests,
+provenance or signatures rank lower. Evidence that was not checked is
+reported as `info`, so offline runs always have `info` findings.
+
+`doctor` checks the setup around securock: the lockfile and policy,
+registry config (`.npmrc`, `.yarnrc.yml`, `nuget.config`) for plain
+http, disabled TLS and literal credentials, workflow actions that are
+not pinned to a commit SHA, and missing repository rulesets.
+
+Both commands accept `--fail-on SEVERITY` (`critical`, `high`,
+`medium`, `low` or `info`; default `high`) and exit `1` when a finding
+is at or above it.
+
 ## Shared flags
 
 | Flag        | Meaning                                                      |
@@ -59,7 +77,7 @@ checks for one subject under the active policy.
 | `--policy`  | Path to a policy file                                        |
 | `--profile` | Built-in policy: `default` or `strict` (not with `--policy`) |
 | `--lock`    | Path to `securock.lock` (for `lock` / `diff` / `verify`)     |
-| `--format`  | `text` (default) or `json`                                   |
+| `--format`  | `text` (default) or `json`; `audit` and `doctor` also `sarif` |
 | `--no-fail` | Always exit `0`                                              |
 
 `--offline` records vulnerability, malicious, capability, behavior,
@@ -83,6 +101,7 @@ securock scan --format json
 securock diff --format json
 securock verify --format json
 securock explain react --format json
+securock audit --format sarif
 ```
 
 - `scan --format json` emits the lock document shape.
@@ -91,7 +110,8 @@ securock explain react --format json
 
 Machine-readable schemas live in the repository under
 [`schemas/`](https://github.com/securock/securock/tree/main/schemas)
-(`securock-lock`, `scan-report`, `diff-report`, `verify-report`).
+(`securock-lock`, `scan-report`, `diff-report`, `verify-report`,
+`audit-report`, `doctor-report`).
 
 ## Typical workflow
 
