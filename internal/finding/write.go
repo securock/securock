@@ -33,12 +33,16 @@ func WriteJSON(w io.Writer, r Report) error {
 
 func WriteText(w io.Writer, r Report) {
 	counts := r.Count()
-	fmt.Fprintf(w, "%d findings", len(r.Findings))
+	suppressed := r.Suppressed()
+	fmt.Fprintf(w, "%d findings", len(r.Findings)-suppressed)
 	var parts []string
 	for _, sev := range slices.Backward(order) {
 		if n := counts[sev]; n > 0 {
 			parts = append(parts, fmt.Sprintf("%d %s", n, sev))
 		}
+	}
+	if suppressed > 0 {
+		parts = append(parts, fmt.Sprintf("%d suppressed", suppressed))
 	}
 	if len(parts) > 0 {
 		fmt.Fprintf(w, " (%s)", strings.Join(parts, ", "))
@@ -46,7 +50,11 @@ func WriteText(w io.Writer, r Report) {
 	fmt.Fprintln(w)
 
 	for _, f := range r.Findings {
-		fmt.Fprintf(w, "\n[%s] %s  %s\n", f.Severity, f.ID, f.Title)
+		tag := string(f.Severity)
+		if f.Suppressed != nil {
+			tag += ", suppressed"
+		}
+		fmt.Fprintf(w, "\n[%s] %s  %s\n", tag, f.ID, f.Title)
 		if f.Subject != "" {
 			fmt.Fprintf(w, "  subject  %s\n", f.Subject)
 		}
@@ -55,6 +63,13 @@ func WriteText(w io.Writer, r Report) {
 		}
 		if f.Remediation != "" {
 			fmt.Fprintf(w, "  fix      %s\n", f.Remediation)
+		}
+		if s := f.Suppressed; s != nil {
+			fmt.Fprintf(w, "  accepted until %s: %s", s.Expires, s.Reason)
+			if s.Approver != "" {
+				fmt.Fprintf(w, " (%s)", s.Approver)
+			}
+			fmt.Fprintln(w)
 		}
 	}
 }
@@ -98,6 +113,14 @@ type sarifResult struct {
 	Locations           []sarifLocation   `json:"locations,omitempty"`
 	PartialFingerprints map[string]string `json:"partialFingerprints"`
 	Properties          sarifProperties   `json:"properties"`
+	// Suppressions marks accepted findings so code scanning shows them as dismissed.
+	Suppressions []sarifSuppression `json:"suppressions,omitempty"`
+}
+
+type sarifSuppression struct {
+	Kind          string `json:"kind"`
+	Status        string `json:"status"`
+	Justification string `json:"justification"`
 }
 
 type sarifProperties struct {
@@ -165,6 +188,13 @@ func WriteSARIF(w io.Writer, r Report) error {
 		}
 		if loc, ok := sarifLocationOf(r.Location, f.Subject); ok {
 			res.Locations = []sarifLocation{loc}
+		}
+		if s := f.Suppressed; s != nil {
+			why := s.Reason + " (accepted until " + s.Expires
+			if s.Approver != "" {
+				why += " by " + s.Approver
+			}
+			res.Suppressions = []sarifSuppression{{Kind: "external", Status: "accepted", Justification: why + ")"}}
 		}
 		results = append(results, res)
 	}

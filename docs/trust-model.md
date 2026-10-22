@@ -170,6 +170,27 @@ Deno JSR and HTTPS URL artifacts record integrity from `deno.lock`.
 OSV does not cover those ecosystems yet, so vulnerability state stays
 `unknown`.
 
+## Accepted findings
+
+`securock accept` records that a team reviewed a finding and accepts it
+until a date. Accepted findings are stored in
+`.securock/exceptions.yaml`, separately from the policy and from
+`securock.lock`.
+
+An exception does not make an artifact `trusted`. It does not change
+`securock.lock`, the policy digest, or any trust status, and `scan`,
+`verify`, and `diff` ignore it. It only suppresses a finding in `audit`
+output (and `--fail-on`), where it stays visible as suppressed with its
+reason, approver, and expiry. Keeping exceptions out of the lockfile keeps
+the lockfile deterministic: an exception that lapses with time never
+rewrites it.
+
+Every exception needs a reason and an expiry date. When one lapses, the
+finding comes back and `audit` reports `exception-expired`, so an
+acceptance cannot become permanent by neglect. `securock doctor` reports
+expired exceptions, those expiring within 14 days, and exceptions with no
+approver.
+
 ## What Securock does not guarantee
 
 - that a trusted package is benign

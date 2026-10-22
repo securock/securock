@@ -57,6 +57,8 @@ not trusted.
   or ambiguous `GOPROXY` lists stay on-machine ([privacy](docs/privacy.md))
 - CycloneDX 1.6 / SPDX 2.3 SBOM export with trust evidence, and
   `sbom verify` against the lockfile
+- `accept` records reviewed findings with a reason and expiry in
+  `.securock/exceptions.yaml`; `audit` suppresses them until they lapse
 - GitHub Action that can run an attested release binary
 - JSON reports (`--format json`) with exit `0` / `1` / `2`
 
@@ -125,6 +127,7 @@ Cargo under [`examples/`](examples/).
 | `securock audit`   | Report dependency findings by severity            |
 | `securock doctor`  | Check the project setup for security problems     |
 | `securock sbom`    | Export `securock.lock` as CycloneDX or SPDX, or verify one |
+| `securock accept`  | Accept a finding until a date, with a reason      |
 | `securock version` | Print the build version                           |
 
 | Flag / exit | Meaning |
@@ -138,6 +141,7 @@ Cargo under [`examples/`](examples/).
 | `--format sarif` | SARIF 2.1.0 on every report command, for GitHub code scanning |
 | `--output` | Write the report to a file instead of stdout (also on exit `1`) |
 | `--fail-on` | `audit` and `doctor`. Exit `1` at or above this severity (default `high`) |
+| `--exceptions` | Accepted-findings file (default `.securock/exceptions.yaml`) |
 | `--no-fail` | Always exit `0` |
 | Exit `0` | Success / no trust drift |
 | `1` | Trust violation |
