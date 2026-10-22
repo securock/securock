@@ -4,6 +4,7 @@ import (
 	"cmp"
 	"context"
 	"slices"
+	"sync"
 
 	"github.com/securock/securock/internal/ecosystem"
 	"github.com/securock/securock/internal/evidence"
@@ -90,18 +91,40 @@ func Scan(ctx context.Context, opts Options) (*Result, error) {
 		if client == nil {
 			client = osv.New()
 		}
-		vulns, err = client.Query(ctx, query)
-		if err != nil {
-			return nil, err
-		}
-		details = advisoryDetails(ctx, client, vulns)
 		collector := opts.Evidence
 		if collector == nil {
 			collector = evidence.NewDefault()
 		}
-		ev, err = collector.Collect(ctx, query)
+
+		// Evidence collection does not depend on the OSV results, so the two run
+		// together. Either failure cancels the other; the OSV error wins when both fail
+		// so the reported error does not depend on timing.
+		ctx, cancel := context.WithCancel(ctx)
+		defer cancel()
+		var (
+			wg    sync.WaitGroup
+			evErr error
+		)
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			ev, evErr = collector.Collect(ctx, query)
+			if evErr != nil {
+				cancel()
+			}
+		}()
+		vulns, err = client.Query(ctx, query)
+		if err == nil {
+			details = advisoryDetails(ctx, client, vulns)
+		} else {
+			cancel()
+		}
+		wg.Wait()
 		if err != nil {
 			return nil, err
+		}
+		if evErr != nil {
+			return nil, evErr
 		}
 	}
 

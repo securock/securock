@@ -2,9 +2,11 @@ package scanner_test
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/securock/securock/internal/ecosystem"
 	"github.com/securock/securock/internal/evidence"
@@ -361,5 +363,63 @@ func TestScanWorksWithAClientThatCannotLookUpAdvisories(t *testing.T) {
 				t.Fatalf("unexpected detail: %+v", v)
 			}
 		}
+	}
+}
+
+// rendezvousOSV answers only once the evidence collector has started, so a scan that runs
+// the two one after the other never finishes.
+type rendezvousOSV struct {
+	started <-chan struct{}
+	err     error
+}
+
+func (r rendezvousOSV) Query(ctx context.Context, deps []ecosystem.Dependency) (map[string][]lockfile.Vulnerability, error) {
+	select {
+	case <-r.started:
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	case <-time.After(5 * time.Second):
+		return nil, errors.New("evidence collection did not start while OSV was queried")
+	}
+	if r.err != nil {
+		return nil, r.err
+	}
+	return map[string][]lockfile.Vulnerability{}, nil
+}
+
+type signalEvidence struct {
+	started chan<- struct{}
+	err     error
+}
+
+func (s signalEvidence) Collect(_ context.Context, _ []ecosystem.Dependency) (map[string]evidence.Record, error) {
+	close(s.started)
+	return map[string]evidence.Record{}, s.err
+}
+
+func TestScanRunsEvidenceAlongsideOSV(t *testing.T) {
+	started := make(chan struct{})
+	_, err := scanner.Scan(context.Background(), scanner.Options{
+		Path:     "../ecosystem/npm/testdata",
+		Policy:   policy.Default(),
+		Client:   rendezvousOSV{started: started},
+		Evidence: signalEvidence{started: started},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestScanReportsOSVErrorOverEvidenceError(t *testing.T) {
+	started := make(chan struct{})
+	osvErr := errors.New("osv down")
+	_, err := scanner.Scan(context.Background(), scanner.Options{
+		Path:     "../ecosystem/npm/testdata",
+		Policy:   policy.Default(),
+		Client:   rendezvousOSV{started: started, err: osvErr},
+		Evidence: signalEvidence{started: started, err: errors.New("evidence down")},
+	})
+	if !errors.Is(err, osvErr) {
+		t.Fatalf("err = %v, want %v", err, osvErr)
 	}
 }
