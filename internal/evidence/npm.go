@@ -115,6 +115,11 @@ func (c *NPM) lookup(ctx context.Context, dep ecosystem.Dependency) Record {
 	}
 	rec.Signature = c.verifySignature(ctx, c.registryFor(dep), dep.Name, dep.Version, meta.Integrity, dep.Digest, meta.Signatures)
 	rec.Ownership = meta.Ownership
+	if meta.Health != nil {
+		health := *meta.Health
+		health.Released = c.released(ctx, dep)
+		rec.Health = &health
+	}
 
 	findings := capability.FromMetadata(meta.Capability)
 	// Install scripts imply shell at install time even without a source scan.
@@ -147,6 +152,7 @@ type versionMeta struct {
 	Ownership  lockfile.OwnershipEvidence
 	Capability capability.Metadata
 	Tarball    string
+	Health     *lockfile.HealthEvidence
 }
 
 func (c *NPM) versionMeta(ctx context.Context, dep ecosystem.Dependency) (versionMeta, bool) {
@@ -197,12 +203,35 @@ func (c *NPM) versionMeta(ctx context.Context, dep ecosystem.Dependency) (versio
 	}
 
 	return versionMeta{
+		Health:     &lockfile.HealthEvidence{Deprecated: npmDeprecated(parsed.Deprecated), License: npmLicense(parsed.License)},
 		Signatures: parsed.Dist.Signatures,
 		Integrity:  parsed.Dist.Integrity,
 		Ownership:  owner,
 		Capability: capMeta,
 		Tarball:    parsed.Dist.Tarball,
 	}, true
+}
+
+// released returns the day this version was published. Only the full package document
+// carries publish times, and for packages with long histories it exceeds the response
+// size limit, in which case the date is simply left unknown.
+func (c *NPM) released(ctx context.Context, dep ecosystem.Dependency) string {
+	endpoint := strings.TrimRight(c.registryFor(dep), "/") + "/" + encodeNPMName(dep.Name)
+	res, err := c.get(ctx, endpoint)
+	if err != nil {
+		return ""
+	}
+	defer res.Body.Close()
+	if res.StatusCode != http.StatusOK {
+		return ""
+	}
+	var parsed struct {
+		Time map[string]string `json:"time"`
+	}
+	if err := json.NewDecoder(res.Body).Decode(&parsed); err != nil {
+		return ""
+	}
+	return day(parsed.Time[dep.Version])
 }
 
 func (c *NPM) scanTarball(ctx context.Context, dep ecosystem.Dependency, tarball string, findings *capability.Findings) error {
@@ -343,6 +372,8 @@ type npmVersionDoc struct {
 	Maintainers          []npmPerson       `json:"maintainers"`
 	Author               softPerson        `json:"author"`
 	NPMUser              *npmPerson        `json:"_npmUser"`
+	Deprecated           json.RawMessage   `json:"deprecated"`
+	License              json.RawMessage   `json:"license"`
 	Dist                 struct {
 		Signatures []npmSignature `json:"signatures"`
 		Integrity  string         `json:"integrity"`

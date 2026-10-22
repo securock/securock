@@ -77,3 +77,43 @@ func TestExplainNotFound(t *testing.T) {
 		t.Fatal("expected error")
 	}
 }
+
+func TestExplainHealth(t *testing.T) {
+	art := func(name string, h *lockfile.HealthEvidence) lockfile.Artifact {
+		return lockfile.Artifact{
+			Subject:  lockfile.Subject{Ecosystem: "npm", Name: name},
+			Version:  "1.0.0",
+			Evidence: lockfile.Evidence{Health: h},
+		}
+	}
+	doc := lockfile.Document{Artifacts: []lockfile.Artifact{
+		art("steady", &lockfile.HealthEvidence{Released: "2025-01-31", License: "MIT"}),
+		art("retired", &lockfile.HealthEvidence{Deprecated: "use steady"}),
+		art("unchecked", nil),
+		art("lodahs", nil),
+	}}
+	tests := []struct {
+		query string
+		want  []string
+	}{
+		{"steady", []string{"✓ release is not deprecated", "released   2025-01-31", "license    MIT"}},
+		{"retired", []string{"✗ release is deprecated (use steady)"}},
+		{"unchecked", []string{"? release health not checked"}},
+		{"lodahs", []string{"✗ name resembles a popular package (lodash)"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.query, func(t *testing.T) {
+			res, err := explain.Find(doc, tt.query)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var buf bytes.Buffer
+			explain.Write(&buf, res)
+			for _, want := range tt.want {
+				if !strings.Contains(buf.String(), want) {
+					t.Fatalf("missing %q in:\n%s", want, buf.String())
+				}
+			}
+		})
+	}
+}

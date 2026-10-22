@@ -79,6 +79,9 @@ type Evidence struct {
 	Behavior        BehaviorEvidence   `json:"behavior" yaml:"behavior"`
 	Ownership       OwnershipEvidence  `json:"ownership" yaml:"ownership"`
 	Chain           ChainEvidence      `json:"chain" yaml:"chain"`
+	// Health is nil when the registry was not asked or did not answer, so a lockfile
+	// never claims a package is healthy without having looked.
+	Health *HealthEvidence `json:"health,omitempty" yaml:"health,omitempty"`
 }
 
 type VulnEvidence struct {
@@ -157,6 +160,17 @@ type OwnershipEvidence struct {
 	State       CapState `json:"state" yaml:"state"`
 	Publisher   string   `json:"publisher,omitempty" yaml:"publisher,omitempty"`
 	Maintainers []string `json:"maintainers,omitempty" yaml:"maintainers,omitempty"`
+}
+
+// HealthEvidence records what the registry says about the release itself.
+type HealthEvidence struct {
+	// Released is the day this version was published, as YYYY-MM-DD. Empty when unknown.
+	Released string `json:"released,omitempty" yaml:"released,omitempty"`
+	// Deprecated is the maintainer's deprecation message, or "yanked" with its reason
+	// on PyPI. Empty means the registry reports the release as supported.
+	Deprecated string `json:"deprecated,omitempty" yaml:"deprecated,omitempty"`
+	// License is the declared license, preferably an SPDX expression.
+	License string `json:"license,omitempty" yaml:"license,omitempty"`
 }
 
 type Trust struct {

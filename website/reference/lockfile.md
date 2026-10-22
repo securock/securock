@@ -105,6 +105,11 @@ the name, version, and digest stay the same.
 skipped (offline or unsupported ecosystem). A change to any of them is
 trust drift.
 
+`health` is optional. It records the release day, deprecation message,
+and license when the registry answered, and is omitted otherwise. It is
+informational and not trust drift on its own. See
+[Release health](/guide/evidence#release-health).
+
 Vulnerability evidence is not a bare list. `state: checked` means OSV
 was queried. `unknown` means it was not. An empty `items` list with
 `state: unknown` is not the same as zero vulnerabilities.

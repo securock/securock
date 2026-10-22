@@ -187,3 +187,41 @@ func (c *countingOSV) Query(_ context.Context, deps []ecosystem.Dependency) (map
 	c.n += len(deps)
 	return map[string][]lockfile.Vulnerability{}, nil
 }
+
+func TestScanRecordsHealthFromEvidence(t *testing.T) {
+	health := &lockfile.HealthEvidence{Released: "2025-01-31", License: "MIT", Deprecated: "use x"}
+	pol := policy.Default()
+	pol.Rules.Health = policy.HealthRule{Deprecated: "deny"}
+
+	result, err := scanner.Scan(context.Background(), scanner.Options{
+		Path:   "../ecosystem/npm/testdata",
+		Policy: pol,
+		Client: fakeOSV{},
+		Evidence: fakeEvidence{
+			"npm:react@19.2.0": {Health: health},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var withHealth int
+	for _, art := range result.Document.Artifacts {
+		switch art.Subject.Name {
+		case "react":
+			withHealth++
+			if art.Evidence.Health == nil || *art.Evidence.Health != *health {
+				t.Fatalf("react health = %+v", art.Evidence.Health)
+			}
+			if art.Trust.Status != lockfile.StatusUntrusted {
+				t.Fatalf("a deprecated release must be untrusted under the rule: %s %v", art.Trust.Status, art.Trust.Reasons)
+			}
+		default:
+			if art.Evidence.Health != nil {
+				t.Fatalf("%s: health must stay nil when nothing was collected: %+v", art.Subject.Name, art.Evidence.Health)
+			}
+		}
+	}
+	if withHealth != 1 {
+		t.Fatalf("react found %d times", withHealth)
+	}
+}

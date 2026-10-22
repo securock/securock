@@ -5,6 +5,7 @@ import (
 	"io"
 	"strings"
 
+	"github.com/securock/securock/internal/typosquat"
 	"github.com/securock/securock/pkg/lockfile"
 )
 
@@ -59,6 +60,7 @@ func writeChecks(w io.Writer, art lockfile.Artifact) {
 	writeEvidence(w, "signature verified", "signature present", "signature missing", "signature not checked", art.Evidence.Signature)
 	writeChain(w, art)
 	writeOwnership(w, art.Evidence.Ownership)
+	writeHealth(w, art)
 	writeCapabilities(w, art.Evidence.Capabilities)
 	writeVulns(w, art.Evidence.Vulnerabilities)
 	writeMalicious(w, art.Evidence.Malicious)
@@ -152,6 +154,28 @@ func writeOwnership(w io.Writer, own lockfile.OwnershipEvidence) {
 		}
 	default:
 		fmt.Fprintln(w, "? ownership not checked")
+	}
+}
+
+func writeHealth(w io.Writer, art lockfile.Artifact) {
+	if target, ok := typosquat.Check(art.Subject.Ecosystem, art.Subject.Name); ok {
+		fmt.Fprintf(w, "✗ name resembles a popular package (%s)\n", target)
+	}
+	h := art.Evidence.Health
+	if h == nil {
+		fmt.Fprintln(w, "? release health not checked")
+		return
+	}
+	if h.Deprecated != "" {
+		fmt.Fprintf(w, "✗ release is deprecated (%s)\n", h.Deprecated)
+	} else {
+		fmt.Fprintln(w, "✓ release is not deprecated")
+	}
+	if h.Released != "" {
+		fmt.Fprintf(w, "  released   %s\n", h.Released)
+	}
+	if h.License != "" {
+		fmt.Fprintf(w, "  license    %s\n", h.License)
 	}
 }
 

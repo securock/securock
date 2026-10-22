@@ -104,6 +104,8 @@ func (c *PyPI) lookup(ctx context.Context, dep ecosystem.Dependency) Record {
 		},
 	}
 
+	rec.Health = c.health(ctx, dep)
+
 	raw, status, err := c.fetchProvenance(ctx, dep)
 	if err != nil {
 		return rec
@@ -124,6 +126,70 @@ func (c *PyPI) lookup(ctx context.Context, dep ecosystem.Dependency) Record {
 	rec.Signature = sig
 	rec.Chain = chain
 	return rec
+}
+
+// health reads the release's license, upload day, and yanked flag from the JSON API.
+// It returns nil when the project cannot be read, so nothing is claimed.
+func (c *PyPI) health(ctx context.Context, dep ecosystem.Dependency) *lockfile.HealthEvidence {
+	index := strings.TrimRight(c.Index, "/")
+	if index == "" {
+		index = "https://pypi.org"
+	}
+	u := fmt.Sprintf("%s/pypi/%s/%s/json", index, url.PathEscape(pypiProjectName(dep.Name)), url.PathEscape(dep.Version))
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
+	if err != nil {
+		return nil
+	}
+	ua := c.UserAgent
+	if ua == "" {
+		ua = "securock"
+	}
+	req.Header.Set("User-Agent", ua)
+
+	res, err := httpx.Do(ctx, c.HTTP, req)
+	if err != nil {
+		return nil
+	}
+	defer res.Body.Close()
+	if res.StatusCode != http.StatusOK {
+		return nil
+	}
+	var parsed struct {
+		Info struct {
+			License           string   `json:"license"`
+			LicenseExpression string   `json:"license_expression"`
+			Classifiers       []string `json:"classifiers"`
+			Yanked            bool     `json:"yanked"`
+			YankedReason      string   `json:"yanked_reason"`
+		} `json:"info"`
+		URLs []struct {
+			Filename     string `json:"filename"`
+			UploadTime   string `json:"upload_time_iso_8601"`
+			Yanked       bool   `json:"yanked"`
+			YankedReason string `json:"yanked_reason"`
+		} `json:"urls"`
+	}
+	if err := json.NewDecoder(io.LimitReader(res.Body, 2<<20)).Decode(&parsed); err != nil {
+		return nil
+	}
+
+	health := &lockfile.HealthEvidence{License: pypiLicense(parsed.Info.LicenseExpression, parsed.Info.License, parsed.Info.Classifiers)}
+	yanked, reason := parsed.Info.Yanked, parsed.Info.YankedReason
+	for _, f := range parsed.URLs {
+		if f.Filename != dep.Filename {
+			continue
+		}
+		health.Released = day(f.UploadTime)
+		yanked, reason = f.Yanked, f.YankedReason
+		break
+	}
+	if yanked {
+		health.Deprecated = "yanked"
+		if r := clip(reason); r != "" {
+			health.Deprecated += ": " + r
+		}
+	}
+	return health
 }
 
 func (c *PyPI) fetchProvenance(ctx context.Context, dep ecosystem.Dependency) ([]byte, int, error) {

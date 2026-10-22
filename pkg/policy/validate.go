@@ -46,6 +46,23 @@ func Validate(doc Document) error {
 	if err := validateOwnershipRule(doc.Rules.Ownership); err != nil {
 		return err
 	}
+	if err := validateHealthRule(doc.Rules.Health); err != nil {
+		return err
+	}
+	return nil
+}
+
+func validateHealthRule(rule HealthRule) error {
+	for _, pair := range []struct{ name, value string }{
+		{"deprecated", rule.Deprecated},
+		{"typosquat", rule.Typosquat},
+	} {
+		switch pair.value {
+		case "", "allow", "deny":
+		default:
+			return fmt.Errorf("unknown health %s action %q: use allow or deny", pair.name, pair.value)
+		}
+	}
 	return nil
 }
 

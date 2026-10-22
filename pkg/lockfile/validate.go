@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+	"time"
 )
 
 var (
@@ -119,8 +120,29 @@ func validateArtifact(art Artifact) error {
 	if !slices.Contains(evidence, art.Evidence.Chain.State) {
 		return fmt.Errorf("unknown chain state %q", art.Evidence.Chain.State)
 	}
+	if err := validateHealth(art.Evidence.Health); err != nil {
+		return err
+	}
 	if !slices.Contains(statuses, art.Trust.Status) {
 		return fmt.Errorf("unknown trust status %q", art.Trust.Status)
+	}
+	return nil
+}
+
+// MaxHealthText bounds the free text recorded in health evidence.
+const MaxHealthText = 500
+
+func validateHealth(h *HealthEvidence) error {
+	if h == nil {
+		return nil
+	}
+	if h.Released != "" {
+		if _, err := time.Parse("2006-01-02", h.Released); err != nil {
+			return fmt.Errorf("health released %q is not a YYYY-MM-DD date", h.Released)
+		}
+	}
+	if len(h.Deprecated) > MaxHealthText || len(h.License) > MaxHealthText {
+		return fmt.Errorf("health text is longer than %d bytes", MaxHealthText)
 	}
 	return nil
 }

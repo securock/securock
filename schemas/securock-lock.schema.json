@@ -109,7 +109,17 @@
         "capabilities": { "$ref": "#/$defs/capabilities" },
         "behavior": { "$ref": "#/$defs/behavior" },
         "ownership": { "$ref": "#/$defs/ownership" },
-        "chain": { "$ref": "#/$defs/chain" }
+        "chain": { "$ref": "#/$defs/chain" },
+        "health": { "$ref": "#/$defs/health" }
+      }
+    },
+    "health": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "released": { "type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" },
+        "deprecated": { "type": "string", "maxLength": 500 },
+        "license": { "type": "string", "maxLength": 500 }
       }
     },
     "vulnEvidence": {

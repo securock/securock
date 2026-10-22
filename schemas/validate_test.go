@@ -139,3 +139,47 @@ func TestRejectsUnknownArtifactField(t *testing.T) {
 		t.Fatal("unknown fields must fail")
 	}
 }
+
+func TestHealthEvidenceIsOptionalAndBounded(t *testing.T) {
+	doc := func(health string) []byte {
+		return []byte(`{
+  "version": 2,
+  "artifacts": [
+    {
+      "subject": { "ecosystem": "npm", "name": "react" },
+      "version": "19.2.0",
+      "evidence": {
+        "provenance": "unknown",
+        "signature": "unknown",
+        "vulnerabilities": { "state": "unknown" },
+        "malicious": { "state": "unknown" },
+        "capabilities": { "state": "unknown" },
+        "behavior": { "state": "unknown" },
+        "ownership": { "state": "unknown" },
+        "chain": { "state": "unknown" }` + health + `
+      },
+      "trust": { "status": "unknown" }
+    }
+  ]
+}`)
+	}
+	tests := []struct {
+		name    string
+		health  string
+		wantErr bool
+	}{
+		{"absent", ``, false},
+		{"full", `, "health": { "released": "2025-01-31", "deprecated": "use x", "license": "MIT" }`, false},
+		{"empty", `, "health": {}`, false},
+		{"bad date", `, "health": { "released": "yesterday" }`, true},
+		{"unknown field", `, "health": { "score": 9 }`, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := schemas.Validate("securock-lock.schema.json", doc(tt.health))
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("err = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}

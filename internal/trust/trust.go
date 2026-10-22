@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/securock/securock/internal/ecosystem/core"
+	"github.com/securock/securock/internal/typosquat"
 	"github.com/securock/securock/pkg/lockfile"
 	"github.com/securock/securock/pkg/policy"
 )
@@ -76,6 +77,19 @@ func Evaluate(art *lockfile.Artifact, pol policy.Document) {
 			untrusted = append(untrusted, capabilityViolations(art.Evidence.Capabilities, pol.Rules.Capabilities)...)
 		default:
 			unknown = append(unknown, "capabilities not checked")
+		}
+	}
+	if pol.Rules.Health.DenyDeprecated() {
+		switch h := art.Evidence.Health; {
+		case h == nil:
+			unknown = append(unknown, "health not checked")
+		case h.Deprecated != "":
+			untrusted = append(untrusted, "deprecated release")
+		}
+	}
+	if pol.Rules.Health.DenyTyposquat() {
+		if target, ok := typosquat.Check(art.Subject.Ecosystem, art.Subject.Name); ok {
+			untrusted = append(untrusted, "possible typosquat of "+target)
 		}
 	}
 

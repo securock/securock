@@ -14,6 +14,8 @@ type Record struct {
 	Behavior     lockfile.BehaviorEvidence
 	Ownership    lockfile.OwnershipEvidence
 	Chain        lockfile.ChainEvidence
+	// Health is nil when the registry did not answer.
+	Health *lockfile.HealthEvidence
 }
 
 type Collector interface {
