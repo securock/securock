@@ -117,13 +117,19 @@ type HealthRule struct {
 	Deprecated string `json:"deprecated,omitempty" yaml:"deprecated,omitempty"`
 	// Typosquat denies package names that look like a misspelling of a popular package.
 	Typosquat string `json:"typosquat,omitempty" yaml:"typosquat,omitempty"`
+	// TyposquatAllow lists package names that are checked and known to be fine, so a real
+	// package whose name happens to be close to a popular one is not denied. Names are
+	// written as the registry spells them, without the ecosystem.
+	TyposquatAllow []string `json:"typosquat_allow,omitempty" yaml:"typosquat_allow,omitempty"`
 }
 
 func (r HealthRule) DenyDeprecated() bool { return r.Deprecated == "deny" }
 
 func (r HealthRule) DenyTyposquat() bool { return r.Typosquat == "deny" }
 
-func (r HealthRule) Configured() bool { return r.Deprecated != "" || r.Typosquat != "" }
+func (r HealthRule) Configured() bool {
+	return r.Deprecated != "" || r.Typosquat != "" || len(r.TyposquatAllow) > 0
+}
 
 func Default() Document {
 	return Document{
@@ -243,8 +249,9 @@ type canonicalLicenses struct {
 }
 
 type canonicalHealth struct {
-	Deprecated string `json:"deprecated,omitempty"`
-	Typosquat  string `json:"typosquat,omitempty"`
+	Deprecated     string   `json:"deprecated,omitempty"`
+	Typosquat      string   `json:"typosquat,omitempty"`
+	TyposquatAllow []string `json:"typosquat_allow,omitempty"`
 }
 
 type canonicalEvidence struct {
@@ -371,7 +378,7 @@ func canonicalHealthRule(rule HealthRule) *canonicalHealth {
 	if !rule.Configured() {
 		return nil
 	}
-	return &canonicalHealth{Deprecated: rule.Deprecated, Typosquat: rule.Typosquat}
+	return &canonicalHealth{Deprecated: rule.Deprecated, Typosquat: rule.Typosquat, TyposquatAllow: sortedCompact(rule.TyposquatAllow)}
 }
 
 func canonicalRegistries(in map[string][]string) map[string][]string {

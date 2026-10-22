@@ -76,6 +76,11 @@ func validateLicenseRule(rule LicenseRule) error {
 }
 
 func validateHealthRule(rule HealthRule) error {
+	for _, name := range rule.TyposquatAllow {
+		if strings.TrimSpace(name) == "" {
+			return fmt.Errorf("health typosquat_allow entry must not be empty")
+		}
+	}
 	for _, pair := range []struct{ name, value string }{
 		{"deprecated", rule.Deprecated},
 		{"typosquat", rule.Typosquat},

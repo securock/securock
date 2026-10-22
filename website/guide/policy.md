@@ -113,6 +113,17 @@ rules:
 | `deprecated` | Deprecated or yanked releases are `untrusted`; unchecked health is `unknown` |
 | `typosquat`  | Names within one edit of a popular npm or PyPI package are `untrusted`       |
 
+`typosquat_allow` lists package names that were checked and are fine, so a real package whose
+name is close to a popular one is not denied:
+
+```yaml
+rules:
+  health:
+    typosquat: deny
+    typosquat_allow:
+      - request
+```
+
 Both default to allow and are not part of the `default` or `strict`
 profiles. Only the age of a release is left out on purpose: trust
 status must not change just because time passed, so `securock audit`

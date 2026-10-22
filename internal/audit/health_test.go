@@ -26,9 +26,9 @@ func TestHealthFindings(t *testing.T) {
 		{"stale", "npm", "left-pad", &lockfile.HealthEvidence{Released: "2024-06-14"}, map[string]finding.Severity{"stale-release": finding.SeverityLow}},
 		{"just under two years", "npm", "left-pad", &lockfile.HealthEvidence{Released: "2024-06-16"}, nil},
 		{"unreadable date is ignored", "npm", "left-pad", &lockfile.HealthEvidence{Released: "sometime"}, nil},
-		{"typosquat needs no health", "npm", "lodahs", nil, map[string]finding.Severity{"typosquat-suspect": finding.SeverityMedium}},
+		{"typosquat needs no health", "npm", "lodahs", nil, map[string]finding.Severity{"typosquat-suspect": finding.SeverityLow}},
 		{"all three", "npm", "lodahs", &lockfile.HealthEvidence{Deprecated: "x", Released: "2010-01-01"}, map[string]finding.Severity{
-			"typosquat-suspect": finding.SeverityMedium, "deprecated-package": finding.SeverityMedium, "stale-release": finding.SeverityLow,
+			"typosquat-suspect": finding.SeverityLow, "deprecated-package": finding.SeverityMedium, "stale-release": finding.SeverityLow,
 		}},
 	}
 	for _, tt := range tests {

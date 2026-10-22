@@ -123,14 +123,16 @@ needs no registry:
 | -------------------- | -------- | ------------------------------------------------------ |
 | `deprecated-package` | medium   | The release is deprecated or yanked                    |
 | `stale-release`      | low      | The release is more than two years old                 |
-| `typosquat-suspect`  | medium   | npm or PyPI name within one edit of a popular package  |
+| `typosquat-suspect`  | low      | npm or PyPI name within one edit of a popular package  |
 | `recent-release`     | high     | Newer than `--min-release-age` (off unless you set it) |
 
 `typosquat-suspect` compares each name against a built-in list of popular
 packages (separator variants such as `lo-dash`, or one typo, swap, or
 missing letter). Scoped npm names are skipped. It is a signal to look at,
-not proof: a real package can have a name close to a popular one. Use
-`securock accept` to record that you checked.
+not proof: a real package can have a name close to a popular one, so it is a low finding and
+the built-in lists of about 400 popular names per ecosystem are kept to names that exist. Use
+`securock accept` to record that you checked, or list the name under `typosquat_allow` in the
+[policy](/guide/policy#health-and-typosquat-gates) if you deny typosquats.
 
 ### Release cooldown
 

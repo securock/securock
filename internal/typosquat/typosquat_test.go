@@ -14,6 +14,12 @@ func TestCheck(t *testing.T) {
 		{"npm", "lodahs", "lodash"},
 		{"npm", "expresss", "express"},
 		{"npm", "expres", "express"},
+		// Real packages whose names sit next to a popular one are on the list themselves.
+		{"npm", "color", ""},
+		{"npm", "colors", ""},
+		{"pypi", "markdown2", ""},
+		{"pypi", "psycopg", ""},
+		{"pypi", "beautifulsoup", ""},
 		{"npm", "lo-dash", "lodash"},
 		{"npm", "Lodash", ""},
 		{"npm", "lodash", ""},

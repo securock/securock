@@ -91,7 +91,7 @@ func Evaluate(art *lockfile.Artifact, pol policy.Document) {
 	if pol.Rules.Licenses.Configured() {
 		untrusted, unknown = licenseVerdict(art, pol.Rules.Licenses, untrusted, unknown)
 	}
-	if pol.Rules.Health.DenyTyposquat() {
+	if pol.Rules.Health.DenyTyposquat() && !slices.Contains(pol.Rules.Health.TyposquatAllow, art.Subject.Name) {
 		if target, ok := typosquat.Check(art.Subject.Ecosystem, art.Subject.Name); ok {
 			untrusted = append(untrusted, "possible typosquat of "+target)
 		}

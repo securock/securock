@@ -111,7 +111,7 @@ func artifact(art lockfile.Artifact, opts Options) []finding.Finding {
 // needs no registry. Findings here are signals to look at, not proof of a problem.
 func health(art lockfile.Artifact, now time.Time, add func(id string, sev finding.Severity, title, detail, fix string)) {
 	if target, ok := typosquat.Check(art.Subject.Ecosystem, art.Subject.Name); ok {
-		add("typosquat-suspect", finding.SeverityMedium, "Name resembles a popular package", "similar to "+target, "Check that this is the package you meant to install.")
+		add("typosquat-suspect", finding.SeverityLow, "Name resembles a popular package", "similar to "+target, "Check that this is the package you meant to install.")
 	}
 	h := art.Evidence.Health
 	if h == nil {

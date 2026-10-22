@@ -79,3 +79,18 @@ func TestDenyTyposquat(t *testing.T) {
 		}
 	}
 }
+
+func TestTyposquatAllowListExemptsKnownGoodNames(t *testing.T) {
+	pol := withHealthRule(policy.HealthRule{Typosquat: "deny", TyposquatAllow: []string{"lodahs"}})
+
+	allowed := healthArtifact("npm", "lodahs", nil)
+	trust.Evaluate(&allowed, pol)
+	if allowed.Trust.Status != lockfile.StatusTrusted {
+		t.Fatalf("an allowed name must pass: %s %v", allowed.Trust.Status, allowed.Trust.Reasons)
+	}
+	other := healthArtifact("npm", "lodsah", nil)
+	trust.Evaluate(&other, pol)
+	if other.Trust.Status != lockfile.StatusUntrusted {
+		t.Fatalf("the allow list is per name: %s %v", other.Trust.Status, other.Trust.Reasons)
+	}
+}

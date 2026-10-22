@@ -16,6 +16,8 @@ func TestHealthRuleValidation(t *testing.T) {
 		{policy.HealthRule{Deprecated: "allow"}, false},
 		{policy.HealthRule{Deprecated: "warn"}, true},
 		{policy.HealthRule{Typosquat: "block"}, true},
+		{policy.HealthRule{Typosquat: "deny", TyposquatAllow: []string{"lodahs"}}, false},
+		{policy.HealthRule{TyposquatAllow: []string{" "}}, true},
 	}
 	for _, tt := range tests {
 		doc := policy.Default()
@@ -103,5 +105,23 @@ func TestFingerprintLicenseRule(t *testing.T) {
 	}
 	if fp(policy.LicenseRule{Allow: []string{"MIT"}}) == fp(policy.LicenseRule{Deny: []string{"MIT"}}) {
 		t.Fatal("allow and deny must differ")
+	}
+}
+
+func TestFingerprintTyposquatAllow(t *testing.T) {
+	fp := func(allow ...string) string {
+		doc := policy.Default()
+		doc.Rules.Health = policy.HealthRule{Typosquat: "deny", TyposquatAllow: allow}
+		got, err := policy.Fingerprint(doc)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return got
+	}
+	if fp() == fp("a") || fp("a") == fp("b") {
+		t.Fatal("the allow list must change the fingerprint")
+	}
+	if fp("b", "a", "a") != fp("a", "b") {
+		t.Fatal("order and duplicates must not matter")
 	}
 }
