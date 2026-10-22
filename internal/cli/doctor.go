@@ -22,7 +22,7 @@ func newDoctorCommand(opts *options) *cobra.Command {
 				LockPath:   opts.lockPath,
 				PolicyPath: opts.policy,
 				Profile:    opts.profile,
-			})
+			}).WithLocation(reportLocation(projectPath(args), opts.lockPath))
 			if err := finding.Write(cmd.OutOrStdout(), report, opts.format); err != nil {
 				return opErr(err)
 			}

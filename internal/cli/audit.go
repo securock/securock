@@ -37,7 +37,7 @@ func newAuditCommand(opts *options) *cobra.Command {
 				return opErr(err)
 			}
 
-			report := audit.Run(result.Document)
+			report := audit.Run(result.Document).WithLocation(reportLocation(projectPath(args), opts.lockPath))
 			if err := finding.Write(cmd.OutOrStdout(), report, opts.format); err != nil {
 				return opErr(err)
 			}
