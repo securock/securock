@@ -8,6 +8,7 @@ import (
 
 	"github.com/securock/securock/internal/ecosystem"
 	"github.com/securock/securock/internal/evidence"
+	"github.com/securock/securock/internal/osv"
 	"github.com/securock/securock/internal/scanner"
 	"github.com/securock/securock/pkg/lockfile"
 	"github.com/securock/securock/pkg/policy"
@@ -287,5 +288,78 @@ func TestScanReachability(t *testing.T) {
 	jest := byName["jest"].Evidence.Vulnerabilities.Items[0]
 	if byName["jest"].Scope != lockfile.ScopeDev || jest.Reachable != lockfile.ReachNo {
 		t.Fatalf("jest = %+v, vulnerability %+v", byName["jest"], jest)
+	}
+}
+
+type detailingOSV struct {
+	fakeOSV
+	details map[string]osv.Detail
+}
+
+func (d detailingOSV) Details(_ context.Context, ids []string) (map[string]osv.Detail, error) {
+	out := map[string]osv.Detail{}
+	for _, id := range ids {
+		if detail, ok := d.details[id]; ok {
+			out[id] = detail
+		}
+	}
+	return out, nil
+}
+
+func TestScanRecordsSeverityAndFixedVersion(t *testing.T) {
+	client := detailingOSV{
+		fakeOSV: fakeOSV{vulns: map[string][]lockfile.Vulnerability{
+			"npm:react@19.2.0": {{ID: "GHSA-1"}, {ID: "GHSA-nodetail"}, {ID: "MAL-1"}},
+		}},
+		details: map[string]osv.Detail{
+			"GHSA-1": {Severity: "high", Affected: []osv.Affected{{
+				Ecosystem: "npm", Name: "react",
+				Ranges: []osv.Range{{Type: "SEMVER", Events: []osv.Event{{Introduced: "0"}, {Fixed: "19.2.1"}}}},
+			}}},
+		},
+	}
+	result, err := scanner.Scan(context.Background(), scanner.Options{
+		Path: "../ecosystem/npm/testdata", Policy: policy.Default(), Client: client, Evidence: fakeEvidence{},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, art := range result.Document.Artifacts {
+		if art.Subject.Name != "react" {
+			continue
+		}
+		items := art.Evidence.Vulnerabilities.Items
+		if len(items) != 2 {
+			t.Fatalf("items = %+v (malicious reports are kept apart)", items)
+		}
+		got := map[string]lockfile.Vulnerability{}
+		for _, v := range items {
+			got[v.ID] = v
+		}
+		if v := got["GHSA-1"]; v.Severity != lockfile.SeverityHigh || len(v.Fixed) != 1 || v.Fixed[0] != "19.2.1" {
+			t.Fatalf("GHSA-1 = %+v", v)
+		}
+		if v := got["GHSA-nodetail"]; v.Severity != "" || v.Fixed != nil {
+			t.Fatalf("an advisory without detail stays bare: %+v", v)
+		}
+		return
+	}
+	t.Fatal("react not found")
+}
+
+func TestScanWorksWithAClientThatCannotLookUpAdvisories(t *testing.T) {
+	result, err := scanner.Scan(context.Background(), scanner.Options{
+		Path: "../ecosystem/npm/testdata", Policy: policy.Default(), Evidence: fakeEvidence{},
+		Client: fakeOSV{vulns: map[string][]lockfile.Vulnerability{"npm:react@19.2.0": {{ID: "GHSA-1"}}}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, art := range result.Document.Artifacts {
+		for _, v := range art.Evidence.Vulnerabilities.Items {
+			if v.Severity != "" || v.Fixed != nil {
+				t.Fatalf("unexpected detail: %+v", v)
+			}
+		}
 	}
 }

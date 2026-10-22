@@ -81,8 +81,9 @@ func Scan(ctx context.Context, opts Options) (*Result, error) {
 	}
 
 	var (
-		vulns map[string][]lockfile.Vulnerability
-		ev    map[string]evidence.Record
+		vulns   map[string][]lockfile.Vulnerability
+		details map[string]osv.Detail
+		ev      map[string]evidence.Record
 	)
 	if len(query) > 0 {
 		client := opts.Client
@@ -93,6 +94,7 @@ func Scan(ctx context.Context, opts Options) (*Result, error) {
 		if err != nil {
 			return nil, err
 		}
+		details = advisoryDetails(ctx, client, vulns)
 		collector := opts.Evidence
 		if collector == nil {
 			collector = evidence.NewDefault()
@@ -177,6 +179,11 @@ func Scan(ctx context.Context, opts Options) (*Result, error) {
 			art.Evidence.Malicious.State = lockfile.VulnChecked
 			if vulns != nil {
 				cves, malware := osv.Partition(vulns[key])
+				for i, v := range cves {
+					if d, ok := details[v.ID]; ok {
+						cves[i] = osv.Enrich(dep, v, d)
+					}
+				}
 				art.Evidence.Vulnerabilities.Items = cves
 				art.Evidence.Malicious.Reports = malware
 			}
@@ -212,4 +219,30 @@ func Summary(doc lockfile.Document) (trusted, untrusted, unknown int) {
 		}
 	}
 	return trusted, untrusted, unknown
+}
+
+// advisoryDetails looks up severity and fix information for the advisories that were hit.
+// It is best effort: a client that cannot look advisories up, or a lookup that fails, only
+// means the findings carry no severity or fixed version.
+func advisoryDetails(ctx context.Context, client osv.Client, hits map[string][]lockfile.Vulnerability) map[string]osv.Detail {
+	detailer, ok := client.(osv.Detailer)
+	if !ok {
+		return nil
+	}
+	var ids []string
+	for _, vulns := range hits {
+		for _, v := range vulns {
+			if !osv.IsMaliciousID(v.ID) {
+				ids = append(ids, v.ID)
+			}
+		}
+	}
+	if len(ids) == 0 {
+		return nil
+	}
+	details, err := detailer.Details(ctx, ids)
+	if err != nil {
+		return nil
+	}
+	return details
 }

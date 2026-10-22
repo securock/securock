@@ -155,3 +155,33 @@ func TestExplainReachability(t *testing.T) {
 		t.Fatalf("nothing should be said when reachability was not recorded:\n%s", buf.String())
 	}
 }
+
+func TestExplainAdvisoryDetail(t *testing.T) {
+	doc := lockfile.Document{Artifacts: []lockfile.Artifact{{
+		Subject: lockfile.Subject{Ecosystem: "npm", Name: "lodash"},
+		Version: "4.17.20",
+		Evidence: lockfile.Evidence{Vulnerabilities: lockfile.VulnEvidence{
+			State: lockfile.VulnChecked,
+			Items: []lockfile.Vulnerability{
+				{ID: "V-BOTH", Severity: lockfile.SeverityHigh, Fixed: []string{"4.17.21", "5.0.1"}},
+				{ID: "V-SEV", Severity: lockfile.SeverityLow},
+				{ID: "V-FIX", Fixed: []string{"4.17.21"}},
+				{ID: "V-NONE"},
+			},
+		}},
+	}}}
+	res, err := explain.Find(doc, "lodash")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var buf bytes.Buffer
+	explain.Write(&buf, res)
+	for _, want := range []string{"V-BOTH high severity, fixed in 4.17.21, 5.0.1", "V-SEV low severity", "V-FIX fixed in 4.17.21"} {
+		if !strings.Contains(buf.String(), want) {
+			t.Fatalf("missing %q in:\n%s", want, buf.String())
+		}
+	}
+	if strings.Contains(buf.String(), "V-NONE ") {
+		t.Fatalf("an advisory with no detail adds no line:\n%s", buf.String())
+	}
+}

@@ -458,3 +458,38 @@ func TestLicenseExport(t *testing.T) {
 		t.Fatalf("licenseDeclared = %v", declared)
 	}
 }
+
+func TestCycloneDXVulnerabilityRatings(t *testing.T) {
+	doc := fixture(t)
+	doc.Artifacts[1].Evidence.Vulnerabilities.Items = []lockfile.Vulnerability{{ID: "GHSA-aaaa", Severity: lockfile.SeverityCritical}}
+	extra := art("npm", "other", "1.0.0", "")
+	extra.Evidence.Vulnerabilities = lockfile.VulnEvidence{State: lockfile.VulnChecked, Items: []lockfile.Vulnerability{
+		{ID: "GHSA-aaaa", Severity: lockfile.SeverityMedium}, {ID: "GHSA-bare"},
+	}}
+	doc.Artifacts = append(doc.Artifacts, extra)
+
+	var bom struct {
+		Vulnerabilities []struct {
+			ID      string
+			Ratings []struct{ Severity string }
+		}
+	}
+	if err := json.Unmarshal(cdx(t, doc, sbom.Options{}), &bom); err != nil {
+		t.Fatal(err)
+	}
+	got := map[string][]string{}
+	for _, v := range bom.Vulnerabilities {
+		for _, r := range v.Ratings {
+			got[v.ID] = append(got[v.ID], r.Severity)
+		}
+		if _, seen := got[v.ID]; !seen {
+			got[v.ID] = nil
+		}
+	}
+	if len(got["GHSA-aaaa"]) != 1 || got["GHSA-aaaa"][0] != "critical" {
+		t.Fatalf("the highest severity wins: %v", got)
+	}
+	if len(got["GHSA-bare"]) != 0 {
+		t.Fatalf("an unrated advisory has no rating: %v", got)
+	}
+}

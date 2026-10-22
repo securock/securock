@@ -67,7 +67,7 @@ func artifact(art lockfile.Artifact, opts Options) []finding.Finding {
 	case lockfile.VulnChecked:
 		for _, v := range ev.Vulnerabilities.Items {
 			sev, title, detail := vulnerability(v)
-			add("known-vulnerability:"+v.ID, sev, title, detail, "Upgrade to a fixed version.")
+			add("known-vulnerability:"+v.ID, sev, title, detail, upgradeAdvice(v))
 		}
 	default:
 		add("vulnerability-unchecked", finding.SeverityInfo, "Vulnerabilities were not checked", "", "Run without --offline to query OSV.")
@@ -125,19 +125,51 @@ func health(art lockfile.Artifact, now time.Time, add func(id string, sev findin
 	}
 }
 
-// vulnerability ranks a known vulnerability. Reachability, when it was recorded, can only
-// lower the severity of one the lockfile shows to be development-only; unknown stays high.
+// vulnerability ranks a known vulnerability. The advisory's own severity sets the level, and
+// high is assumed when it gave none, which is how every advisory was ranked before severity
+// was recorded. Reachability can only lower it: a vulnerability the lockfile shows to be
+// development-only is low. Unknown reachability changes nothing.
 func vulnerability(v lockfile.Vulnerability) (finding.Severity, string, string) {
+	sev := advisorySeverity(v.Severity)
+	title := "Known vulnerability"
+	detail := v.ID
+	if v.Severity != "" {
+		detail += " (" + string(v.Severity) + " severity)"
+	}
 	switch v.Reachable {
 	case lockfile.ReachNo:
-		return finding.SeverityLow, "Known vulnerability in a development-only dependency", v.ID + " (not part of the runtime dependencies)"
+		return finding.SeverityLow, "Known vulnerability in a development-only dependency", detail + ", not part of the runtime dependencies"
 	case lockfile.ReachYes:
 		if len(v.Via) > 1 {
-			return finding.SeverityHigh, "Known vulnerability", v.ID + " (reached via " + strings.Join(v.Via, " -> ") + ")"
+			return sev, title, detail + ", reached via " + strings.Join(v.Via, " -> ")
 		}
-		return finding.SeverityHigh, "Known vulnerability", v.ID + " (runtime dependency)"
+		return sev, title, detail + ", runtime dependency"
+	}
+	return sev, title, detail
+}
+
+func advisorySeverity(s lockfile.VulnSeverity) finding.Severity {
+	switch s {
+	case lockfile.SeverityCritical:
+		return finding.SeverityCritical
+	case lockfile.SeverityMedium:
+		return finding.SeverityMedium
+	case lockfile.SeverityLow:
+		return finding.SeverityLow
 	default:
-		return finding.SeverityHigh, "Known vulnerability", v.ID
+		return finding.SeverityHigh
+	}
+}
+
+// upgradeAdvice names the version that fixes the advisory when OSV says which.
+func upgradeAdvice(v lockfile.Vulnerability) string {
+	switch len(v.Fixed) {
+	case 0:
+		return "Upgrade to a fixed version."
+	case 1:
+		return "Upgrade to " + v.Fixed[0] + " or later."
+	default:
+		return "Upgrade to " + v.Fixed[0] + " or later (also fixed in " + strings.Join(v.Fixed[1:], ", ") + ")."
 	}
 }
 

@@ -62,6 +62,7 @@ not trusted.
 - Release health (deprecated, release day, license) for npm and PyPI,
   typosquat-suspect names, and optional `health` and `licenses` policy gates
 - `audit --min-release-age` holds back releases that are too new
+- Vulnerabilities carry CVSS-derived severity and the version that fixes them
 - `--reachability` marks each vulnerability reachable, unreachable (development-only), or
   unknown from the dependency graph, so `audit` stops failing on test tooling
 - GitHub Action that can run an attested release binary

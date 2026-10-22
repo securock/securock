@@ -191,6 +191,24 @@ func vulnerabilities(doc lockfile.Document) map[string][]string {
 	return out
 }
 
+var severityRank = map[lockfile.VulnSeverity]int{
+	lockfile.SeverityLow: 1, lockfile.SeverityMedium: 2, lockfile.SeverityHigh: 3, lockfile.SeverityCritical: 4,
+}
+
+// vulnerabilitySeverities gives each advisory ID its highest recorded severity, since the
+// same advisory can be rated per package.
+func vulnerabilitySeverities(doc lockfile.Document) map[string]lockfile.VulnSeverity {
+	out := map[string]lockfile.VulnSeverity{}
+	for _, a := range doc.Artifacts {
+		for _, v := range a.Evidence.Vulnerabilities.Items {
+			if severityRank[v.Severity] > severityRank[out[v.ID]] {
+				out[v.ID] = v.Severity
+			}
+		}
+	}
+	return out
+}
+
 func sortedKeys[V any](m map[string]V) []string {
 	keys := make([]string, 0, len(m))
 	for k := range m {

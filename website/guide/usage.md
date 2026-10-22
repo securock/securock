@@ -106,6 +106,21 @@ securock accept remove known-vulnerability:GHSA-xxxx-xxxx-xxxx --subject npm:lod
   toward `--fail-on`. Once an exception expires the finding returns, with
   an `exception-expired` finding alongside it.
 
+### Severity and fixed versions
+
+For every advisory that matches, Securock reads its OSV record and stores the `severity`
+(`critical`, `high`, `medium`, or `low`) and the `fixed` versions on the vulnerability in the
+lockfile. Severity is the CVSS v3 base score when the advisory has a v3 vector, otherwise the
+rating the advisory database attached (GitHub's `moderate` is `medium`). CVSS v2 and v4 vectors
+are not computed, so an advisory with only those and no database rating has no severity.
+`fixed` is the version that ends the affected range containing your version, so a fix for an
+old release branch does not show up for a newer one.
+
+`audit` ranks each known vulnerability by its severity, still high when none is recorded,
+and the remediation names the version to upgrade to. Reachability can still lower a
+vulnerability to low, never raise it. `explain` and the CycloneDX SBOM (`ratings`) show the
+same data. Severity and fixed versions are not trust drift.
+
 ### Reachability
 
 A dependency scan finds a vulnerable package whether or not it ends up in what you ship. A

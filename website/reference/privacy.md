@@ -18,11 +18,13 @@ public file provenance.
 
 The default network mode is `public-only`. Securock only queries:
 
-- OSV (`https://api.osv.dev`)
+- OSV (`https://api.osv.dev`): the batch query by package name and version, and the advisory
+  record (`/v1/vulns/<id>`) of each advisory that matched, for its severity and fixed version
 - the npm registry (`https://registry.npmjs.org`) and Yarn's default
   (`https://registry.yarnpkg.com`)
-- the PyPI Integrity API (`https://pypi.org/integrity/...`) for public
-  PyPI artifacts with a filename in the language lockfile
+- the PyPI Integrity API (`https://pypi.org/integrity/...`) and JSON API
+  (`https://pypi.org/pypi/<project>/<version>/json`, for license, release date and yanked
+  status) for public PyPI artifacts with a filename in the language lockfile
 
 and only for artifacts whose lockfile registry is a known public
 registry:

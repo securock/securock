@@ -116,6 +116,10 @@ With `--reachability`, each artifact also records `scope` (`runtime`, `dev`, or 
 path from a runtime package. These fields are optional and are not trust drift. See
 [Usage](/guide/usage#reachability).
 
+Each vulnerability item can also carry `severity` and `fixed` (the versions that fix it for this
+package, oldest first), read from the advisory record; both are omitted when OSV gives none. They
+are not trust drift. See [Usage](/guide/usage#severity-and-fixed-versions).
+
 Vulnerability evidence is not a bare list. `state: checked` means OSV
 was queried. `unknown` means it was not. An empty `items` list with
 `state: unknown` is not the same as zero vulnerabilities.

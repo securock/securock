@@ -19,6 +19,7 @@ var (
 	sourceKinds = []string{"", "registry", "workspace", "git", "file", "url"}
 	scopes      = []Scope{"", ScopeRuntime, ScopeDev, ScopeOptional}
 	reachStates = []Reachability{"", ReachUnknown, ReachYes, ReachNo}
+	severities  = []VulnSeverity{"", SeverityLow, SeverityMedium, SeverityHigh, SeverityCritical}
 )
 
 func Validate(doc Document) error {
@@ -77,6 +78,14 @@ func validateArtifact(art Artifact) error {
 	for _, v := range art.Evidence.Vulnerabilities.Items {
 		if v.ID == "" {
 			return fmt.Errorf("missing vulnerability id")
+		}
+		if !slices.Contains(severities, v.Severity) {
+			return fmt.Errorf("unknown severity %q for %s", v.Severity, v.ID)
+		}
+		for _, fixed := range v.Fixed {
+			if fixed == "" {
+				return fmt.Errorf("missing fixed version for %s", v.ID)
+			}
 		}
 		if !slices.Contains(reachStates, v.Reachable) {
 			return fmt.Errorf("unknown reachability %q for %s", v.Reachable, v.ID)

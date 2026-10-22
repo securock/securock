@@ -76,3 +76,22 @@ func TestCanonicalizeSortsDependencies(t *testing.T) {
 		t.Fatalf("dependencies = %v", got)
 	}
 }
+
+func TestValidateAdvisoryDetail(t *testing.T) {
+	doc := func(v lockfile.Vulnerability) lockfile.Document {
+		d := reachDoc()
+		d.Artifacts[0].Evidence.Vulnerabilities = lockfile.VulnEvidence{State: lockfile.VulnChecked, Items: []lockfile.Vulnerability{v}}
+		return d
+	}
+	if err := lockfile.Validate(doc(lockfile.Vulnerability{ID: "G", Severity: lockfile.SeverityHigh, Fixed: []string{"1.2.3"}})); err != nil {
+		t.Fatal(err)
+	}
+	for name, v := range map[string]lockfile.Vulnerability{
+		"unknown severity": {ID: "G", Severity: "urgent"},
+		"empty fixed":      {ID: "G", Fixed: []string{""}},
+	} {
+		if err := lockfile.Validate(doc(v)); err == nil {
+			t.Errorf("%s should be rejected", name)
+		}
+	}
+}

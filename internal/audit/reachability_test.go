@@ -44,3 +44,46 @@ func TestVulnerabilitySeverityFollowsReachability(t *testing.T) {
 		})
 	}
 }
+
+func TestVulnerabilitySeverityFromAdvisory(t *testing.T) {
+	tests := []struct {
+		name string
+		vuln lockfile.Vulnerability
+		sev  finding.Severity
+		fix  string
+		in   string
+	}{
+		{"none recorded is high, as before", lockfile.Vulnerability{ID: "G"}, finding.SeverityHigh, "Upgrade to a fixed version.", ""},
+		{"critical", lockfile.Vulnerability{ID: "G", Severity: lockfile.SeverityCritical}, finding.SeverityCritical, "", "critical severity"},
+		{"medium", lockfile.Vulnerability{ID: "G", Severity: lockfile.SeverityMedium}, finding.SeverityMedium, "", "medium severity"},
+		{"low", lockfile.Vulnerability{ID: "G", Severity: lockfile.SeverityLow}, finding.SeverityLow, "", ""},
+		{"one fix", lockfile.Vulnerability{ID: "G", Fixed: []string{"1.2.3"}}, finding.SeverityHigh, "Upgrade to 1.2.3 or later.", ""},
+		{"two fixes", lockfile.Vulnerability{ID: "G", Fixed: []string{"1.2.3", "2.0.1"}}, finding.SeverityHigh, "Upgrade to 1.2.3 or later (also fixed in 2.0.1).", ""},
+		{"dev only lowers it", lockfile.Vulnerability{ID: "G", Severity: lockfile.SeverityCritical, Reachable: lockfile.ReachNo}, finding.SeverityLow, "", "critical severity"},
+		{"runtime keeps it", lockfile.Vulnerability{ID: "G", Severity: lockfile.SeverityMedium, Reachable: lockfile.ReachYes}, finding.SeverityMedium, "", "runtime dependency"},
+		{"unknown reachability keeps it", lockfile.Vulnerability{ID: "G", Severity: lockfile.SeverityCritical, Reachable: lockfile.ReachUnknown}, finding.SeverityCritical, "", ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			doc := artifact(func(a *lockfile.Artifact) {
+				a.Evidence.Vulnerabilities.Items = []lockfile.Vulnerability{tt.vuln}
+			})
+			var got *finding.Finding
+			for _, f := range audit.Run(doc).Findings {
+				if f.ID == "known-vulnerability:G" {
+					f := f
+					got = &f
+				}
+			}
+			if got == nil {
+				t.Fatal("no finding")
+			}
+			if got.Severity != tt.sev || !strings.Contains(got.Detail, tt.in) {
+				t.Fatalf("got %+v", *got)
+			}
+			if tt.fix != "" && got.Remediation != tt.fix {
+				t.Fatalf("remediation = %q, want %q", got.Remediation, tt.fix)
+			}
+		})
+	}
+}

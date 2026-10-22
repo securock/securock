@@ -188,6 +188,19 @@ func writeCapabilities(w io.Writer, caps lockfile.CapabilityEvidence) {
 	}
 }
 
+func writeAdvisory(w io.Writer, v lockfile.Vulnerability) {
+	var parts []string
+	if v.Severity != "" {
+		parts = append(parts, string(v.Severity)+" severity")
+	}
+	if len(v.Fixed) > 0 {
+		parts = append(parts, "fixed in "+strings.Join(v.Fixed, ", "))
+	}
+	if len(parts) > 0 {
+		fmt.Fprintf(w, "  %s %s\n", v.ID, strings.Join(parts, ", "))
+	}
+}
+
 func writeReachability(w io.Writer, v lockfile.Vulnerability) {
 	switch v.Reachable {
 	case lockfile.ReachYes:
@@ -215,6 +228,7 @@ func writeVulns(w io.Writer, vulns lockfile.VulnEvidence) {
 			}
 			fmt.Fprintf(w, "✗ known vulnerabilities (%s)\n", strings.Join(ids, ", "))
 			for _, v := range vulns.Items {
+				writeAdvisory(w, v)
 				writeReachability(w, v)
 			}
 		}

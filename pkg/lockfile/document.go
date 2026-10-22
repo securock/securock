@@ -119,7 +119,22 @@ type Vulnerability struct {
 	// Via is the dependency path from a runtime package to this one, when it is not direct.
 	Reachable Reachability `json:"reachable,omitempty" yaml:"reachable,omitempty"`
 	Via       []string     `json:"via,omitempty" yaml:"via,omitempty"`
+
+	// Severity and Fixed come from the advisory record. Severity is empty when the advisory
+	// carries no rating securock can read; Fixed lists the versions that fix it for this
+	// package, oldest first.
+	Severity VulnSeverity `json:"severity,omitempty" yaml:"severity,omitempty"`
+	Fixed    []string     `json:"fixed,omitempty" yaml:"fixed,omitempty"`
 }
+
+type VulnSeverity string
+
+const (
+	SeverityLow      VulnSeverity = "low"
+	SeverityMedium   VulnSeverity = "medium"
+	SeverityHigh     VulnSeverity = "high"
+	SeverityCritical VulnSeverity = "critical"
+)
 
 // MaliciousEvidence records OpenSSF Malicious Packages / OSV MAL-* reports.
 // It is separate from VulnerabilityEvidence: malware is not a CVE.

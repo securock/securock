@@ -69,7 +69,13 @@ type cdxLicName struct {
 type cdxVuln struct {
 	ID      string       `json:"id"`
 	Source  cdxVulnSrc   `json:"source"`
+	Ratings []cdxRating  `json:"ratings,omitempty"`
 	Affects []cdxAffects `json:"affects"`
+}
+
+type cdxRating struct {
+	Source   cdxVulnSrc `json:"source"`
+	Severity string     `json:"severity"`
 }
 
 type cdxVulnSrc struct {
@@ -106,8 +112,12 @@ func WriteCycloneDX(w io.Writer, doc lockfile.Document, opts Options) error {
 
 	var vulns []cdxVuln
 	byID := vulnerabilities(doc)
+	severities := vulnerabilitySeverities(doc)
 	for _, id := range sortedKeys(byID) {
 		v := cdxVuln{ID: id, Source: cdxVulnSrc{Name: "OSV", URL: "https://osv.dev/vulnerability/" + id}}
+		if sev := severities[id]; sev != "" {
+			v.Ratings = []cdxRating{{Source: v.Source, Severity: string(sev)}}
+		}
 		for _, ref := range byID[id] {
 			v.Affects = append(v.Affects, cdxAffects{Ref: ref})
 		}

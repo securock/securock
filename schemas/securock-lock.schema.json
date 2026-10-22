@@ -167,6 +167,11 @@
       "properties": {
         "id": { "type": "string", "minLength": 1 },
         "reachable": { "enum": ["yes", "no", "unknown"] },
+        "severity": { "enum": ["low", "medium", "high", "critical"] },
+        "fixed": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
         "via": {
           "type": "array",
           "items": { "type": "string", "minLength": 1 }
