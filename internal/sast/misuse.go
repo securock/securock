@@ -134,6 +134,19 @@ func matchesAny(have string, want []string) bool {
 	return false
 }
 
+// literalArg reports a string literal of some length, or a name the analysis resolved to
+// one (const secret = "..."): constText gives the name back when it cannot resolve it.
+func literalArg(e *expr, constText func(*expr) (string, bool)) bool {
+	if e.kind == exprStr {
+		return len(e.str) >= 4
+	}
+	if e.kind != exprName {
+		return false
+	}
+	have, ok := constText(e)
+	return ok && have != strings.ToLower(e.name) && len(have) >= 4
+}
+
 func (m misuse) matches(c *expr, constText func(*expr) (string, bool)) bool {
 	if m.recvCall != "" {
 		if c.x == nil || c.x.kind != exprMember || c.x.x == nil || c.x.x.kind != exprCall || c.x.x.x == nil || lastName(c.x.x.x) != m.recvCall {
@@ -141,7 +154,7 @@ func (m misuse) matches(c *expr, constText func(*expr) (string, bool)) bool {
 		}
 	}
 	for i := range m.literal {
-		if i >= len(c.args) || c.args[i].kind != exprStr || len(c.args[i].str) < 4 {
+		if i >= len(c.args) || !literalArg(c.args[i], constText) {
 			return false
 		}
 	}

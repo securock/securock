@@ -31,6 +31,21 @@ func init() {
 	for _, m := range []string{"create", "update", "updateOne", "updateMany", "build", "upsert", "bulkCreate", "findOneAndUpdate", "insertOne", "insertMany", "save"} {
 		js.sinks["?."+m] = mergeSink(js.sinks["?."+m], sink{kind: kMass, args: []int{0}, recvUpper: true, direct: true})
 	}
+	// A string literal as the JWT secret: jwt.sign(payload, 'secret'), jwt.verify(t, 'secret').
+	for _, m := range []string{"jsonwebtoken.sign", "jsonwebtoken.verify"} {
+		js.misuse[m] = append(js.misuse[m], misuse{rule: ruleHardKey, detail: "the signing key is a string literal", literal: map[int]bool{1: true}})
+	}
+	// Headless browsers fetch and render whatever they are given: puppeteer and playwright
+	// pages, wkhtmltopdf and PhantomJS.
+	pages := []string{"page", "tab", "frame", "mainFrame", "newPage"}
+	for _, m := range []string{"goto", "setContent", "open"} {
+		js.sinks["?."+m] = mergeSink(js.sinks["?."+m], sink{kind: kSSRF, args: []int{0}, recv: pages})
+	}
+	js.sinks["?.evaluate"] = mergeSink(js.sinks["?.evaluate"], sink{kind: kCode, args: []int{0}, recv: pages})
+	for _, m := range []string{"wkhtmltopdf", "wkhtmltoimage"} {
+		js.sinks[m] = sink{kind: kSSRF, args: []int{0}}
+		js.builtins[m] = true
+	}
 	// An LLM system prompt that includes request data: system: "...", {role: "system", content: x}
 	js.sinks["llmPrompt"] = sink{kind: kPrompt, args: []int{0}}
 	js.builtins["llmPrompt"] = true
