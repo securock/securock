@@ -31,7 +31,7 @@ func csSimpleTypes() map[string]string {
 	add("System.Net", "WebClient", "WebRequest", "WebUtility")
 	add("System.Runtime.Serialization.Formatters.Binary", "BinaryFormatter")
 	add("System.Xml", "XmlDocument", "XmlReaderSettings")
-	add("System.Security.Cryptography", "MD5", "SHA1", "DES", "TripleDES", "RC2", "MD5CryptoServiceProvider", "SHA1CryptoServiceProvider", "SHA1Managed", "DESCryptoServiceProvider")
+	add("System.Security.Cryptography", "MD5", "SHA1", "DES", "TripleDES", "RC2", "MD5CryptoServiceProvider", "SHA1CryptoServiceProvider", "SHA1Managed", "DESCryptoServiceProvider", "HMACSHA1", "HMACSHA256", "HMACSHA384", "HMACSHA512", "HMACMD5")
 	add("System.Text.RegularExpressions", "Regex")
 	add("System", "Random", "Activator", "Type", "Convert", "Uri")
 	add("System.Web", "HttpUtility")

@@ -1484,6 +1484,11 @@ func (r *irRun) strOf(e *expr) (string, bool) {
 		}
 		return b.String(), true
 	case exprMember:
+		// self::KEY, static::KEY: a constant of the class being analyzed, kept by name.
+		if e.x != nil && e.x.kind == exprName && (e.x.name == "self" || e.x.name == "static") && r.mod != nil {
+			v, ok := topStrs(r.mod)[e.name]
+			return v, ok
+		}
 		// Constants.KEY where Constants is one of the project's classes.
 		if e.x != nil && e.x.kind == exprName && r.proj != nil {
 			if path := r.proj.classes[e.x.name]; path != "" {

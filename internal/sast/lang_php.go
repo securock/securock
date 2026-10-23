@@ -335,6 +335,10 @@ func (p *phpLower) expr(n *node) *expr {
 		e := p.mk(exprMember, n)
 		if len(cs) >= 2 {
 			e.x, e.name = p.expr(cs[0]), phpName(p.text(cs[len(cs)-1]))
+			if p.kind(cs[0]) == "relative_scope" {
+				e.x = p.mk(exprName, cs[0])
+				e.x.name = strings.TrimSpace(p.text(cs[0]))
+			}
 		}
 		return e
 	case "subscript_expression":
