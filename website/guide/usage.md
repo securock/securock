@@ -267,6 +267,7 @@ PHP (`php`), and Ruby (`rb`). Rule ids are `sast:LANGUAGE/RULE`:
 | `debug-enabled`                | 489  | medium   | Python, PHP, Ruby       |
 | `insecure-cookie`              | 614  | medium   | all but Ruby, PHP       |
 | `https-not-enforced`           | 319  | medium   | Ruby                    |
+| `electron-insecure-window`     | 1021 | high     | JS                      |
 | `mass-assignment`              | 915  | medium   | JS, Ruby                |
 | `weak-allowlist`               | 601  | medium   | JS, Python, Java, Ruby  |
 | `directory-listing`            | 548  | medium   | JS                      |

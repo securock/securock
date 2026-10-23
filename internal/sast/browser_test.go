@@ -73,3 +73,27 @@ func TestJWTSecretLiteral(t *testing.T) {
 		})
 	}
 }
+
+func TestJSObjectOptionChecks(t *testing.T) {
+	tests := []struct {
+		name string
+		src  string
+		want []string
+	}{
+		{"none among the algorithms", "const jwt = require('jsonwebtoken');\nfunction f(t, k) { return jwt.verify(t, k, { algorithms: ['RS256', 'none'] }); }", []string{"sast:js/jwt-unverified"}},
+		{"pinned algorithms", "const jwt = require('jsonwebtoken');\nfunction f(t, k) { return jwt.verify(t, k, { algorithms: ['RS256'] }); }", nil},
+		{"passport secretOrKey literal", "const { Strategy } = require('passport-jwt');\nnew Strategy({ secretOrKey: 'HARDCODED-SECRET' }, () => {});", []string{"sast:js/hardcoded-signing-key"}},
+		{"passport secretOrKey from env", "const { Strategy } = require('passport-jwt');\nnew Strategy({ secretOrKey: process.env.JWT_SECRET }, () => {});", nil},
+		{"electron nodeIntegration", "new BrowserWindow({ webPreferences: { nodeIntegration: true } });", []string{"sast:js/electron-insecure-window"}},
+		{"electron contextIsolation off", "new BrowserWindow({ webPreferences: { contextIsolation: false } });", []string{"sast:js/electron-insecure-window"}},
+		{"electron secure defaults", "new BrowserWindow({ webPreferences: { nodeIntegration: false, contextIsolation: true, webSecurity: true } });", nil},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := analyze(t, map[string]string{"app.js": tt.src})
+			if !slices.Equal(got, tt.want) {
+				t.Fatalf("got %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

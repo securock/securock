@@ -8,6 +8,13 @@ import (
 
 type node = gotreesitter.Node
 
+// jsPairChecks are object keys whose value is checked by a misuse entry of the same
+// name: { rejectUnauthorized: false }, { nodeIntegration: true }.
+var jsPairChecks = map[string]bool{
+	"rejectUnauthorized": true, "algorithms": true, "nodeIntegration": true, "contextIsolation": true,
+	"webSecurity": true, "allowRunningInsecureContent": true, "secretOrKey": true,
+}
+
 var jsRequestRoot = map[string]string{
 	"query": "request query", "body": "request body", "params": "request path parameter",
 	"headers": "request header", "cookies": "request cookie", "signedCookies": "request cookie",
@@ -832,12 +839,17 @@ func (j *jsLower) expr(n *node) *expr {
 		}
 		// { rejectUnauthorized: false } is a call to a misuse check; any other pair is
 		// just its value.
-		if j.text(j.field(n, "key")) == "rejectUnauthorized" {
+		if key := strings.Trim(j.text(j.field(n, "key")), `"'`); jsPairChecks[key] {
 			call := j.mk(exprCall, n)
 			fn := j.mk(exprName, n)
-			fn.name = "rejectUnauthorized"
+			fn.name = key
 			call.x = fn
-			call.args = []*expr{j.expr(j.field(n, "value"))}
+			val := j.expr(j.field(n, "value"))
+			if key == "algorithms" {
+				// ['RS256', 'none']: the check looks for the word in the list's text.
+				val = &expr{kind: exprStr, pos: val.pos, str: j.text(j.field(n, "value"))}
+			}
+			call.args = []*expr{val}
 			call.kw = []string{""}
 			return call
 		}

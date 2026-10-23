@@ -35,6 +35,19 @@ func init() {
 	for _, m := range []string{"jsonwebtoken.sign", "jsonwebtoken.verify"} {
 		js.misuse[m] = append(js.misuse[m], misuse{rule: ruleHardKey, detail: "the signing key is a string literal", literal: map[int]bool{1: true}})
 	}
+	// Object keys checked by name (jsPairChecks).
+	js.misuse["algorithms"] = []misuse{md(ruleJWT, "the algorithm none accepts unsigned tokens", map[int][]string{0: {"'none'", "\"none\""}})}
+	js.misuse["secretOrKey"] = []misuse{{rule: ruleHardKey, detail: "the signing key is a string literal", literal: map[int]bool{0: true}}}
+	electron := func(detail string, vals ...string) []misuse {
+		return []misuse{md(ruleElectron, detail, map[int][]string{0: vals})}
+	}
+	js.misuse["nodeIntegration"] = electron("nodeIntegration gives page scripts direct access to Node.js", "=true")
+	js.misuse["contextIsolation"] = electron("contextIsolation is off, so page scripts can reach the preload script's globals", "=false")
+	js.misuse["webSecurity"] = electron("webSecurity is off, which disables the same-origin policy", "=false")
+	js.misuse["allowRunningInsecureContent"] = electron("insecure content may run inside an HTTPS page", "=true")
+	for _, k := range []string{"algorithms", "secretOrKey", "nodeIntegration", "contextIsolation", "webSecurity", "allowRunningInsecureContent"} {
+		js.builtins[k] = true
+	}
 	// Headless browsers fetch and render whatever they are given: puppeteer and playwright
 	// pages, wkhtmltopdf and PhantomJS.
 	pages := []string{"page", "tab", "frame", "mainFrame", "newPage"}
