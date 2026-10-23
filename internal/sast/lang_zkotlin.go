@@ -18,7 +18,7 @@ func init() {
 	ktSpec.misuse["kotlin.random.Random"] = nil
 	// Ktor handlers read the request through the implicit "call" receiver.
 	ktSpec.sourceRoots = copyRoots(javaSpec.sourceRoots)
-	ktSpec.sourceRoots["call"] = map[string]string{"parameters": "request parameter", "queryParameters": "request parameter"}
+	ktSpec.sourceRoots["call"] = map[string]string{"parameters": "request parameter", "queryParameters": "request parameter", "request": "request data", "receive": "request body"}
 	ktSpec.sourceMembers = copyStrings(javaSpec.sourceMembers)
 	ktSpec.sourceMembers["queryParameters"] = "request parameter"
 	ktSpec.sourceMethods = copyStrings(javaSpec.sourceMethods)
