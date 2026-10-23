@@ -2018,3 +2018,157 @@ class Reports < ApplicationController
     report.public_send("build_#{params[:kind]}")
   end
 end
+
+=== jsx/xss-dangerously-set-from-url
+// want: sast:js/xss
+export function Preview() {
+  const q = new URLSearchParams(window.location.search).get("html");
+  return <div dangerouslySetInnerHTML={{ __html: q }} />;
+}
+
+=== jsx/safe-sanitized
+// want: none
+import DOMPurify from "dompurify";
+export function Preview() {
+  const q = new URLSearchParams(window.location.search).get("html");
+  return <div dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(q) }} />;
+}
+
+=== jsx/safe-text-child
+// want: none
+export function Hello() {
+  const name = new URLSearchParams(window.location.search).get("name");
+  return <h1>Hello {name}</h1>;
+}
+
+=== tsx/xss-dangerously-set-from-hash
+// want: sast:js/xss
+export function Note() {
+  return <p dangerouslySetInnerHTML={{ __html: window.location.hash.slice(1) }} />;
+}
+
+=== jsx/gap-props-between-components
+// gap: sast:js/xss
+function Raw({ html }) { return <div dangerouslySetInnerHTML={{ __html: html }} />; }
+export function Page() {
+  const h = window.location.hash;
+  return <Raw html={h} />;
+}
+
+=== docker/root-and-latest
+# want: sast:iac/docker-root-user, sast:iac/docker-unpinned-image
+FROM python:latest
+COPY . /app
+CMD ["python", "/app/main.py"]
+
+=== docker/safe-nonroot-pinned
+# want: none
+FROM python:3.12-slim
+COPY . /app
+USER 10001
+CMD ["python", "/app/main.py"]
+
+=== docker/pipe-to-shell
+# want: sast:iac/docker-pipe-to-shell
+FROM alpine:3.19
+USER app
+RUN wget -qO- https://get.example.com | sh
+
+=== docker/safe-download-then-verify
+# want: none
+FROM alpine:3.19
+USER app
+RUN curl -fsSLo /tmp/i.sh https://get.example.com && echo "abc  /tmp/i.sh" | sha256sum -c -
+
+=== k8s/privileged
+# want: sast:iac/privileged-container
+apiVersion: v1
+kind: Pod
+metadata:
+  name: p
+spec:
+  containers:
+    - name: c
+      image: app:1.0
+      securityContext:
+        privileged: true
+
+=== k8s/safe-restricted
+# want: none
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: d
+spec:
+  template:
+    spec:
+      securityContext:
+        runAsNonRoot: true
+      containers:
+        - name: c
+          image: app:1.0
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+
+=== k8s/safe-non-manifest-yaml
+# want: none
+privileged: true
+hostNetwork: true
+
+=== tf/open-ssh
+# want: sast:iac/open-ingress
+resource "aws_security_group" "ssh" {
+  ingress {
+    from_port   = 22
+    to_port     = 22
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+}
+
+=== tf/safe-internal-ssh
+# want: none
+resource "aws_security_group" "ssh" {
+  ingress {
+    from_port   = 22
+    to_port     = 22
+    protocol    = "tcp"
+    cidr_blocks = ["10.0.0.0/8"]
+  }
+}
+
+=== tf/gap-module-defaults
+# gap: sast:iac/public-bucket
+module "bucket" {
+  source = "./modules/bucket"
+  acl    = "public-read"
+}
+
+=== actions/script-injection
+# want: sast:iac/actions-script-injection
+name: greet
+on:
+  issues:
+    types: [opened]
+jobs:
+  greet:
+    runs-on: ubuntu-latest
+    steps:
+      - run: 'echo "New issue: ${{ github.event.issue.title }}"'
+
+=== actions/safe-env-indirection
+# want: none
+name: greet
+on:
+  issues:
+    types: [opened]
+jobs:
+  greet:
+    runs-on: ubuntu-latest
+    steps:
+      - name: greet
+        env:
+          TITLE: ${{ github.event.issue.title }}
+        run: 'echo "New issue: $TITLE"'

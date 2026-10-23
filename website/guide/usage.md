@@ -253,6 +253,26 @@ and Ruby (`rb`). Rule ids are `sast:LANGUAGE/RULE`:
 
 `sast:analysis-incomplete` (info) marks a file that could not be analyzed.
 
+React's `dangerouslySetInnerHTML` is an `xss` sink in `.jsx` and `.tsx`. Values
+passed between components as props are not followed yet.
+
+`sast` also checks infrastructure files for unsafe settings. These are
+configuration checks, not dataflow, and have the rule ids `sast:iac/RULE`:
+
+| Files                         | Rules                                                                                                                                             |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Dockerfile`, `Containerfile` | `docker-root-user`, `docker-unpinned-image`, `docker-add-remote`, `docker-pipe-to-shell`, `hardcoded-secret`                                      |
+| Kubernetes and Compose YAML   | `privileged-container`, `host-namespace`, `privilege-escalation`, `run-as-root`, `host-path-mount`, `docker-socket-mount`, `dangerous-capability` |
+| Terraform (`.tf`, AWS)        | `open-ingress`, `public-bucket`, `public-database`, `unencrypted-storage`, `iam-wildcard`, `hardcoded-secret`                                     |
+| `.github/workflows/*.yml`     | `actions-script-injection`, `actions-pwn-request`                                                                                                 |
+
+Only the file itself is read: a Terraform module's inputs, Helm templates, and
+Kustomize overlays are not rendered, so a setting supplied that way is not seen.
+YAML is treated as a manifest only when it has `apiVersion` and `kind`, or a
+`services` key. Remaining unsafe configuration, such as missing resource
+limits, network policies or IAM least privilege beyond wildcards, is not
+checked.
+
 Sources are HTTP request data and command-line arguments: `net/http`, gin,
 echo, fiber, chi and mux in Go; Express, Koa, Next.js, NestJS and the browser
 URL in JavaScript; Flask, Django, FastAPI and Tornado in Python; servlets,

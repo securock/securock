@@ -64,7 +64,8 @@ var jsSpec = &langSpec{
 		"vm.runInContext": {kind: kCode, args: []int{0}}, "vm.Script": {kind: kCode, args: []int{0}},
 		"node-serialize.unserialize": {kind: kDeser, args: []int{0}},
 
-		"document.write": {kind: kXSS, args: []int{0}}, "document.writeln": {kind: kXSS, args: []int{0}},
+		"dangerouslySetInnerHTML": {kind: kXSS, args: []int{0}},
+		"document.write":          {kind: kXSS, args: []int{0}}, "document.writeln": {kind: kXSS, args: []int{0}},
 		"?.insertAdjacentHTML": {kind: kXSS, args: []int{1}},
 		"?.send":               {kind: kXSS, args: []int{0}, recv: []string{"res", "response", "reply"}},
 		"?.write":              {kind: kXSS, args: []int{0}, recv: []string{"res", "response", "reply"}},
@@ -101,6 +102,7 @@ var jsSpec = &langSpec{
 		"ctx":          {"query": "request query", "params": "request parameter", "request": "request", "path": "request path", "querystring": "request query"},
 		"event":        {"queryStringParameters": "request query", "body": "request body", "pathParameters": "request parameter", "headers": "request header"},
 		"searchParams": {"*": "request query"},
+		"context":      {"query": "request query", "params": "request parameter", "req": "request"},
 	},
 	returns:     map[string]string{},
 	mutators:    map[string]bool{"push": true, "unshift": true, "add": true, "set": true, "append": true},
@@ -110,7 +112,7 @@ var jsSpec = &langSpec{
 	builtins: map[string]bool{
 		"eval": true, "Function": true, "fetch": true, "encodeURIComponent": true, "encodeURI": true,
 		"parseInt": true, "parseFloat": true, "Number": true, "Boolean": true, "window": true, "document": true,
-		"location": true, "process": true, "Math": true,
+		"location": true, "process": true, "Math": true, "dangerouslySetInnerHTML": true,
 	},
 }
 
@@ -613,6 +615,18 @@ func (j *jsLower) expr(n *node) *expr {
 		}
 	case "ternary_expression":
 		return j.other(n, j.expr(j.field(n, "consequence")), j.expr(j.field(n, "alternative")))
+	case "jsx_attribute":
+		// <div dangerouslySetInnerHTML={{__html: x}}>: React's escape hatch, a call to a sink.
+		cs := j.named(n)
+		if len(cs) == 2 && j.text(cs[0]) == "dangerouslySetInnerHTML" {
+			call := j.mk(exprCall, n)
+			fn := j.mk(exprName, n)
+			fn.name = "dangerouslySetInnerHTML"
+			call.x = fn
+			call.args = []*expr{j.expr(cs[1])}
+			call.kw = []string{""}
+			return call
+		}
 	case "assignment_expression":
 		return j.expr(j.field(n, "right"))
 	}

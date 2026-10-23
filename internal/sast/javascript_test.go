@@ -123,3 +123,42 @@ module.exports = { find };`
 		})
 	}
 }
+
+func TestJSX(t *testing.T) {
+	tests := []struct {
+		name string
+		file string
+		src  string
+		want []string
+	}{
+		{"dangerouslySetInnerHTML from the URL", "A.jsx", `
+export function A() {
+  const q = new URLSearchParams(window.location.search).get("q");
+  return <div dangerouslySetInnerHTML={{ __html: q }} />;
+}`, []string{"sast:js/xss"}},
+		{"sanitized with DOMPurify", "C.jsx", `
+import DOMPurify from "dompurify";
+export function C() {
+  const q = window.location.hash;
+  return <div dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(q) }} />;
+}`, nil},
+		{"constant html is safe", "D.jsx", `
+export function D() { return <div dangerouslySetInnerHTML={{ __html: "<b>hi</b>" }} />; }`, nil},
+		{"plain text child is escaped by React", "E.jsx", `
+export function E() { const q = window.location.hash; return <p>{q}</p>; }`, nil},
+		{"Next.js server props", "page.jsx", `
+export async function getServerSideProps(context) {
+  const html = context.query.html;
+  return { props: { html } };
+}
+export default function P({ html }) { return <div dangerouslySetInnerHTML={{ __html: window.location.search }} />; }`, []string{"sast:js/xss"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := slices.Compact(analyze(t, map[string]string{tt.file: tt.src}))
+			if !slices.Equal(got, tt.want) {
+				t.Fatalf("got %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

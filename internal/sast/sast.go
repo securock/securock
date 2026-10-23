@@ -201,12 +201,16 @@ func load(fset *token.FileSet, root string) ([]*pkg, []*module, []finding.Findin
 			name := e.Name()
 			full := filepath.Join(dir, name)
 			if e.IsDir() {
-				if skipDirs[name] || strings.HasPrefix(name, ".") || strings.HasPrefix(name, "_") {
+				if skipDirs[name] || (strings.HasPrefix(name, ".") && name != ".github") || strings.HasPrefix(name, "_") {
 					continue
 				}
 				if err := walk(full, lowValue || skippedDirs[name]); err != nil {
 					return err
 				}
+				continue
+			}
+			if kind := iacKind(relPath(root, full), name); kind != "" && !lowValue {
+				incomplete = append(incomplete, scanIaC(root, full, relPath(root, full), kind)...)
 				continue
 			}
 			if _, other := extensions[strings.ToLower(filepath.Ext(name))]; other {
@@ -418,4 +422,12 @@ func loadOther(fset *token.FileSet, root, full string) (*module, string) {
 		return m, "it has syntax errors; the parts that parsed were analyzed"
 	}
 	return m, ""
+}
+
+func relPath(root, full string) string {
+	r, err := filepath.Rel(root, full)
+	if err != nil {
+		return full
+	}
+	return filepath.ToSlash(r)
 }
