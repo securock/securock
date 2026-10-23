@@ -1,0 +1,2020 @@
+Benchmark corpus for securock sast. Each case is a complete Go file after a "=== name"
+line. The first comment of a case states the expected outcome:
+
+  // want: RULE[, RULE]   these rules must be reported, and no others
+  // want: none           nothing may be reported
+  // gap: RULE            a real vulnerability the engine does not find yet (false negative)
+  // fp-gap: RULE         safe code the engine wrongly reports today (false positive)
+
+A gap or fp-gap case fails once the engine handles it, so the file must be promoted to
+want and the numbers stay honest. The corpus is written by the engine's authors: it guards
+against regressions and documents limits, it is not a measure of real-world accuracy.
+
+=== sqli-concat
+// want: sast:go/sql-injection
+package main
+
+import (
+	"database/sql"
+	"net/http"
+)
+
+func h(db *sql.DB, r *http.Request) {
+	db.Query("SELECT * FROM t WHERE id = " + r.FormValue("id"))
+}
+
+=== sqli-sprintf-variable
+// want: sast:go/sql-injection
+package main
+
+import (
+	"database/sql"
+	"fmt"
+	"net/http"
+)
+
+func h(db *sql.DB, r *http.Request) {
+	id := r.URL.Query().Get("id")
+	q := fmt.Sprintf("SELECT * FROM t WHERE id = '%s'", id)
+	db.Exec(q)
+}
+
+=== sqli-context-variant
+// want: sast:go/sql-injection
+package main
+
+import (
+	"database/sql"
+	"net/http"
+)
+
+func h(db *sql.DB, r *http.Request) {
+	db.QueryRowContext(r.Context(), "SELECT 1 WHERE n = '"+r.FormValue("n")+"'")
+}
+
+=== sqli-transaction
+// want: sast:go/sql-injection
+package main
+
+import (
+	"database/sql"
+	"net/http"
+)
+
+func h(tx *sql.Tx, r *http.Request) {
+	tx.Exec("DELETE FROM t WHERE k = " + r.PostFormValue("k"))
+}
+
+=== sqli-repository-method
+// want: sast:go/sql-injection
+package main
+
+import (
+	"database/sql"
+	"net/http"
+)
+
+type repo struct{ db *sql.DB }
+
+func (r *repo) find(name string) {
+	r.db.Query("SELECT * FROM u WHERE n = '" + name + "'")
+}
+
+func h(rp *repo, r *http.Request) {
+	rp.find(r.FormValue("n"))
+}
+
+=== sqli-three-calls-deep
+// want: sast:go/sql-injection
+package main
+
+import (
+	"database/sql"
+	"net/http"
+)
+
+func a(db *sql.DB, s string) { b(db, s) }
+func b(db *sql.DB, s string) { c(db, s) }
+func c(db *sql.DB, s string) { db.Query("SELECT " + s) }
+
+func h(db *sql.DB, r *http.Request) { a(db, r.FormValue("x")) }
+
+=== sqli-helper-returns-input
+// want: sast:go/sql-injection
+package main
+
+import (
+	"database/sql"
+	"net/http"
+)
+
+func param(r *http.Request) string { return r.FormValue("n") }
+
+func h(db *sql.DB, r *http.Request) { db.Query("SELECT " + param(r)) }
+
+=== sqli-multiple-returns
+// want: sast:go/sql-injection
+package main
+
+import (
+	"database/sql"
+	"net/http"
+)
+
+func read(r *http.Request) (string, error) { return r.FormValue("n"), nil }
+
+func h(db *sql.DB, r *http.Request) {
+	n, err := read(r)
+	if err != nil {
+		return
+	}
+	db.Query("SELECT " + n)
+}
+
+=== sqli-string-methods
+// want: sast:go/sql-injection
+package main
+
+import (
+	"database/sql"
+	"net/http"
+	"strings"
+)
+
+func h(db *sql.DB, r *http.Request) {
+	n := strings.ToUpper(strings.TrimSpace(r.FormValue("n")))
+	db.Query("SELECT '" + strings.ReplaceAll(n, "x", "y") + "'")
+}
+
+=== sqli-strings-builder
+// want: sast:go/sql-injection
+package main
+
+import (
+	"database/sql"
+	"net/http"
+	"strings"
+)
+
+func h(db *sql.DB, r *http.Request) {
+	var b strings.Builder
+	b.WriteString("SELECT * FROM t WHERE n = '")
+	b.WriteString(r.FormValue("n"))
+	b.WriteString("'")
+	db.Query(b.String())
+}
+
+=== sqli-join-slice
+// want: sast:go/sql-injection
+package main
+
+import (
+	"database/sql"
+	"net/http"
+	"strings"
+)
+
+func h(db *sql.DB, r *http.Request) {
+	parts := []string{"a = 1"}
+	parts = append(parts, "b = '"+r.FormValue("b")+"'")
+	db.Query("SELECT * FROM t WHERE " + strings.Join(parts, " AND "))
+}
+
+=== sqli-map-value
+// want: sast:go/sql-injection
+package main
+
+import (
+	"database/sql"
+	"net/http"
+)
+
+func h(db *sql.DB, r *http.Request) {
+	m := map[string]string{}
+	m["n"] = r.FormValue("n")
+	db.Query("SELECT " + m["n"])
+}
+
+=== sqli-struct-literal
+// want: sast:go/sql-injection
+package main
+
+import (
+	"database/sql"
+	"net/http"
+)
+
+type filter struct{ Name string }
+
+func h(db *sql.DB, r *http.Request) {
+	f := filter{Name: r.FormValue("n")}
+	db.Query("SELECT " + f.Name)
+}
+
+=== sqli-header
+// want: sast:go/sql-injection
+package main
+
+import (
+	"database/sql"
+	"net/http"
+)
+
+func h(db *sql.DB, r *http.Request) {
+	db.Query("SELECT '" + r.Header.Get("X-User") + "'")
+}
+
+=== sqli-cookie
+// want: sast:go/sql-injection
+package main
+
+import (
+	"database/sql"
+	"net/http"
+)
+
+func h(db *sql.DB, r *http.Request) {
+	c, err := r.Cookie("session")
+	if err != nil {
+		return
+	}
+	db.Query("SELECT * FROM s WHERE id = '" + c.Value + "'")
+}
+
+=== sqli-path-value
+// want: sast:go/sql-injection
+package main
+
+import (
+	"database/sql"
+	"net/http"
+)
+
+func h(db *sql.DB, r *http.Request) {
+	db.Query("SELECT * FROM u WHERE id = " + r.PathValue("id"))
+}
+
+=== sqli-json-body
+// want: sast:go/sql-injection
+package main
+
+import (
+	"database/sql"
+	"encoding/json"
+	"net/http"
+)
+
+type in struct{ Name string }
+
+func h(db *sql.DB, r *http.Request) {
+	var v in
+	json.NewDecoder(r.Body).Decode(&v)
+	db.Query("SELECT " + v.Name)
+}
+
+=== sqli-closure-handler
+// want: sast:go/sql-injection
+package main
+
+import (
+	"database/sql"
+	"net/http"
+)
+
+func main() {
+	var db *sql.DB
+	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		db.Query("SELECT " + r.FormValue("c"))
+	})
+}
+
+=== sqli-range-over-values
+// want: sast:go/sql-injection
+package main
+
+import (
+	"database/sql"
+	"net/http"
+)
+
+func h(db *sql.DB, r *http.Request) {
+	r.ParseForm()
+	for _, v := range r.Form["id"] {
+		db.Query("SELECT " + v)
+	}
+}
+
+=== sqli-branch-merge
+// want: sast:go/sql-injection
+package main
+
+import (
+	"database/sql"
+	"net/http"
+)
+
+func h(db *sql.DB, r *http.Request, ok bool) {
+	s := "SELECT 1"
+	if ok {
+		s = "SELECT " + r.FormValue("c")
+	}
+	db.Query(s)
+}
+
+=== sqli-defer-and-go
+// want: sast:go/sql-injection
+package main
+
+import (
+	"database/sql"
+	"net/http"
+)
+
+func h(db *sql.DB, r *http.Request) {
+	id := r.FormValue("id")
+	go func() {
+		db.Exec("DELETE FROM t WHERE id = " + id)
+	}()
+}
+
+=== sqli-recursion
+// want: sast:go/sql-injection
+package main
+
+import (
+	"database/sql"
+	"net/http"
+)
+
+func walk(db *sql.DB, s string, n int) {
+	if n == 0 {
+		db.Query("SELECT " + s)
+		return
+	}
+	walk(db, s, n-1)
+}
+
+func h(db *sql.DB, r *http.Request) { walk(db, r.FormValue("x"), 3) }
+
+=== sqli-os-args
+// want: sast:go/sql-injection
+package main
+
+import (
+	"database/sql"
+	"os"
+)
+
+func main() {
+	var db *sql.DB
+	db.Query("SELECT " + os.Args[1])
+}
+
+=== sqli-after-html-escape
+// want: sast:go/sql-injection
+package main
+
+import (
+	"database/sql"
+	"html"
+	"net/http"
+)
+
+func h(db *sql.DB, r *http.Request) {
+	db.Query("SELECT '" + html.EscapeString(r.FormValue("c")) + "'")
+}
+
+=== cmd-shell-c
+// want: sast:go/command-injection
+package main
+
+import (
+	"net/http"
+	"os/exec"
+)
+
+func h(w http.ResponseWriter, r *http.Request) {
+	exec.Command("sh", "-c", "ping "+r.FormValue("host")).Run()
+}
+
+=== cmd-context-shell
+// want: sast:go/command-injection
+package main
+
+import (
+	"context"
+	"net/http"
+	"os/exec"
+)
+
+func h(w http.ResponseWriter, r *http.Request) {
+	exec.CommandContext(context.Background(), "bash", "-c", r.FormValue("c")).Run()
+}
+
+=== cmd-tainted-executable
+// want: sast:go/command-injection
+package main
+
+import (
+	"net/http"
+	"os/exec"
+)
+
+func h(w http.ResponseWriter, r *http.Request) {
+	exec.Command(r.FormValue("bin"), "--version").Run()
+}
+
+=== cmd-from-argv
+// want: sast:go/command-injection
+package main
+
+import (
+	"os"
+	"os/exec"
+)
+
+func main() {
+	exec.Command(os.Args[1]).Run()
+}
+
+=== cmd-json-body
+// want: sast:go/command-injection
+package main
+
+import (
+	"encoding/json"
+	"net/http"
+	"os/exec"
+)
+
+type job struct{ Cmd string }
+
+func h(w http.ResponseWriter, r *http.Request) {
+	var j job
+	json.NewDecoder(r.Body).Decode(&j)
+	exec.Command(j.Cmd).Run()
+}
+
+=== path-readfile-join
+// want: sast:go/path-traversal
+package main
+
+import (
+	"net/http"
+	"os"
+	"path/filepath"
+)
+
+func h(w http.ResponseWriter, r *http.Request) {
+	b, _ := os.ReadFile(filepath.Join("/srv", r.FormValue("f")))
+	w.Write(b)
+}
+
+=== path-open-url-path
+// want: sast:go/path-traversal
+package main
+
+import (
+	"net/http"
+	"os"
+)
+
+func h(w http.ResponseWriter, r *http.Request) {
+	f, _ := os.Open("./public" + r.URL.Path)
+	defer f.Close()
+}
+
+=== path-servefile
+// want: sast:go/path-traversal
+package main
+
+import "net/http"
+
+func h(w http.ResponseWriter, r *http.Request) {
+	http.ServeFile(w, r, r.URL.Query().Get("file"))
+}
+
+=== path-remove
+// want: sast:go/path-traversal
+package main
+
+import (
+	"net/http"
+	"os"
+)
+
+func h(w http.ResponseWriter, r *http.Request) {
+	os.Remove("/tmp/" + r.FormValue("name"))
+}
+
+=== path-write-via-helper
+// want: sast:go/path-traversal
+package main
+
+import (
+	"net/http"
+	"os"
+)
+
+func save(name string, data []byte) error { return os.WriteFile("/data/"+name, data, 0o600) }
+
+func h(w http.ResponseWriter, r *http.Request) {
+	save(r.FormValue("name"), []byte("x"))
+}
+
+=== ssrf-get
+// want: sast:go/ssrf
+package main
+
+import "net/http"
+
+func h(w http.ResponseWriter, r *http.Request) {
+	http.Get(r.FormValue("url"))
+}
+
+=== ssrf-new-request
+// want: sast:go/ssrf
+package main
+
+import "net/http"
+
+func h(w http.ResponseWriter, r *http.Request) {
+	req, _ := http.NewRequest("GET", r.FormValue("u"), nil)
+	http.DefaultClient.Do(req)
+}
+
+=== ssrf-client-method
+// want: sast:go/ssrf
+package main
+
+import "net/http"
+
+func h(c *http.Client, r *http.Request) {
+	c.Get("http://" + r.FormValue("host") + "/health")
+}
+
+=== xss-fprintf
+// want: sast:go/xss
+package main
+
+import (
+	"fmt"
+	"net/http"
+)
+
+func h(w http.ResponseWriter, r *http.Request) {
+	fmt.Fprintf(w, "<p>%s</p>", r.FormValue("name"))
+}
+
+=== xss-write
+// want: sast:go/xss
+package main
+
+import "net/http"
+
+func h(w http.ResponseWriter, r *http.Request) {
+	w.Write([]byte("<b>" + r.FormValue("n") + "</b>"))
+}
+
+=== xss-io-writestring
+// want: sast:go/xss
+package main
+
+import (
+	"io"
+	"net/http"
+)
+
+func h(w http.ResponseWriter, r *http.Request) {
+	io.WriteString(w, r.URL.Query().Get("q"))
+}
+
+=== xss-template-html
+// want: sast:go/xss
+package main
+
+import (
+	"html/template"
+	"net/http"
+)
+
+func h(w http.ResponseWriter, r *http.Request) {
+	t := template.Must(template.New("x").Parse("{{.}}"))
+	t.Execute(w, template.HTML(r.FormValue("body")))
+}
+
+=== redirect-open
+// want: sast:go/open-redirect
+package main
+
+import "net/http"
+
+func h(w http.ResponseWriter, r *http.Request) {
+	http.Redirect(w, r, r.FormValue("next"), http.StatusFound)
+}
+
+=== multiple-rules-one-file
+// want: sast:go/command-injection, sast:go/sql-injection
+package main
+
+import (
+	"database/sql"
+	"net/http"
+	"os/exec"
+)
+
+func h(db *sql.DB, r *http.Request) {
+	db.Query("SELECT " + r.FormValue("a"))
+	exec.Command("sh", "-c", r.FormValue("b")).Run()
+}
+
+=== crypto-md5
+// want: sast:go/weak-crypto
+package main
+
+import "crypto/md5"
+
+func f(b []byte) [16]byte { return md5.Sum(b) }
+
+=== tls-skip-verify
+// want: sast:go/tls-verification-disabled
+package main
+
+import "crypto/tls"
+
+func f() *tls.Config { return &tls.Config{InsecureSkipVerify: true} }
+
+=== hardcoded-secret
+// want: sast:go/hardcoded-secret
+package main
+
+func f() string {
+	apiKey := "Zk3pQ9vLm2XcT7wRb5NhY8aD"
+	return apiKey
+}
+
+=== safe-placeholder
+// want: none
+package main
+
+import (
+	"database/sql"
+	"net/http"
+)
+
+func h(db *sql.DB, r *http.Request) {
+	db.Query("SELECT * FROM t WHERE id = ?", r.FormValue("id"))
+}
+
+=== safe-atoi
+// want: none
+package main
+
+import (
+	"database/sql"
+	"fmt"
+	"net/http"
+	"strconv"
+)
+
+func h(db *sql.DB, r *http.Request) {
+	id, err := strconv.Atoi(r.FormValue("id"))
+	if err != nil {
+		return
+	}
+	db.Query(fmt.Sprintf("SELECT * FROM t WHERE id = %d", id))
+}
+
+=== safe-constant-query
+// want: none
+package main
+
+import (
+	"database/sql"
+	"net/http"
+)
+
+func h(db *sql.DB, r *http.Request) {
+	_ = r.FormValue("unused")
+	db.Query("SELECT 1")
+}
+
+=== safe-allowlist-switch
+// want: none
+package main
+
+import (
+	"database/sql"
+	"net/http"
+)
+
+func h(db *sql.DB, r *http.Request) {
+	var col string
+	switch r.FormValue("sort") {
+	case "name":
+		col = "name"
+	case "age":
+		col = "age"
+	default:
+		col = "id"
+	}
+	db.Query("SELECT * FROM t ORDER BY " + col)
+}
+
+=== safe-length-only
+// want: none
+package main
+
+import (
+	"database/sql"
+	"fmt"
+	"net/http"
+)
+
+func h(db *sql.DB, r *http.Request) {
+	n := len(r.FormValue("x"))
+	db.Query(fmt.Sprintf("SELECT * FROM t LIMIT %d", n))
+}
+
+=== safe-overwritten
+// want: none
+package main
+
+import (
+	"database/sql"
+	"net/http"
+)
+
+func h(db *sql.DB, r *http.Request) {
+	s := r.FormValue("x")
+	s = "SELECT 1"
+	db.Query(s)
+}
+
+=== safe-both-branches-overwrite
+// want: none
+package main
+
+import (
+	"database/sql"
+	"net/http"
+)
+
+func h(db *sql.DB, r *http.Request, ok bool) {
+	s := r.FormValue("c")
+	if ok {
+		s = "SELECT 1"
+	} else {
+		s = "SELECT 2"
+	}
+	db.Query(s)
+}
+
+=== safe-struct-fields-separate
+// want: none
+package main
+
+import (
+	"database/sql"
+	"net/http"
+)
+
+type q struct{ a, b string }
+
+func h(db *sql.DB, r *http.Request) {
+	var v q
+	v.a = r.FormValue("x")
+	v.b = "constant"
+	db.Query(v.b)
+}
+
+=== safe-helper-only-called-with-constants
+// want: none
+package main
+
+import "database/sql"
+
+func find(db *sql.DB, name string) { db.Query("SELECT * FROM u WHERE n = '" + name + "'") }
+
+func h(db *sql.DB) { find(db, "admin") }
+
+=== safe-digest-as-filename
+// want: none
+package main
+
+import (
+	"crypto/sha256"
+	"encoding/hex"
+	"net/http"
+	"os"
+	"path/filepath"
+)
+
+func h(r *http.Request) {
+	sum := sha256.Sum256([]byte(r.FormValue("k")))
+	os.ReadFile(filepath.Join("/cache", hex.EncodeToString(sum[:])))
+}
+
+=== safe-filepath-base
+// want: none
+package main
+
+import (
+	"net/http"
+	"os"
+	"path/filepath"
+)
+
+func h(w http.ResponseWriter, r *http.Request) {
+	os.ReadFile(filepath.Join("/srv", filepath.Base(r.FormValue("f"))))
+}
+
+=== safe-html-escape
+// want: none
+package main
+
+import (
+	"fmt"
+	"html"
+	"net/http"
+)
+
+func h(w http.ResponseWriter, r *http.Request) {
+	fmt.Fprintf(w, "<p>%s</p>", html.EscapeString(r.FormValue("name")))
+}
+
+=== safe-template-execute
+// want: none
+package main
+
+import (
+	"html/template"
+	"net/http"
+)
+
+func h(w http.ResponseWriter, r *http.Request) {
+	t := template.Must(template.New("x").Parse("<p>{{.}}</p>"))
+	t.Execute(w, r.FormValue("name"))
+}
+
+=== safe-fixed-command-with-argument
+// want: none
+package main
+
+import (
+	"net/http"
+	"os/exec"
+)
+
+func h(w http.ResponseWriter, r *http.Request) {
+	exec.Command("ping", "-c", "1", r.FormValue("host")).Run()
+}
+
+=== safe-escaped-url-segment
+// want: none
+package main
+
+import (
+	"net/http"
+	"net/url"
+)
+
+func h(w http.ResponseWriter, r *http.Request) {
+	http.Get("https://api.example.com/items/" + url.PathEscape(r.FormValue("id")))
+}
+
+=== safe-ip-parsed
+// want: none
+package main
+
+import (
+	"net"
+	"net/http"
+)
+
+func h(w http.ResponseWriter, r *http.Request) {
+	ip := net.ParseIP(r.FormValue("ip"))
+	if ip == nil {
+		return
+	}
+	http.Get("http://" + ip.String() + "/status")
+}
+
+=== safe-redirect-constant
+// want: none
+package main
+
+import "net/http"
+
+func h(w http.ResponseWriter, r *http.Request) {
+	_ = r.FormValue("ignored")
+	http.Redirect(w, r, "/home", http.StatusFound)
+}
+
+=== safe-redirect-escaped-next
+// want: none
+package main
+
+import (
+	"net/http"
+	"net/url"
+)
+
+func h(w http.ResponseWriter, r *http.Request) {
+	http.Redirect(w, r, "/login?next="+url.QueryEscape(r.URL.Path), http.StatusFound)
+}
+
+=== safe-logging-only
+// want: none
+package main
+
+import (
+	"log"
+	"net/http"
+)
+
+func h(w http.ResponseWriter, r *http.Request) {
+	log.Println("request for", r.FormValue("id"))
+}
+
+=== safe-sha256
+// want: none
+package main
+
+import "crypto/sha256"
+
+func f(b []byte) [32]byte { return sha256.Sum256(b) }
+
+=== safe-tls-verified
+// want: none
+package main
+
+import "crypto/tls"
+
+func f() *tls.Config { return &tls.Config{MinVersion: tls.VersionTLS13} }
+
+=== safe-secret-from-env
+// want: none
+package main
+
+import "os"
+
+func f() string {
+	apiKey := os.Getenv("API_KEY")
+	return apiKey
+}
+
+=== sqli-interface-dispatch
+// want: sast:go/sql-injection
+package main
+
+import (
+	"database/sql"
+	"net/http"
+)
+
+type store interface{ Find(name string) }
+
+type sqlStore struct{ db *sql.DB }
+
+func (s sqlStore) Find(name string) { s.db.Query("SELECT '" + name + "'") }
+
+func h(s store, r *http.Request) { s.Find(r.FormValue("n")) }
+
+=== sqli-global-variable
+// want: sast:go/sql-injection
+package main
+
+import (
+	"database/sql"
+	"net/http"
+)
+
+var last string
+
+func set(r *http.Request) { last = r.FormValue("n") }
+
+func use(db *sql.DB) { db.Query("SELECT '" + last + "'") }
+
+=== sqli-receiver-state
+// want: sast:go/sql-injection
+package main
+
+import (
+	"database/sql"
+	"net/http"
+)
+
+type job struct {
+	db   *sql.DB
+	name string
+}
+
+func (j *job) run() { j.db.Query("SELECT '" + j.name + "'") }
+
+func h(db *sql.DB, r *http.Request) {
+	j := &job{db: db}
+	j.name = r.FormValue("n")
+	j.run()
+}
+
+=== gap-channel
+// gap: sast:go/sql-injection
+package main
+
+import (
+	"database/sql"
+	"net/http"
+)
+
+func h(db *sql.DB, r *http.Request) {
+	ch := make(chan string, 1)
+	ch <- r.FormValue("n")
+	db.Query("SELECT '" + <-ch + "'")
+}
+
+=== safe-allowlist-guard
+// want: none
+package main
+
+import (
+	"database/sql"
+	"net/http"
+)
+
+var allowed = map[string]bool{"name": true, "age": true}
+
+func h(db *sql.DB, r *http.Request) {
+	col := r.FormValue("sort")
+	if !allowed[col] {
+		return
+	}
+	db.Query("SELECT * FROM t ORDER BY " + col)
+}
+
+=== safe-regexp-guard
+// want: none
+package main
+
+import (
+	"database/sql"
+	"net/http"
+	"regexp"
+)
+
+var ident = regexp.MustCompile(`^[a-z_]+$`)
+
+func h(db *sql.DB, r *http.Request) {
+	col := r.FormValue("col")
+	if !ident.MatchString(col) {
+		return
+	}
+	db.Query("SELECT " + col + " FROM t")
+}
+
+=== fp-gap-prefix-guard
+// fp-gap: sast:go/path-traversal
+package main
+
+import (
+	"net/http"
+	"os"
+	"path/filepath"
+	"strings"
+)
+
+func h(w http.ResponseWriter, r *http.Request) {
+	p := filepath.Join("/srv", r.FormValue("f"))
+	if !strings.HasPrefix(p, "/srv/") {
+		return
+	}
+	os.ReadFile(p)
+}
+
+=== safe-allowlist-comma-ok
+// want: none
+package main
+
+import (
+	"database/sql"
+	"net/http"
+)
+
+var columns = map[string]string{"name": "name", "age": "age"}
+
+func h(db *sql.DB, r *http.Request) {
+	col := r.FormValue("sort")
+	if _, ok := columns[col]; !ok {
+		return
+	}
+	db.Query("SELECT * FROM t ORDER BY " + col)
+}
+
+=== safe-allowlist-positive-form
+// want: none
+package main
+
+import (
+	"database/sql"
+	"net/http"
+)
+
+var allowed = map[string]bool{"name": true}
+
+func h(db *sql.DB, r *http.Request) {
+	col := r.FormValue("sort")
+	if allowed[col] {
+		db.Query("SELECT * FROM t ORDER BY " + col)
+	}
+}
+
+=== safe-slices-contains-guard
+// want: none
+package main
+
+import (
+	"database/sql"
+	"net/http"
+	"slices"
+)
+
+func h(db *sql.DB, r *http.Request) {
+	col := r.FormValue("sort")
+	if !slices.Contains([]string{"a", "b"}, col) {
+		http.Error(nil, "bad", 400)
+		return
+	}
+	db.Query("SELECT * FROM t ORDER BY " + col)
+}
+
+=== guard-that-does-not-stop-is-not-trusted
+// want: sast:go/sql-injection
+package main
+
+import (
+	"database/sql"
+	"log"
+	"net/http"
+)
+
+var allowed = map[string]bool{"name": true}
+
+func h(db *sql.DB, r *http.Request) {
+	col := r.FormValue("sort")
+	if !allowed[col] {
+		log.Println("unexpected column")
+	}
+	db.Query("SELECT * FROM t ORDER BY " + col)
+}
+
+=== guard-on-a-different-value
+// want: sast:go/sql-injection
+package main
+
+import (
+	"database/sql"
+	"net/http"
+)
+
+var allowed = map[string]bool{"name": true}
+
+func h(db *sql.DB, r *http.Request) {
+	if !allowed[r.FormValue("a")] {
+		return
+	}
+	db.Query("SELECT * FROM t ORDER BY " + r.FormValue("b"))
+}
+
+=== regexp-guard-with-wildcard-is-not-trusted
+// want: sast:go/sql-injection
+package main
+
+import (
+	"database/sql"
+	"net/http"
+	"regexp"
+)
+
+var loose = regexp.MustCompile(`^[a-z]+.*$`)
+
+func h(db *sql.DB, r *http.Request) {
+	col := r.FormValue("col")
+	if !loose.MatchString(col) {
+		return
+	}
+	db.Query("SELECT " + col)
+}
+
+=== regexp-guard-unanchored-is-not-trusted
+// want: sast:go/sql-injection
+package main
+
+import (
+	"database/sql"
+	"net/http"
+	"regexp"
+)
+
+var word = regexp.MustCompile(`[a-z]+`)
+
+func h(db *sql.DB, r *http.Request) {
+	col := r.FormValue("col")
+	if !word.MatchString(col) {
+		return
+	}
+	db.Query("SELECT " + col)
+}
+
+=== sqli-interface-two-implementations-one-unsafe
+// want: sast:go/sql-injection
+package main
+
+import (
+	"database/sql"
+	"net/http"
+)
+
+type store interface{ Find(name string) }
+
+type safe struct{ db *sql.DB }
+
+func (s safe) Find(name string) { s.db.Query("SELECT 1 WHERE n = ?", name) }
+
+type unsafe struct{ db *sql.DB }
+
+func (s unsafe) Find(name string) { s.db.Query("SELECT 1 WHERE n = '" + name + "'") }
+
+func h(s store, r *http.Request) { s.Find(r.FormValue("n")) }
+
+=== safe-interface-all-implementations-safe
+// want: none
+package main
+
+import (
+	"database/sql"
+	"net/http"
+)
+
+type store interface{ Find(name string) }
+
+type safe struct{ db *sql.DB }
+
+func (s safe) Find(name string) { s.db.Query("SELECT 1 WHERE n = ?", name) }
+
+func h(s store, r *http.Request) { s.Find(r.FormValue("n")) }
+
+=== safe-global-set-from-constant
+// want: none
+package main
+
+import "database/sql"
+
+var table string
+
+func init() { table = "users" }
+
+func use(db *sql.DB) { db.Query("SELECT * FROM " + table) }
+
+=== safe-method-with-untainted-receiver
+// want: none
+package main
+
+import (
+	"database/sql"
+	"net/http"
+)
+
+type repo struct {
+	db    *sql.DB
+	table string
+}
+
+func (r *repo) all() { r.db.Query("SELECT * FROM " + r.table) }
+
+func h(rp *repo, r *http.Request) {
+	_ = r.FormValue("ignored")
+	rp.all()
+}
+
+=== fp-gap-receiver-other-field
+// fp-gap: sast:go/sql-injection
+package main
+
+import (
+	"database/sql"
+	"net/http"
+)
+
+type job struct {
+	db    *sql.DB
+	table string
+	note  string
+}
+
+func (j *job) run() { j.db.Query("SELECT * FROM " + j.table) }
+
+func h(db *sql.DB, r *http.Request) {
+	j := &job{db: db, table: "users"}
+	j.note = r.FormValue("n")
+	j.run()
+}
+
+=== sqli-variadic-helper
+// want: sast:go/sql-injection
+package main
+
+import (
+	"database/sql"
+	"net/http"
+	"strings"
+)
+
+func where(db *sql.DB, conds ...string) { db.Query("SELECT * FROM t WHERE " + strings.Join(conds, " AND ")) }
+
+func h(db *sql.DB, r *http.Request) { where(db, "a = 1", "b = '"+r.FormValue("b")+"'") }
+
+=== js/sqli-express-concat
+// want: sast:js/sql-injection
+const express = require('express');
+const app = express();
+app.get('/users', (req, res) => {
+  db.query("SELECT * FROM users WHERE name = '" + req.query.name + "'", (err, rows) => res.json(rows));
+});
+
+=== js/sqli-template-literal
+// want: sast:js/sql-injection
+app.get('/users/:id', async (req, res) => {
+  const { id } = req.params;
+  const rows = await pool.query(`SELECT * FROM users WHERE id = ${id}`);
+  res.json(rows);
+});
+
+=== js/sqli-knex-raw
+// want: sast:js/sql-injection
+app.get('/s', async (req, res) => {
+  const rows = await knex.raw("SELECT * FROM t ORDER BY " + req.query.sort);
+  res.json(rows);
+});
+
+=== js/sqli-service-layer
+// want: sast:js/sql-injection
+--- routes.js
+const { findByName } = require('./service');
+app.get('/u', async (req, res) => res.json(await findByName(req.query.name)));
+--- service.js
+const { run } = require('./repo');
+function findByName(name) { return run("SELECT * FROM u WHERE n = '" + name + "'"); }
+module.exports = { findByName };
+--- repo.js
+function run(sql) { return db.query(sql); }
+module.exports = { run };
+
+=== js/sqli-array-callback
+// want: sast:js/sql-injection
+app.post('/bulk', (req, res) => {
+  req.body.ids.forEach(id => db.query("DELETE FROM t WHERE id = " + id));
+});
+
+=== js/cmd-exec
+// want: sast:js/command-injection
+const { exec } = require('child_process');
+app.get('/ping', (req, res) => {
+  exec('ping -c 1 ' + req.query.host, (e, out) => res.type('text').send(out));
+});
+
+=== js/path-readfile
+// want: sast:js/path-traversal
+const fs = require('fs');
+const path = require('path');
+app.get('/file', (req, res) => {
+  res.type('text').send(fs.readFileSync(path.join(__dirname, 'public', req.query.name)));
+});
+
+=== js/xss-res-send
+// want: sast:js/xss
+app.get('/hello', (req, res) => {
+  res.send(`<h1>Hello ${req.query.name}</h1>`);
+});
+
+=== js/xss-innerhtml-dom
+// want: sast:js/xss
+const params = new URLSearchParams(window.location.search);
+document.querySelector('#out').innerHTML = window.location.hash;
+
+=== js/ssrf-axios
+// want: sast:js/ssrf
+const axios = require('axios');
+app.get('/proxy', async (req, res) => {
+  const r = await axios.get(req.query.url);
+  res.send(r.data);
+});
+
+=== js/redirect
+// want: sast:js/open-redirect
+app.get('/out', (req, res) => res.redirect(req.query.to));
+
+=== js/eval
+// want: sast:js/code-injection
+app.post('/calc', (req, res) => res.json({ r: eval(req.body.expr) }));
+
+=== js/safe-parameterized
+// want: none
+app.get('/u', (req, res) => {
+  db.query("SELECT * FROM users WHERE name = ?", [req.query.name], (e, rows) => res.json(rows));
+});
+
+=== js/safe-parseint
+// want: none
+app.get('/u/:id', (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  db.query("SELECT * FROM users WHERE id = " + id, (e, rows) => res.json(rows));
+});
+
+=== js/safe-allowlist
+// want: none
+const SORTABLE = ['name', 'created'];
+app.get('/u', (req, res) => {
+  const col = req.query.sort;
+  if (!SORTABLE.includes(col)) return res.sendStatus(400);
+  db.query("SELECT * FROM users ORDER BY " + col, (e, rows) => res.json(rows));
+});
+
+=== js/safe-regex-guard
+// want: none
+app.get('/u/:id', (req, res) => {
+  const id = req.params.id;
+  if (!/^[0-9a-f]{24}$/.test(id)) return res.sendStatus(400);
+  db.query("SELECT * FROM users WHERE id = '" + id + "'", (e, rows) => res.json(rows));
+});
+
+=== js/safe-basename
+// want: none
+const fs = require('fs');
+const path = require('path');
+app.get('/f', (req, res) => res.send(fs.readFileSync('/srv/' + path.basename(req.query.name))));
+
+=== js/safe-escape-html
+// want: none
+const escapeHtml = require('escape-html');
+app.get('/h', (req, res) => res.send('<p>' + escapeHtml(req.query.name) + '</p>'));
+
+=== js/safe-socket-send
+// want: none
+io.on('connection', (socket) => {
+  socket.on('m', (req) => socket.send(req.query.m));
+});
+
+=== js/safe-local-params-variable
+// want: none
+function build() {
+  const params = { sort: 'name' };
+  return db.query("SELECT * FROM t ORDER BY " + params.sort);
+}
+
+=== js/gap-promise-chain
+// gap: sast:js/sql-injection
+app.get('/u', (req, res) => {
+  Promise.resolve(req.query.id).then(id => db.query("SELECT " + id));
+});
+
+=== ts/sqli-nest-controller
+// want: sast:js/sql-injection
+import { Controller, Get, Query } from '@nestjs/common';
+@Controller('users')
+export class UsersController {
+  constructor(private readonly db: any) {}
+  @Get()
+  find(@Query('name') name: string) {
+    return this.db.query(`SELECT * FROM users WHERE name = '${name}'`);
+  }
+}
+
+=== ts/sqli-typed-request
+// want: sast:js/sql-injection
+import { Request, Response } from 'express';
+export async function handler(req: Request, res: Response) {
+  const term: string = req.query.q as string;
+  const rows = await pool.query("SELECT * FROM items WHERE title LIKE '%" + term + "%'");
+  res.json(rows);
+}
+
+=== ts/safe-numeric-param
+// want: none
+import { Request, Response } from 'express';
+export async function handler(req: Request, res: Response) {
+  const page: number = Number(req.query.page);
+  const rows = await pool.query("SELECT * FROM items LIMIT 20 OFFSET " + page * 20);
+  res.json(rows);
+}
+
+=== py/sqli-flask-sqlite
+# want: sast:py/sql-injection
+import sqlite3
+from flask import Flask, request
+app = Flask(__name__)
+
+@app.route("/user")
+def user():
+    conn = sqlite3.connect("app.db")
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM users WHERE name = '" + request.args.get("name") + "'")
+    return str(cur.fetchall())
+
+=== py/sqli-django-raw
+# want: sast:py/sql-injection
+from django.http import JsonResponse
+
+def search(request):
+    term = request.GET.get("q", "")
+    rows = list(Item.objects.raw("SELECT * FROM item WHERE title LIKE '%%" + term + "%%'"))
+    return JsonResponse({"n": len(rows)})
+
+=== py/sqli-fastapi-route-param
+# want: sast:py/sql-injection
+from fastapi import FastAPI
+app = FastAPI()
+
+@app.get("/items")
+def items(q: str, db):
+    return db.execute(f"SELECT * FROM items WHERE title = '{q}'")
+
+=== py/sqli-service-layer
+# want: sast:py/sql-injection
+--- views.py
+from flask import request
+from .services import find_user
+
+def view():
+    return find_user(request.args["name"])
+--- services.py
+from .repo import run
+
+def find_user(name):
+    return run("SELECT * FROM users WHERE name = '%s'" % name)
+--- repo.py
+def run(sql):
+    return cursor.execute(sql)
+
+=== py/cmd-os-system
+# want: sast:py/command-injection
+import os
+from flask import request, Flask
+app = Flask(__name__)
+
+@app.route("/ping")
+def ping():
+    return os.popen("ping -c 1 " + request.args["host"]).read()
+
+=== py/cmd-subprocess-shell
+# want: sast:py/command-injection
+import subprocess
+from flask import request
+
+def run():
+    return subprocess.check_output("convert " + request.form["f"] + " out.png", shell=True)
+
+=== py/path-open
+# want: sast:py/path-traversal
+from flask import request
+
+def download():
+    with open("/srv/files/" + request.args["name"], "rb") as f:
+        return f.read()
+
+=== py/ssrf-requests
+# want: sast:py/ssrf
+import requests
+from flask import request
+
+def fetch():
+    return requests.get(request.args["url"], timeout=5).text
+
+=== py/deser-pickle
+# want: sast:py/insecure-deserialization
+import pickle
+from flask import request
+
+def load():
+    return pickle.loads(request.get_data())
+
+=== py/ssti
+# want: sast:py/code-injection
+from flask import request, render_template_string
+
+def page():
+    return render_template_string("<h1>" + request.args["name"] + "</h1>")
+
+=== py/safe-parameterized
+# want: none
+from flask import request
+
+def user(cur):
+    cur.execute("SELECT * FROM users WHERE name = %s", (request.args["name"],))
+
+=== py/safe-int
+# want: none
+from flask import request
+
+def user(cur):
+    uid = int(request.args["id"])
+    cur.execute("SELECT * FROM users WHERE id = " + str(uid))
+
+=== py/safe-list-subprocess
+# want: none
+import subprocess
+from flask import request
+
+def run():
+    return subprocess.check_output(["convert", request.form["f"], "out.png"])
+
+=== py/safe-secure-filename
+# want: none
+from flask import request
+from werkzeug.utils import secure_filename
+
+def save():
+    with open("/srv/up/" + secure_filename(request.files["f"].filename), "wb") as f:
+        f.write(b"")
+
+=== py/safe-allowlist
+# want: none
+from flask import request
+SORTABLE = {"name", "created"}
+
+def users(cur):
+    col = request.args.get("sort", "name")
+    if col not in SORTABLE:
+        return "bad", 400
+    cur.execute("SELECT * FROM users ORDER BY " + col)
+
+=== py/safe-regex-guard
+# want: none
+import re
+from flask import request
+
+def users(cur):
+    ident = request.args["id"]
+    if not re.match(r"^[A-Za-z0-9_]+$", ident):
+        return "bad", 400
+    cur.execute("SELECT * FROM users WHERE ident = '" + ident + "'")
+
+=== py/safe-plain-helper
+# want: none
+def build(cur, name):
+    cur.execute("SELECT * FROM users WHERE name = '" + name + "'")
+
+=== py/gap-getattr-dispatch
+# gap: sast:py/code-injection
+from flask import request
+import handlers
+
+def dispatch():
+    return getattr(handlers, request.args["action"])()
+
+=== java/sqli-servlet
+// want: sast:java/sql-injection
+import javax.servlet.http.*;
+import java.sql.*;
+
+public class UserServlet extends HttpServlet {
+  protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws Exception {
+    Connection c = DriverManager.getConnection("jdbc:h2:mem:");
+    Statement st = c.createStatement();
+    ResultSet rs = st.executeQuery("SELECT * FROM users WHERE name = '" + req.getParameter("name") + "'");
+  }
+}
+
+=== java/sqli-spring-jdbc-template
+// want: sast:java/sql-injection
+import org.springframework.web.bind.annotation.*;
+import org.springframework.jdbc.core.JdbcTemplate;
+
+@RestController
+public class UserController {
+  private final JdbcTemplate jdbcTemplate;
+  public UserController(JdbcTemplate t) { this.jdbcTemplate = t; }
+
+  @GetMapping("/users")
+  public Object users(@RequestParam String name) {
+    return jdbcTemplate.queryForList("SELECT * FROM users WHERE name = '" + name + "'");
+  }
+}
+
+=== java/sqli-service-layer
+// want: sast:java/sql-injection
+--- UserController.java
+import org.springframework.web.bind.annotation.*;
+
+@RestController
+public class UserController {
+  private UserService service;
+
+  @GetMapping("/users")
+  public Object users(@RequestParam("q") String q) { return service.search(q); }
+}
+--- UserService.java
+public class UserService {
+  private UserDao dao;
+  public Object search(String q) { return dao.find(q); }
+}
+--- UserDao.java
+import java.sql.*;
+
+public class UserDao {
+  private Statement st;
+  public Object find(String q) throws Exception { return st.executeQuery("SELECT * FROM u WHERE n = '" + q + "'"); }
+}
+
+=== java/cmd-runtime-exec
+// want: sast:java/command-injection
+import javax.servlet.http.*;
+
+public class P extends HttpServlet {
+  protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws Exception {
+    Runtime.getRuntime().exec("ping -c 1 " + req.getParameter("host"));
+  }
+}
+
+=== java/xss-writer
+// want: sast:java/xss
+import javax.servlet.http.*;
+
+public class H extends HttpServlet {
+  protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws Exception {
+    resp.getWriter().println("<h1>Hello " + req.getParameter("name") + "</h1>");
+  }
+}
+
+=== java/path-fileinputstream
+// want: sast:java/path-traversal
+import javax.servlet.http.*;
+import java.io.*;
+
+public class F extends HttpServlet {
+  protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws Exception {
+    InputStream in = new FileInputStream("/srv/files/" + req.getParameter("name"));
+  }
+}
+
+=== java/safe-prepared-statement
+// want: none
+import javax.servlet.http.*;
+import java.sql.*;
+
+public class S extends HttpServlet {
+  protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws Exception {
+    Connection c = DriverManager.getConnection("jdbc:h2:mem:");
+    PreparedStatement ps = c.prepareStatement("SELECT * FROM users WHERE name = ?");
+    ps.setString(1, req.getParameter("name"));
+    ps.executeQuery();
+  }
+}
+
+=== java/safe-parse-int
+// want: none
+import javax.servlet.http.*;
+import java.sql.*;
+
+public class S extends HttpServlet {
+  protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws Exception {
+    Statement st = DriverManager.getConnection("jdbc:h2:mem:").createStatement();
+    int id = Integer.parseInt(req.getParameter("id"));
+    st.executeQuery("SELECT * FROM users WHERE id = " + id);
+  }
+}
+
+=== java/safe-regex-guard
+// want: none
+import javax.servlet.http.*;
+import java.sql.*;
+
+public class S extends HttpServlet {
+  protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws Exception {
+    Statement st = DriverManager.getConnection("jdbc:h2:mem:").createStatement();
+    String col = req.getParameter("col");
+    if (!col.matches("[a-z_]+")) { return; }
+    st.executeQuery("SELECT " + col + " FROM t");
+  }
+}
+
+=== java/gap-session-roundtrip
+// gap: sast:java/sql-injection
+import javax.servlet.http.*;
+import java.sql.*;
+
+public class S extends HttpServlet {
+  protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws Exception {
+    req.getSession().setAttribute("n", req.getParameter("n"));
+    Statement st = DriverManager.getConnection("jdbc:h2:mem:").createStatement();
+    st.executeQuery("SELECT '" + req.getSession().getAttribute("n") + "'");
+  }
+}
+
+=== php/sqli-mysqli
+// want: sast:php/sql-injection
+<?php
+$id = $_GET['id'];
+$res = mysqli_query($conn, "SELECT * FROM users WHERE id = " . $id);
+
+=== php/sqli-pdo-query
+// want: sast:php/sql-injection
+<?php
+function find($pdo) {
+    return $pdo->query("SELECT * FROM users WHERE name = '" . $_POST['name'] . "'")->fetchAll();
+}
+
+=== php/sqli-class-helper
+// want: sast:php/sql-injection
+<?php
+class UserRepo {
+    private $pdo;
+    public function findByName($name) {
+        return $this->pdo->query("SELECT * FROM users WHERE name = '$name'");
+    }
+}
+function handle($repo) {
+    return $repo->findByName($_GET['name']);
+}
+
+=== php/cmd-system
+// want: sast:php/command-injection
+<?php
+system("convert " . $_GET['file'] . " out.png");
+
+=== php/xss-echo
+// want: sast:php/xss
+<?php
+echo "<h1>Welcome " . $_GET['name'] . "</h1>";
+
+=== php/lfi-include
+// want: sast:php/path-traversal
+<?php
+include($_GET['page'] . '.php');
+
+=== php/unserialize
+// want: sast:php/insecure-deserialization
+<?php
+$data = unserialize($_COOKIE['prefs']);
+
+=== php/safe-prepared
+// want: none
+<?php
+function find($pdo) {
+    $s = $pdo->prepare("SELECT * FROM users WHERE name = ?");
+    $s->execute([$_POST['name']]);
+    return $s->fetchAll();
+}
+
+=== php/safe-intval
+// want: none
+<?php
+$id = intval($_GET['id']);
+$res = mysqli_query($conn, "SELECT * FROM users WHERE id = $id");
+
+=== php/safe-htmlspecialchars
+// want: none
+<?php
+echo "<h1>" . htmlspecialchars($_GET['name'], ENT_QUOTES) . "</h1>";
+
+=== php/safe-preg-guard
+// want: none
+<?php
+$id = $_GET['id'];
+if (!preg_match('/^[0-9]+$/', $id)) { die('bad id'); }
+$res = mysqli_query($conn, "SELECT * FROM users WHERE id = " . $id);
+
+=== php/gap-extract
+// gap: sast:php/sql-injection
+<?php
+extract($_GET);
+$res = mysqli_query($conn, "SELECT * FROM users WHERE id = " . $id);
+
+=== rb/sqli-where-interpolation
+# want: sast:rb/sql-injection
+class UsersController < ApplicationController
+  def index
+    @users = User.where("name = '#{params[:name]}'")
+  end
+end
+
+=== rb/sqli-order
+# want: sast:rb/sql-injection
+class UsersController < ApplicationController
+  def index
+    @users = User.order(params[:sort])
+  end
+end
+
+=== rb/sqli-helper-method
+# want: sast:rb/sql-injection
+class UsersController < ApplicationController
+  def show
+    find_by_name(params[:name])
+  end
+
+  def find_by_name(name)
+    User.find_by_sql("SELECT * FROM users WHERE name = '#{name}'")
+  end
+end
+
+=== rb/cmd-system
+# want: sast:rb/command-injection
+class ToolsController < ApplicationController
+  def ping
+    system("ping -c 1 #{params[:host]}")
+  end
+end
+
+=== rb/path-file-read
+# want: sast:rb/path-traversal
+class FilesController < ApplicationController
+  def show
+    render plain: File.read(Rails.root.join("public", params[:name]).to_s)
+  end
+end
+
+=== rb/xss-html-safe
+# want: sast:rb/xss
+class PagesController < ApplicationController
+  def hello
+    render html: "<h1>Hello #{params[:name]}</h1>".html_safe
+  end
+end
+
+=== rb/redirect
+# want: sast:rb/open-redirect
+class SessionsController < ApplicationController
+  def create
+    redirect_to params[:return_to]
+  end
+end
+
+=== rb/deser-marshal
+# want: sast:rb/insecure-deserialization
+class ImportController < ApplicationController
+  def create
+    Marshal.load(Base64.decode64(params[:blob]))
+  end
+end
+
+=== rb/safe-hash-where
+# want: none
+class UsersController < ApplicationController
+  def index
+    @users = User.where(name: params[:name], active: true)
+  end
+end
+
+=== rb/safe-placeholder-where
+# want: none
+class UsersController < ApplicationController
+  def index
+    @users = User.where("name = ?", params[:name])
+  end
+end
+
+=== rb/safe-to-i
+# want: none
+class UsersController < ApplicationController
+  def index
+    @users = User.where("id = #{params[:id].to_i}")
+  end
+end
+
+=== rb/safe-system-argv-form
+# want: none
+class ToolsController < ApplicationController
+  def ping
+    system("ping", "-c", "1", params[:host])
+  end
+end
+
+=== rb/safe-allowlist
+# want: none
+class UsersController < ApplicationController
+  SORTABLE = %w[name created_at].freeze
+  def index
+    col = params[:sort]
+    return head(:bad_request) unless SORTABLE.include?(col)
+    @users = User.order("#{col} asc")
+  end
+end
+
+=== rb/safe-regex-guard
+# want: none
+class UsersController < ApplicationController
+  def show
+    id = params[:id]
+    return head(:bad_request) unless id =~ /\A[0-9]+\z/
+    @user = User.where("id = #{id}").first
+  end
+end
+
+=== rb/code-dynamic-send
+# want: sast:rb/code-injection
+class Reports < ApplicationController
+  def run
+    report = Report.new
+    report.public_send("build_#{params[:kind]}")
+  end
+end

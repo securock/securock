@@ -59,6 +59,14 @@ Those changes are easy to miss in a language lockfile diff.
   (development-only), or unknown from the dependency graph, so `audit`
   stops failing on test tooling
 
+**Source code analysis**
+
+- `sast` follows untrusted data (HTTP input, command-line arguments) through
+  assignments, fields, closures, and calls across functions and files to SQL,
+  command, code, path, request, response, and deserialization sinks, and prints
+  the path it took. Go, JavaScript/TypeScript, Python, Java, PHP, and Ruby,
+  fully offline. A file it cannot parse is reported rather than skipped
+
 **Exports**
 
 - CycloneDX 1.6 / SPDX 2.3 SBOM export with trust evidence, and
@@ -158,6 +166,7 @@ Cargo under [`examples/`](examples/).
 | `securock verify`  | Fail on trust-relevant drift                                |
 | `securock explain` | Explain why a package is trusted                            |
 | `securock audit`   | Report dependency findings by severity                      |
+| `securock sast`    | Find vulnerabilities in your own source code                |
 | `securock doctor`  | Check the project setup for security problems               |
 | `securock sbom`    | Export `securock.lock` as CycloneDX or SPDX, or verify one  |
 | `securock accept`  | Accept a finding until a date, with a reason                |
@@ -175,7 +184,7 @@ Cargo under [`examples/`](examples/).
 | `--format sarif`        | SARIF 2.1.0 on every report command, for GitHub code scanning                                  |
 | `--output`              | Write the report to a file instead of stdout (also on exit `1`)                                |
 | `--min-release-age`     | `audit`. Report npm and PyPI releases newer than this, such as `7d`                            |
-| `--fail-on`             | `audit` and `doctor`. Exit `1` at or above this severity (default `high`)                      |
+| `--fail-on`             | `audit`, `sast` and `doctor`. Exit `1` at or above this severity (default `high`)                      |
 | `--exceptions`          | Accepted-findings file (default `.securock/exceptions.yaml`)                                   |
 | `--reachability`        | Record package scope and dependencies; mark vulnerabilities reachable, unreachable, or unknown |
 | `--no-fail`             | Always exit `0`                                                                                |

@@ -16,6 +16,7 @@ securock update [path]
 securock verify [path]
 securock explain PACKAGE [path]
 securock audit [path]
+securock sast [path]
 securock doctor [path]
 securock sbom export [path]
 securock sbom verify SBOM [path]
@@ -39,6 +40,7 @@ verified. The CLI prints this as `trusted (under active policy)`.
 | `verify`  | Fail on trust-relevant drift versus the lockfile             |
 | `explain` | Print a trust checklist for one package                      |
 | `audit`   | Report dependency findings ranked by severity                |
+| `sast`    | Find vulnerabilities in your own source code                 |
 | `doctor`  | Check the project setup for security problems                |
 | `sbom`    | Export the lockfile as an SBOM, or verify an SBOM against it |
 | `accept`  | Accept a finding until a date, with a reason                 |
@@ -230,12 +232,59 @@ checks for one subject under the active policy.
 provenance or signatures rank lower. Evidence that was not checked is
 reported as `info`, so offline runs always have `info` findings.
 
+`sast` analyzes the project's own source, offline, and reports untrusted data
+that reaches a dangerous call along with the path it took. It reads Go,
+JavaScript and TypeScript (`js`), Python (`py`), Java (`java`), PHP (`php`),
+and Ruby (`rb`). Rule ids are `sast:LANGUAGE/RULE`:
+
+| Rule                        | CWE | Severity | Languages  |
+| --------------------------- | --- | -------- | ---------- |
+| `sql-injection`             | 89  | high     | all        |
+| `command-injection`         | 78  | high     | all        |
+| `path-traversal`            | 22  | high     | all        |
+| `ssrf`                      | 918 | medium   | all        |
+| `xss`                       | 79  | medium   | all        |
+| `open-redirect`             | 601 | medium   | all        |
+| `code-injection`            | 94  | critical | all but Go |
+| `insecure-deserialization`  | 502 | high     | all but Go |
+| `weak-crypto`               | 327 | medium   | Go         |
+| `tls-verification-disabled` | 295 | medium   | Go         |
+| `hardcoded-secret`          | 798 | medium   | Go         |
+
+`sast:analysis-incomplete` (info) marks a file that could not be analyzed.
+
+Sources are HTTP request data and command-line arguments: `net/http`, gin,
+echo, fiber, chi and mux in Go; Express, Koa, Next.js, NestJS and the browser
+URL in JavaScript; Flask, Django, FastAPI and Tornado in Python; servlets,
+Spring and JAX-RS in Java; the PHP superglobals and Laravel requests; Rails
+and Sinatra `params`. Taint is tracked per field, through closures, interface
+and inheritance calls, and across functions and files. A sanitizer clears only
+the classes it neutralizes: HTML escaping stops `xss` but not SQL injection,
+while an integer conversion or a digest clears everything. Test files,
+`vendor`, `node_modules`, `testdata`, build output, and generated files are not
+analyzed.
+
+A file that does not parse is reported as `sast:analysis-incomplete`: its
+vulnerabilities are unknown, not absent. A value that passes a strict check and
+then leaves the function on failure (`if !allowed[x] { return }`, or an
+anchored regular expression that admits only letters, digits and a few
+separators) counts as validated. Channels, reflection, sessions and other
+storage round trips, and field-level state of a method receiver are not
+modeled, so a clean run is not proof of safety.
+
+Go is type-checked, so callees are resolved exactly; for the other languages
+callees are resolved through imports and declared types, and a call on a value
+of unknown class is matched by method name only when at most three classes
+define it. Calls into third-party libraries the rules do not name are assumed
+to pass their arguments through to the result. `sast` uses the same `accept`,
+`--exceptions`, and `--fail-on` flow as `audit`.
+
 `doctor` checks the setup around securock: the lockfile and policy,
 registry config (`.npmrc`, `.yarnrc.yml`, `nuget.config`) for plain
 http, disabled TLS and literal credentials, workflow actions that are
 not pinned to a commit SHA, and missing repository rulesets.
 
-Both commands accept `--fail-on SEVERITY` (`critical`, `high`,
+`audit`, `sast` and `doctor` accept `--fail-on SEVERITY` (`critical`, `high`,
 `medium`, `low` or `info`; default `high`) and exit `1` when a finding
 is at or above it.
 
@@ -253,7 +302,7 @@ findings; see [Release cooldown](/guide/evidence#release-cooldown).
 | `--lock`         | Path to `securock.lock` (for `lock` / `diff` / `update` / `verify`)                       |
 | `--format`       | `text` (default), `json`, or `sarif`                                                      |
 | `--output`       | Write the report to a file instead of stdout                                              |
-| `--exceptions`   | Path to the accepted-findings file (`accept`, `audit`, `doctor`)                          |
+| `--exceptions`   | Path to the accepted-findings file (`accept`, `audit`, `sast`, `doctor`)                  |
 | `--reachability` | Record scope and dependencies and mark vulnerabilities reachable, unreachable, or unknown |
 | `--no-fail`      | Always exit `0`                                                                           |
 
@@ -285,7 +334,8 @@ securock verify --format sarif --output securock.sarif
 - `scan --format json` emits the lock document shape.
 - `diff` and `verify` print a `schema_version: 1` report.
 - `explain --format json` emits the matched artifacts.
-- `--format sarif` works on `scan`, `diff`, `verify`, `audit`, and `doctor`.
+- `--format sarif` works on `scan`, `diff`, `verify`, `audit`, `sast`, and `doctor`.
+  `sast` results point at the source line and carry a `codeFlows` trace.
   Results point at `securock.lock` and name the package as a logical
   location. Each result has a stable `partialFingerprints` entry so code
   scanning can track it across runs. `--output` writes the file even when
@@ -304,7 +354,7 @@ Upload SARIF to GitHub code scanning:
 Machine-readable schemas live in the repository under
 [`schemas/`](https://github.com/securock/securock/tree/main/schemas)
 (`securock-lock`, `scan-report`, `diff-report`, `verify-report`,
-`audit-report`, `doctor-report`, `sbom-verify-report`).
+`audit-report`, `sast-report`, `doctor-report`, `sbom-verify-report`).
 
 ## Typical workflow
 

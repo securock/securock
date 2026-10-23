@@ -4,6 +4,7 @@ go 1.26.0
 
 require (
 	github.com/in-toto/attestation v1.2.0
+	github.com/odvcencio/gotreesitter v0.56.0
 	github.com/pelletier/go-toml/v2 v2.4.3
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.3
 	github.com/sigstore/protobuf-specs v0.5.2

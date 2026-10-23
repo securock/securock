@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://securock.dev/schema/sast-report.schema.json",
+  "title": "securock sast report",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["tool", "findings"],
+  "properties": {
+    "tool": { "const": "sast" },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "severity", "title", "location"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^sast:" },
+          "severity": { "enum": ["critical", "high", "medium", "low", "info"] },
+          "title": { "type": "string", "minLength": 1 },
+          "detail": { "type": "string" },
+          "subject": { "type": "string" },
+          "remediation": { "type": "string" },
+          "location": { "$ref": "#/$defs/location" },
+          "trace": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["file", "line", "message"],
+              "properties": {
+                "file": { "type": "string", "minLength": 1 },
+                "line": { "type": "integer", "minimum": 1 },
+                "column": { "type": "integer", "minimum": 1 },
+                "message": { "type": "string", "minLength": 1 }
+              }
+            }
+          },
+          "suppressed": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["reason", "expires"],
+            "properties": {
+              "reason": { "type": "string", "minLength": 1 },
+              "approver": { "type": "string" },
+              "expires": { "type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" }
+            }
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "location": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["file", "line"],
+      "properties": {
+        "file": { "type": "string", "minLength": 1 },
+        "line": { "type": "integer", "minimum": 1 },
+        "column": { "type": "integer", "minimum": 1 }
+      }
+    }
+  }
+}
