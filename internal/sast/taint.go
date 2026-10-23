@@ -640,6 +640,14 @@ func (a *analyzer) applyFill(c *ast.CallExpr, f fill, argT []taintSet, recvT tai
 	if len(t) == 0 {
 		return
 	}
+	if f.rest {
+		for i := f.to; i < len(c.Args); i++ {
+			if obj, field, _, ok := a.pathOf(c.Args[i]); ok {
+				st.write(obj, field, t, true)
+			}
+		}
+		return
+	}
 	var target ast.Expr
 	if f.to == toRecv {
 		target = recvExpr

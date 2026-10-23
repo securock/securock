@@ -193,10 +193,14 @@ var sinks = map[string]sink{
 	"(*github.com/jackc/pgx/pgxpool.Pool).QueryRow": {kind: kSQL, args: []int{1}},
 	"(*github.com/jackc/pgx/pgxpool.Pool).Exec":     {kind: kSQL, args: []int{1}},
 
-	"os/exec.Command":        {kind: kCmd, args: []int{0}, shellFrom: 1},
-	"os/exec.CommandContext": {kind: kCmd, args: []int{1}, shellFrom: 2},
-	"syscall.Exec":           {kind: kCmd, args: []int{0}},
-	"os.StartProcess":        {kind: kCmd, args: []int{0}},
+	"os/exec.Command":                         {kind: kCmd, args: []int{0}, shellFrom: 1},
+	"os/exec.CommandContext":                  {kind: kCmd, args: []int{1}, shellFrom: 2},
+	"golang.org/x/sys/execabs.Command":        {kind: kCmd, args: []int{0}, shellFrom: 1},
+	"golang.org/x/sys/execabs.CommandContext": {kind: kCmd, args: []int{1}, shellFrom: 2},
+	"syscall.ForkExec":                        {kind: kCmd, args: []int{0}},
+	"syscall.StartProcess":                    {kind: kCmd, args: []int{0}},
+	"syscall.Exec":                            {kind: kCmd, args: []int{0}},
+	"os.StartProcess":                         {kind: kCmd, args: []int{0}},
 
 	"os.Open":             {kind: kPath, args: []int{0}},
 	"os.OpenFile":         {kind: kPath, args: []int{0}},
@@ -266,17 +270,19 @@ var sinks = map[string]sink{
 // sanitizers return their input with the listed kinds neutralized. Numeric and boolean
 // results are cleared everywhere by type instead (an int cannot carry a payload).
 var sanitizers = map[string]kind{
-	"html.EscapeString":              kXSS,
-	"html/template.HTMLEscapeString": kXSS,
-	"html/template.JSEscapeString":   kXSS,
-	"html/template.HTMLEscaper":      kXSS,
-	"net/url.QueryEscape":            kXSS | kPath | kRedirect | kSSRF,
-	"net/url.PathEscape":             kXSS | kPath | kRedirect | kSSRF,
-	"path/filepath.Base":             kPath,
-	"path.Base":                      kPath,
-	"strconv.Quote":                  kLog,
-	"strings.ReplaceAll":             kLog,
-	"strings.Replace":                kLog,
+	"html.EscapeString":                 kXSS,
+	"html/template.HTMLEscapeString":    kXSS,
+	"html/template.JSEscapeString":      kXSS,
+	"html/template.HTMLEscaper":         kXSS,
+	"net/url.QueryEscape":               kXSS | kPath | kRedirect | kSSRF,
+	"net/url.PathEscape":                kXSS | kPath | kRedirect | kSSRF,
+	"github.com/lib/pq.QuoteIdentifier": kSQL,
+	"github.com/lib/pq.QuoteLiteral":    kSQL,
+	"path/filepath.Base":                kPath,
+	"path.Base":                         kPath,
+	"strconv.Quote":                     kLog,
+	"strings.ReplaceAll":                kLog,
+	"strings.Replace":                   kLog,
 
 	// Parsed values are structured data, not text that can carry a payload.
 	"net.ParseIP":           kAll,
@@ -320,7 +326,8 @@ var sourceCalls = map[string]string{
 }
 
 var sourceVars = map[string]string{
-	"os.Args": "command-line arguments",
+	"os.Args":  "command-line arguments",
+	"os.Stdin": "standard input",
 }
 
 // requestFields are the fields of net/http.Request that hold attacker-controlled data.
@@ -341,6 +348,7 @@ type fill struct {
 	to   int    // argument index that receives the data (a pointer or value to merge into)
 	from int    // argument index it comes from, or fromRecv, or fromSource
 	src  string // description when from == fromSource
+	rest bool   // every argument from index to onward receives the data
 }
 
 const (
@@ -350,6 +358,10 @@ const (
 )
 
 var fills = map[string]fill{
+	// Reading from standard input is untrusted for a command-line program.
+	"fmt.Scan":                                            {to: 0, from: fromSource, src: "standard input", rest: true},
+	"fmt.Scanln":                                          {to: 0, from: fromSource, src: "standard input", rest: true},
+	"fmt.Scanf":                                           {to: 1, from: fromSource, src: "standard input", rest: true},
 	"encoding/json.Unmarshal":                             {to: 1, from: 0},
 	"encoding/xml.Unmarshal":                              {to: 1, from: 0},
 	"(*encoding/json.Decoder).Decode":                     {to: 0, from: fromRecv},

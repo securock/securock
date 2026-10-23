@@ -366,7 +366,7 @@ YAML is treated as a manifest only when it has `apiVersion` and `kind`, or a
 limits, network policies or IAM least privilege beyond wildcards, is not
 checked.
 
-Sources are HTTP request data and command-line arguments: `net/http`, gin,
+Sources are HTTP request data, command-line arguments and standard input: `net/http`, gin,
 echo, fiber, chi and mux in Go; Express, Koa, Next.js, NestJS, Angular routes and the browser
 URL in JavaScript; Flask, Django, FastAPI and Tornado in Python; servlets,
 Spring and JAX-RS in Java; ASP.NET Core controller actions (`[FromQuery]`, `[FromBody]`, `Request.Query`)
