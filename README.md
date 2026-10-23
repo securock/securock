@@ -154,6 +154,7 @@ Cargo under [`examples/`](examples/).
 | `securock scan`    | Inspect the tree (default if you pass no command)           |
 | `securock lock`    | Write `securock.lock`                                       |
 | `securock diff`    | Show trust drift vs the lockfile                            |
+| `securock update`  | Review trust changes, then refresh the lockfile             |
 | `securock verify`  | Fail on trust-relevant drift                                |
 | `securock explain` | Explain why a package is trusted                            |
 | `securock audit`   | Report dependency findings by severity                      |
@@ -169,7 +170,7 @@ Cargo under [`examples/`](examples/).
 | `--offline`             | Skip remote lookups; remote evidence stays `unknown`                                           |
 | `--policy`              | Path to a policy file                                                                          |
 | `--profile`             | Built-in policy profile: `default` or `strict` (not with `--policy`)                           |
-| `--lock`                | Path to `securock.lock` (for `lock` / `diff` / `verify`)                                       |
+| `--lock`                | Path to `securock.lock` (for `lock` / `diff` / `update` / `verify`)                            |
 | `--format json`         | Stable JSON on `scan`, `diff`, `verify`, and `explain`                                         |
 | `--format sarif`        | SARIF 2.1.0 on every report command, for GitHub code scanning                                  |
 | `--output`              | Write the report to a file instead of stdout (also on exit `1`)                                |

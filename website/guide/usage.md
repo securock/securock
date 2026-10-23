@@ -12,6 +12,7 @@ or compares against `securock.lock`.
 securock scan [path]
 securock lock [path]
 securock diff [path]
+securock update [path]
 securock verify [path]
 securock explain PACKAGE [path]
 securock audit [path]
@@ -34,6 +35,7 @@ verified. The CLI prints this as `trusted (under active policy)`.
 | `scan`    | Inspect the current tree under the active policy (default)   |
 | `lock`    | Write a deterministic `securock.lock`                        |
 | `diff`    | Show trust drift versus the lockfile                         |
+| `update`  | Review trust changes, then refresh the lockfile              |
 | `verify`  | Fail on trust-relevant drift versus the lockfile             |
 | `explain` | Print a trust checklist for one package                      |
 | `audit`   | Report dependency findings ranked by severity                |
@@ -41,6 +43,28 @@ verified. The CLI prints this as `trusted (under active policy)`.
 | `sbom`    | Export the lockfile as an SBOM, or verify an SBOM against it |
 | `accept`  | Accept a finding until a date, with a reason                 |
 | `version` | Print the build version                                      |
+
+### `update`
+
+`update` is the review step after a dependency update. It scans the tree,
+prints the same report as `diff`, and records the new state in
+`securock.lock` only when you ask.
+
+```sh
+securock update              # preview: show what changed, write nothing
+securock update --write      # record the new state
+```
+
+- Without `--write` the lockfile is never touched and the command exits `0`,
+  so it is a preview, not a gate. Use `verify` to fail CI on drift.
+- `--write` refuses to record a state that has untrusted or unknown
+  artifacts and exits `1` without changing the file. Add `--no-fail` to record
+  it anyway, for example for a first offline snapshot.
+- When the lockfile already matches the tree, it reports `up to date` and
+  leaves the file byte-identical.
+- It needs an existing `securock.lock`; run `securock lock` once to create it.
+- `--format json` prints the `diff` report (`diff-report` schema) on stdout and
+  moves the status lines to stderr. `--format sarif` is not supported.
 
 ### `sbom`
 
@@ -226,7 +250,7 @@ findings; see [Release cooldown](/guide/evidence#release-cooldown).
 | `--offline`      | Skip remote lookups; remote evidence stays `unknown`                                      |
 | `--policy`       | Path to a policy file                                                                     |
 | `--profile`      | Built-in policy: `default` or `strict` (not with `--policy`)                              |
-| `--lock`         | Path to `securock.lock` (for `lock` / `diff` / `verify`)                                  |
+| `--lock`         | Path to `securock.lock` (for `lock` / `diff` / `update` / `verify`)                       |
 | `--format`       | `text` (default), `json`, or `sarif`                                                      |
 | `--output`       | Write the report to a file instead of stdout                                              |
 | `--exceptions`   | Path to the accepted-findings file (`accept`, `audit`, `doctor`)                          |
@@ -303,11 +327,15 @@ Machine-readable schemas live in the repository under
    securock verify
    ```
 
-5. When you accept the new trust state, rewrite the lockfile:
+5. When you accept the new trust state, record it:
 
    ```sh
-   securock lock
+   securock update --write
    ```
+
+   `update` without `--write` previews the same report. `securock lock`
+   also rewrites the lockfile, but without the review step or the refusal
+   on untrusted artifacts.
 
 ## Next steps
 
