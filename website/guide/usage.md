@@ -322,7 +322,7 @@ files, so an algorithm named in a properties file is checked.
 `sast:template/unescaped-output` (low) reports a template that prints a value without
 HTML escaping: the `safe` filter in Jinja2, Django and Nunjucks, the `raw` filter in
 Twig, `autoescape off`, EJS `<%-`, Handlebars triple braces, Mustache `&` tags, Blade `!!`
-tags, ERB `<%==`, `raw` and `html_safe`, Pug `!=`, Vue `v-html`, and Angular `[innerHTML]`.
+tags, ERB `<%==`, `raw` and `html_safe`, Pug `!=`, Vue `v-html`, Angular `[innerHTML]`, Razor `@Html.Raw`, Blazor `MarkupString`, and ASP.NET `<%= %>`.
 It is a pattern, not
 dataflow: a raw print of a string literal, an `inspect`ed value or a CSRF token is not
 reported, anything else is. In PHP, a variable called `$html` or `$output` is treated as
@@ -333,7 +333,8 @@ tokens by their fixed shape (AWS, GitHub, GitLab, Slack, Stripe, Google, npm,
 PyPI, SendGrid, OpenAI, Anthropic, Twilio, and private key blocks, rated
 high), and `name = "literal"` for password, secret, token and key names in
 code and configuration files when the literal looks random (rated medium).
-The value is never copied into the report. Lockfiles, Markdown, minified files,
+Connection strings with a password (`Server=...;Password=...`) and URLs with credentials
+(`postgres://user:secret@host/db`) are reported as well. The value is never copied into the report. Lockfiles, Markdown, minified files,
 tests and documented example keys are skipped, and a literal that names another
 variable (`var.db_password`) is not a secret.
 

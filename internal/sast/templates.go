@@ -25,7 +25,7 @@ var templatePatterns = []templatePattern{
 	{re: regexp.MustCompile(`\{\{[^}]*?\|\s*safe\b`), engine: "Jinja2/Django/Nunjucks |safe"},
 	{re: regexp.MustCompile(`\{\{[^}]*?\|\s*raw\b`), engine: "Twig/Nunjucks |raw"},
 	{re: regexp.MustCompile(`\{%-?\s*autoescape\s+(?:off|false)\b`), engine: "autoescape off"},
-	{re: regexp.MustCompile(`<%-\s*[^%]`), engine: "EJS <%- unescaped"},
+	{re: regexp.MustCompile(`<%-[^-%]`), engine: "EJS <%- unescaped"},
 	{re: regexp.MustCompile(`\{\{\{[^}]+\}\}\}`), engine: "Handlebars {{{ }}} unescaped"},
 	{re: regexp.MustCompile(`\{\{&\s*[^}]+\}\}`), engine: "Mustache {{& }} unescaped"},
 	{re: regexp.MustCompile(`\{!!\s*[^!]+!!\}`), engine: "Blade {!! !!} unescaped"},
@@ -34,6 +34,10 @@ var templatePatterns = []templatePattern{
 	{re: regexp.MustCompile(`<%=[^%]*\.html_safe\b`), engine: "ERB html_safe"},
 	{re: regexp.MustCompile(`(?m)^\s*[A-Za-z0-9_.#-]*\s*!=\s*\S`), engine: "Pug != unescaped", exts: []string{".pug", ".jade"}},
 	{re: regexp.MustCompile(`!\{[^}]+\}`), engine: "Pug !{ } unescaped", exts: []string{".pug", ".jade"}},
+	{re: regexp.MustCompile(`@Html\.Raw\(\s*[^")\s]`), engine: "Razor @Html.Raw", exts: []string{".cshtml", ".razor"}},
+	{re: regexp.MustCompile(`@\(?\(?(?:new\s+)?(?:Html|Mvc)String\(`), engine: "Razor HtmlString", exts: []string{".cshtml", ".razor"}},
+	{re: regexp.MustCompile(`<%=\s*[^%]`), engine: "ASP.NET <%= unencoded", exts: []string{".aspx", ".ascx", ".master"}},
+	{re: regexp.MustCompile(`\(MarkupString\)`), engine: "Blazor MarkupString", exts: []string{".razor"}},
 	{re: regexp.MustCompile(`\bv-html\s*=`), engine: "Vue v-html"},
 	{re: regexp.MustCompile(`\[innerHTML\]\s*=`), engine: "Angular [innerHTML]"},
 }
@@ -57,7 +61,7 @@ var harmlessRaw = regexp.MustCompile(`'[^']*'\.html_safe|"[^"#]*"\.html_safe|\.i
 
 func isTemplate(name string) bool {
 	low := strings.ToLower(name)
-	for _, suf := range []string{".html", ".htm", ".jinja", ".jinja2", ".j2", ".njk", ".twig", ".ejs", ".hbs", ".handlebars", ".mustache", ".erb", ".blade.php", ".pug", ".jade", ".vue", ".swig"} {
+	for _, suf := range []string{".html", ".htm", ".jinja", ".jinja2", ".j2", ".njk", ".twig", ".ejs", ".hbs", ".handlebars", ".mustache", ".erb", ".blade.php", ".pug", ".jade", ".vue", ".swig", ".cshtml", ".razor", ".aspx", ".ascx", ".master"} {
 		if strings.HasSuffix(low, suf) {
 			return true
 		}

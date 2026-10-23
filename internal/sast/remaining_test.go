@@ -378,3 +378,29 @@ func TestJavaJWTAndSpringSecurity(t *testing.T) {
 		})
 	}
 }
+
+func TestRazorAspxAndConnectionStrings(t *testing.T) {
+	tests := []struct {
+		name  string
+		files map[string]string
+		want  []string
+	}{
+		{"razor raw html", map[string]string{"Views/Home/Index.cshtml": "<p>@Html.Raw(Model.Comment)</p>\n"}, []string{"sast:template/unescaped-output"}},
+		{"razor raw literal", map[string]string{"Views/Home/Index.cshtml": "<p>@Html.Raw(\"<b>hi</b>\")</p>\n"}, nil},
+		{"razor encoded", map[string]string{"Views/Home/Index.cshtml": "<p>@Model.Comment</p>\n"}, nil},
+		{"aspx unencoded", map[string]string{"Default.aspx": "<p><%= Request.QueryString[\"q\"] %></p>\n"}, []string{"sast:template/unescaped-output"}},
+		{"aspx encoded", map[string]string{"Default.aspx": "<p><%: Request.QueryString[\"q\"] %></p>\n"}, nil},
+		{"connection string password", map[string]string{"appsettings.json": "{ \"ConnectionStrings\": { \"Default\": \"Server=db;Database=app;User Id=sa;Password=Zq8vN2kLm4T;\" } }\n"}, []string{"sast:secrets/connection-string-password"}},
+		{"connection string placeholder", map[string]string{"appsettings.json": "{ \"ConnectionStrings\": { \"Default\": \"Server=db;Password=${DB_PASSWORD};\" } }\n"}, nil},
+		{"url credentials", map[string]string{"config.py": "DATABASE_URL = 'postgres://app:Zq8vN2kLm4T@db.internal/app'\n"}, []string{"sast:secrets/url-credentials"}},
+		{"url without credentials", map[string]string{"config.py": "URL = 'https://example.com:8443/path'\n"}, nil},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := analyze(t, tt.files)
+			if !slices.Equal(got, tt.want) {
+				t.Fatalf("got %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

@@ -40,7 +40,12 @@ var (
 	reKeyedBare   = regexp.MustCompile(`(?i)^\s*([A-Za-z0-9_.-]*(?:password|passwd|secret|api[_-]?key|access[_-]?key|auth[_-]?token|private[_-]?key|client[_-]?secret|token)[A-Za-z0-9_.-]*)\s*[:=]\s*([^\s"'#]{12,128})\s*$`)
 	// referenceLike values name another variable (var.db_password, config.apiKey,
 	// my_secret_name) rather than being a credential.
-	referenceLike   = regexp.MustCompile(`^(?:[A-Za-z_][A-Za-z0-9_-]*(?:\.[A-Za-z_][A-Za-z0-9_\[\]-]*)+|[a-z_][a-z0-9_]*|[A-Z_][A-Z0-9_]*)$`)
+	referenceLike = regexp.MustCompile(`^(?:[A-Za-z_][A-Za-z0-9_-]*(?:\.[A-Za-z_][A-Za-z0-9_\[\]-]*)+|[a-z_][a-z0-9_]*|[A-Z_][A-Z0-9_]*)$`)
+	// "Server=db;Password=hunter2;" and "postgres://user:hunter2@db/app": a credential
+	// inside a connection string, which the name-based patterns do not see.
+	reConnPassword  = regexp.MustCompile(`(?i)\b(?:password|pwd)\s*=\s*([^;"'\s{}$<>%]{4,64})\s*(?:;|"|'|$)`)
+	reConnContext   = regexp.MustCompile(`(?i)(server|data source|host|database|initial catalog|user id|uid|provider|dsn|port)\s*=`)
+	reURLPassword   = regexp.MustCompile(`[a-z][a-z0-9+.-]*://[^:/@\s"'{}$<>]+:([^@\s"'{}$<>/]{4,64})@[^\s"'{}$<>]+`)
 	placeholderWord = regexp.MustCompile(`(?i)example|sample|dummy|fake|placeholder|changeme|your[_-]|xxxx|redacted|\*{4}`)
 )
 
@@ -127,6 +132,13 @@ func scanSecrets(root, full, rel, name string) []finding.Finding {
 		for _, p := range secretPatterns {
 			if p.re.MatchString(line) {
 				add(p.name, i+1, finding.SeverityHigh, p.name+" found; the value is not shown")
+			}
+		}
+		if keyed {
+			if m := reConnPassword.FindStringSubmatch(line); m != nil && reConnContext.MatchString(line) && !referenceLike.MatchString(m[1]) && !strings.ContainsAny(m[1], "()[]") && len(m[1]) >= 6 {
+				add("connection-string-password", i+1, finding.SeverityMedium, "a connection string contains a password")
+			} else if m := reURLPassword.FindStringSubmatch(line); m != nil && !referenceLike.MatchString(m[1]) && !strings.EqualFold(m[1], "password") {
+				add("url-credentials", i+1, finding.SeverityMedium, "a URL contains a user name and password")
 			}
 		}
 		if !keyed || isGo {
