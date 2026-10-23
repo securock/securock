@@ -1346,6 +1346,14 @@ func (r *irRun) analyze(f *funcIR) *summary {
 	r.checked = map[string]bool{}
 	r.consts = map[string]int64{}
 	r.strs = map[string]string{}
+	if f.name != "<module>" {
+		for k, v := range r.moduleStrs() {
+			r.strs[k] = v
+		}
+		for _, p := range f.params {
+			delete(r.strs, p.name)
+		}
+	}
 	r.xxeFactories, r.xxeHardened, r.lhsName = nil, false, ""
 	r.cookies, r.cookieSecure, r.cookieHTTPOnly = nil, false, false
 	st := istate{}
@@ -1489,4 +1497,35 @@ func (r *irRun) argText(e *expr) (string, bool) {
 		return strings.ToLower(v), true
 	}
 	return constText(e)
+}
+
+// moduleStrs are the module-level names that are assigned a string exactly once, so a
+// function that reads const SECRET = "..." sees its value. A name that is assigned again
+// at the top level is left out.
+func (r *irRun) moduleStrs() map[string]string {
+	if r.mod.topStrs != nil {
+		return r.mod.topStrs
+	}
+	out := map[string]string{}
+	count := map[string]int{}
+	for _, s := range r.mod.top {
+		if s.kind != stmtAssign {
+			continue
+		}
+		for _, l := range s.lhs {
+			if l.kind == exprName {
+				count[l.name]++
+			}
+		}
+	}
+	for _, s := range r.mod.top {
+		if s.kind != stmtAssign || s.aug || len(s.lhs) != 1 || s.lhs[0].kind != exprName || count[s.lhs[0].name] != 1 {
+			continue
+		}
+		if v, ok := r.strOf(s.rhs); ok {
+			out[s.lhs[0].name] = v
+		}
+	}
+	r.mod.topStrs = out
+	return out
 }

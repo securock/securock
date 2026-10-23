@@ -60,6 +60,8 @@ func TestJWTSecretLiteral(t *testing.T) {
 	}{
 		{"literal secret in sign", "const jwt = require('jsonwebtoken');\nfunction f(u) { return jwt.sign({ id: u }, 'shhh'); }", []string{"sast:js/hardcoded-signing-key"}},
 		{"literal secret held in a variable", "const jwt = require('jsonwebtoken');\nfunction f(t) { const secret = 'shhh'; return jwt.verify(t, secret); }", []string{"sast:js/hardcoded-signing-key"}},
+		{"module-level secret constant", "const jwt = require('jsonwebtoken');\nconst SECRET = 'shhh-secret';\nfunction f(t) { return jwt.verify(t, SECRET); }", []string{"sast:js/hardcoded-signing-key"}},
+		{"module-level name shadowed by a parameter", "const jwt = require('jsonwebtoken');\nconst key = 'shhh-secret';\nfunction f(t, key) { return jwt.verify(t, key); }", nil},
 		{"secret from the environment", "const jwt = require('jsonwebtoken');\nfunction f(u) { return jwt.sign({ id: u }, process.env.JWT_SECRET); }", nil},
 	}
 	for _, tt := range tests {

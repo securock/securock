@@ -104,6 +104,8 @@ type module struct {
 	locals map[string]localRef
 	funcs  []*funcIR
 	top    []*stmt // module-level code
+	// topStrs caches the module-level string constants (irRun.moduleStrs).
+	topStrs map[string]string
 	// fields maps class -> field -> declared type, for languages that declare them.
 	fields map[string]map[string]string
 	// supers maps class -> declared supertypes (extends, implements), so a call through
