@@ -86,6 +86,8 @@ func TestJSObjectOptionChecks(t *testing.T) {
 		{"passport secretOrKey from env", "const { Strategy } = require('passport-jwt');\nnew Strategy({ secretOrKey: process.env.JWT_SECRET }, () => {});", nil},
 		{"session secret literal", "const session = require('express-session');\napp.use(session({ secret: 'keyboard cat', resave: false, saveUninitialized: true }));", []string{"sast:js/hardcoded-signing-key"}},
 		{"session secret from env", "const session = require('express-session');\napp.use(session({ secret: process.env.SESSION_SECRET, resave: false, saveUninitialized: true }));", nil},
+		{"cookie-session keys literal", "const cookieSession = require('cookie-session');\napp.use(cookieSession({ name: 'session', keys: ['key1-literal', 'key2-literal'] }));", []string{"sast:js/hardcoded-signing-key"}},
+		{"cookie-session keys from env", "const cookieSession = require('cookie-session');\napp.use(cookieSession({ name: 'session', keys: [process.env.K1] }));", nil},
 		{"electron nodeIntegration", "new BrowserWindow({ webPreferences: { nodeIntegration: true } });", []string{"sast:js/electron-insecure-window"}},
 		{"electron contextIsolation off", "new BrowserWindow({ webPreferences: { contextIsolation: false } });", []string{"sast:js/electron-insecure-window"}},
 		{"electron secure defaults", "new BrowserWindow({ webPreferences: { nodeIntegration: false, contextIsolation: true, webSecurity: true } });", nil},

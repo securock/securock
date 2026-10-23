@@ -769,7 +769,7 @@ func (j *jsLower) expr(n *node) *expr {
 	case "object":
 		// { origin: true, credentials: true } hands credentials to any website.
 		e := j.mk(exprOther, n)
-		var origin, creds, secret *node
+		var origin, creds, secret, keys *node
 		sessionOpts := false
 		for _, c := range j.named(n) {
 			if x := j.expr(c); x != nil {
@@ -779,6 +779,8 @@ func (j *jsLower) expr(n *node) *expr {
 				switch strings.Trim(j.text(j.field(c, "key")), `"'`) {
 				case "secret":
 					secret = j.field(c, "value")
+				case "keys":
+					keys = j.field(c, "value")
 				case "resave", "saveUninitialized":
 					sessionOpts = true
 				case "origin":
@@ -798,6 +800,20 @@ func (j *jsLower) expr(n *node) *expr {
 			call.args = []*expr{j.expr(secret)}
 			call.kw = []string{""}
 			e.args = append(e.args, call)
+		}
+		// cookie-session options: { name: "session", keys: ["..."] }.
+		if keys != nil && j.kind(keys) == "array" {
+			for _, k := range j.named(keys) {
+				if j.kind(k) == "string" {
+					call := j.mk(exprCall, n)
+					fn := j.mk(exprName, n)
+					fn.name = "sessionKeys"
+					call.x = fn
+					call.args = []*expr{j.expr(k)}
+					call.kw = []string{""}
+					e.args = append(e.args, call)
+				}
+			}
 		}
 		// {role: "system", content: x} and {system: x}: request data in an LLM's instructions.
 		var role, content *node
