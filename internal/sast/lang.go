@@ -137,7 +137,7 @@ func parseFile(fset *token.FileSet, abs, rel string, src []byte) (m *module, had
 	}
 	lang := entry.Language()
 	if info[1] == "kt" {
-		src = blankTypeArguments(blankVisibility(blankExtensionAnnotations(blankClassRefs(src))))
+		src = markIndexedAssignments(blankTypeArguments(blankVisibility(blankExtensionAnnotations(blankClassRefs(src)))))
 	}
 	tree, err := gotreesitter.NewParser(lang).Parse(src)
 	if err != nil || tree == nil {
@@ -237,5 +237,26 @@ func blankTypeArguments(src []byte) []byte {
 			out[i] = ' '
 		}
 		return out
+	})
+}
+
+var reIndexedAssign = regexp.MustCompile(`(?m)^([ \t]*)([A-Za-z_]\w*)(\[[^\n=]*?\][ \t]*[-+*/%]?=)([^=\n]|$)`)
+
+// markIndexedAssignments writes `a[k] = v` as `a!![k] = v`. The Kotlin grammar fails on a
+// second statement of that shape in the same block and loses the rest of the function
+// (`model["a"] = x` followed by `model["b"] = y` is the usual case). The two characters
+// replace indentation when there is enough, so only the identifier's own column moves.
+func markIndexedAssignments(src []byte) []byte {
+	return reIndexedAssign.ReplaceAllFunc(src, func(m []byte) []byte {
+		sub := reIndexedAssign.FindSubmatch(m)
+		indent, name, rest, tail := sub[1], sub[2], sub[3], sub[4]
+		if len(indent) >= 2 {
+			indent = indent[2:]
+		}
+		out := append([]byte(nil), indent...)
+		out = append(out, name...)
+		out = append(out, '!', '!')
+		out = append(out, rest...)
+		return append(out, tail...)
 	})
 }
