@@ -62,6 +62,7 @@ func TestJWTSecretLiteral(t *testing.T) {
 		{"literal secret held in a variable", "const jwt = require('jsonwebtoken');\nfunction f(t) { const secret = 'shhh'; return jwt.verify(t, secret); }", []string{"sast:js/hardcoded-signing-key"}},
 		{"module-level secret constant", "const jwt = require('jsonwebtoken');\nconst SECRET = 'shhh-secret';\nfunction f(t) { return jwt.verify(t, SECRET); }", []string{"sast:js/hardcoded-signing-key"}},
 		{"module-level name shadowed by a parameter", "const jwt = require('jsonwebtoken');\nconst key = 'shhh-secret';\nfunction f(t, key) { return jwt.verify(t, key); }", nil},
+		{"literal secret as a Buffer", "const jwt = require('jsonwebtoken');\nfunction f(u) { return jwt.sign({ id: u }, Buffer.from('shhh-secret')); }", []string{"sast:js/hardcoded-signing-key"}},
 		{"secret from the environment", "const jwt = require('jsonwebtoken');\nfunction f(u) { return jwt.sign({ id: u }, process.env.JWT_SECRET); }", nil},
 	}
 	for _, tt := range tests {

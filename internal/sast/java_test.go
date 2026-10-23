@@ -199,6 +199,9 @@ func TestJavaStringConstants(t *testing.T) {
 			"Keys.java": "class Keys { public static final String JWT = \"shhh-secret\"; }",
 			"A.java":    "import io.jsonwebtoken.Jwts;\nimport io.jsonwebtoken.SignatureAlgorithm;\nclass A {\n String f(String u) { return Jwts.builder().setSubject(u).signWith(SignatureAlgorithm.HS256, Keys.JWT).compact(); }\n}",
 		}, []string{"sast:java/hardcoded-signing-key"}},
+		{"literal key as bytes", map[string]string{
+			"A.java": "import io.jsonwebtoken.Jwts;\nimport io.jsonwebtoken.SignatureAlgorithm;\nclass A {\n private static final String KEY = \"shhh-secret\";\n String f(String u) { return Jwts.builder().setSubject(u).signWith(SignatureAlgorithm.HS256, KEY.getBytes()).compact(); }\n String g(String u) { return Jwts.builder().setSubject(u).signWith(SignatureAlgorithm.HS256, \"inline-secret\".getBytes()).compact(); }\n}",
+		}, []string{"sast:java/hardcoded-signing-key", "sast:java/hardcoded-signing-key"}},
 		{"key read from configuration", map[string]string{
 			"A.java": "import io.jsonwebtoken.Jwts;\nimport io.jsonwebtoken.SignatureAlgorithm;\nclass A {\n private static final String KEY = System.getenv(\"KEY\");\n String f(String u) { return Jwts.builder().setSubject(u).signWith(SignatureAlgorithm.HS256, KEY).compact(); }\n}",
 		}, nil},

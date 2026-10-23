@@ -136,9 +136,26 @@ func matchesAny(have string, want []string) bool {
 	return false
 }
 
+// unwrapBytes strips the call that turns a key string into bytes: KEY.getBytes(),
+// "k".encode(), Buffer.from("k").
+func unwrapBytes(e *expr) *expr {
+	for e != nil && e.kind == exprCall && e.x != nil {
+		switch {
+		case e.x.kind == exprMember && e.x.x != nil && (e.x.name == "getBytes" || e.x.name == "toCharArray" || e.x.name == "encode"):
+			e = e.x.x
+		case e.x.kind == exprMember && e.x.name == "from" && e.x.x != nil && e.x.x.kind == exprName && e.x.x.name == "Buffer" && len(e.args) > 0:
+			e = e.args[0]
+		default:
+			return e
+		}
+	}
+	return e
+}
+
 // literalArg reports a string literal of some length, or a name the analysis resolved to
 // one (const secret = "..."): constText gives the name back when it cannot resolve it.
 func literalArg(e *expr, constText func(*expr) (string, bool)) bool {
+	e = unwrapBytes(e)
 	if e.kind == exprStr {
 		return len(e.str) >= 4
 	}
