@@ -37,6 +37,9 @@ type langSpec struct {
 	self map[string]bool
 	// shells are executables that parse their argument as a command line.
 	shells map[string]bool
+	// assignRoots are containers whose elements the application trusts or sends back:
+	// session["k"] = value.
+	assignRoots map[string]kind
 	// nameSinks are variables that collect output the framework later writes to the
 	// page, such as $html in PHP code that is included into a template.
 	nameSinks map[string]kind
@@ -57,6 +60,9 @@ type langSpec struct {
 	fsCheck, fsUse map[string]bool
 	// xxeFactories create an XML parser that resolves external entities unless hardened.
 	xxeFactories map[string]bool
+	// pkgRoots are the first segments of fully qualified names written inline, as in
+	// java.io.File or org.apache.commons.io.FileUtils.
+	pkgRoots map[string]bool
 	// builtins are global functions that may be named without an import.
 	builtins map[string]bool
 }
@@ -240,9 +246,24 @@ type irRun struct {
 	shadow map[string]bool
 	// per-function state for the checks that look at order and context
 	lhsName      string
+	loopAcc      istate // states at break/continue in the innermost loop
+	fn           *funcIR
+	strVars      map[string]bool  // variables that hold a string built in this function
+	consts       map[string]int64 // integer variables with a known value on this path
 	checked      map[string]bool
 	xxeFactories []token.Pos
 	xxeHardened  bool
+}
+
+// commonMethods are names that the standard library defines on many types, so a project
+// method of the same name says nothing about which one a call reaches.
+var commonMethods = map[string]bool{
+	"toString": true, "equals": true, "hashCode": true, "get": true, "set": true, "put": true, "add": true, "remove": true,
+	"size": true, "length": true, "close": true, "run": true, "call": true, "apply": true, "accept": true, "compare": true,
+	"valueOf": true, "getClass": true, "name": true, "value": true, "getValue": true, "getName": true, "contains": true,
+	"isEmpty": true, "clear": true, "next": true, "print": true, "println": true, "write": true, "read": true, "of": true,
+	"to_s": true, "to_a": true, "to_h": true, "each": true, "map": true, "join": true, "split": true, "append": true,
+	"push": true, "pop": true, "keys": true, "values": true, "items": true,
 }
 
 // maxNameCandidates bounds the name-based guess for a call on a value of unknown class.
@@ -290,6 +311,12 @@ func (r *irRun) qualified(e *expr, st istate) string {
 		}
 		if st.has(e.name) || r.types[e.name] != "" {
 			return ""
+		}
+		if strings.Contains(e.name, ".") {
+			return e.name // a type written out in full: new java.io.FileInputStream(...)
+		}
+		if r.spec.pkgRoots[e.name] && !st.has(e.name) && r.types[e.name] == "" {
+			return e.name
 		}
 		for _, f := range r.mod.funcs {
 			if f.class == "" && f.name == e.name {
@@ -372,7 +399,9 @@ func (r *irRun) resolve(fn *expr, st istate) (qname string, recv *expr, field st
 		return "", nil, ""
 	case exprMember:
 		if q := r.qualified(fn, st); q != "" {
-			return q, nil, fn.name
+			// A qualified static call is also a call on its qualifier, so method-name
+			// sinks (?.queryForObject) still apply to DatabaseHelper.template.query...().
+			return q, fn.x, fn.name
 		}
 		if t := r.typeOf(fn.x, st); t != "" {
 			return r.resolveType(t) + "." + fn.name, fn.x, fn.name
@@ -420,6 +449,27 @@ func (r *irRun) eval(e *expr, st istate) taintSet {
 		r.walkFn(e.fn, st, nil)
 	case exprNot:
 		r.eval(e.x, st)
+	case exprBin:
+		// Arithmetic and comparisons yield numbers and booleans, which cannot carry a
+		// payload; the operands are still evaluated for the sinks inside them. A random
+		// number stays random through arithmetic.
+		var out taintSet
+		for _, a := range e.args {
+			out = merge(out, r.eval(a, st))
+		}
+		if isArith(e.str) {
+			return out.keep(kRand)
+		}
+		return nil
+	case exprCond:
+		r.eval(e.x, st)
+		if v, ok := r.constBool(e.x); ok {
+			if v {
+				return r.eval(e.args[0], st)
+			}
+			return r.eval(e.args[1], st)
+		}
+		return merge(r.eval(e.args[0], st), r.eval(e.args[1], st))
 	case exprAnd, exprOr:
 		// `a || b` and `a ?? b` evaluate to one of their operands, so they carry the
 		// taint of both: const q = req.query.q || "" is still request data.
@@ -530,6 +580,10 @@ func (r *irRun) evalCall(e *expr, st istate) taintSet {
 	}
 	r.checkMisuse(e, qname, field)
 	r.checkExtras(e, qname, field, fn, st)
+	if r.spec.weakRNG[qname] {
+		// Not just a hint by name: the value itself is tracked to where it is used.
+		return merge(recvT, r.source(e.pos, randomDesc))
+	}
 	if fn.kind == exprIndex && len(fn.args) > 0 && r.spec.name != "php" {
 		// handlers[req.query.action](): the request picks which function runs.
 		for _, at := range r.eval(fn.args[0], st) {
@@ -622,11 +676,30 @@ func (r *irRun) lookupSink(qname string, recv *expr, field string) (sink, string
 	if len(s.recv) > 0 || s.recvUpper {
 		root := rootName(recv)
 		upper := s.recvUpper && root != "" && root[0] >= 'A' && root[0] <= 'Z'
-		if !upper && !slices.Contains(s.recv, root) {
+		// The receiver may be named by its root variable or, for a qualified static
+		// reference such as DatabaseHelper.JDBCtemplate, by its last segment.
+		if !upper && !containsFold(s.recv, root) && !containsFold(s.recv, lastName(recv)) {
 			return sink{}, "", false
 		}
 	}
 	return s, "." + field, true
+}
+
+func containsFold(list []string, s string) bool {
+	for _, x := range list {
+		if strings.EqualFold(x, s) {
+			return true
+		}
+	}
+	return false
+}
+
+// lastName is the final identifier of a chain: DatabaseHelper.JDBCtemplate -> JDBCtemplate.
+func lastName(e *expr) string {
+	if e != nil && (e.kind == exprMember || e.kind == exprName) {
+		return e.name
+	}
+	return ""
 }
 
 // rootName is the variable at the base of a chain of member accesses and calls.
@@ -656,6 +729,47 @@ func (r *irRun) callSource(fn *expr) (string, bool) {
 	}
 	d, ok := r.spec.sourceMethods[fn.name]
 	return d, ok
+}
+
+// narrow keeps the most plausible targets when several files define a method of the same
+// name. Class names repeat across a codebase (Util, Helper, an inner Test), and a call must
+// not pick up the summary of an unrelated class: a candidate in the current file wins,
+// then one whose directory the current file imports from, and a name that is still
+// ambiguous after that is not guessed at.
+func (r *irRun) narrow(keys []string) []string {
+	if len(keys) <= 1 {
+		return keys
+	}
+	file := func(k string) string { f, _, _ := strings.Cut(k, "#"); return f }
+	var same []string
+	for _, k := range keys {
+		if file(k) == r.mod.path {
+			same = append(same, k)
+		}
+	}
+	if len(same) > 0 {
+		return same
+	}
+	// Different files: keep those in the same directory (the same package), else those
+	// reachable through an import of the project's own code.
+	dir := path.Dir(r.mod.path)
+	var near []string
+	for _, k := range keys {
+		if path.Dir(file(k)) == dir {
+			near = append(near, k)
+		}
+	}
+	if len(near) > 0 {
+		return near
+	}
+	files := map[string]bool{}
+	for _, k := range keys {
+		files[file(k)] = true
+	}
+	if len(files) > maxNameCandidates {
+		return nil
+	}
+	return keys
 }
 
 // sanitized clears the kinds the callee neutralizes from t.
@@ -704,7 +818,7 @@ func (r *irRun) targets(fn, call *expr, st istate) []string {
 			if len(keys) == 0 {
 				keys = append(keys, r.proj.methods[r.class+"."+fn.name]...)
 			}
-			return keys
+			return r.narrow(keys)
 		}
 		if fn.x.kind == exprName {
 			if ref, ok := r.mod.locals[fn.x.name]; ok {
@@ -723,20 +837,44 @@ func (r *irRun) targets(fn, call *expr, st istate) []string {
 				if spec != "" {
 					if m := r.proj.resolveModule(r.mod, spec); m != nil {
 						add(m, "", fn.name)
-						return keys
+						return r.narrow(keys)
 					}
 				}
 			}
 		}
-		if t := r.typeOf(fn.x, st); t != "" {
+		// Util.run(x): a static call on one of the project's own classes.
+		if fn.x.kind == exprName && r.proj.classes[fn.x.name] != "" && !st.has(fn.x.name) {
+			if ks := r.proj.methods[fn.x.name+"."+fn.name]; len(ks) > 0 {
+				return r.narrow(ks)
+			}
+		}
+		t := r.typeOf(fn.x, st)
+		if t != "" {
 			keys = append(keys, r.proj.methods[t+"."+fn.name]...)
-		} else if cands := r.proj.byName[fn.name]; len(cands) > 0 && len(cands) <= maxNameCandidates {
+			if len(keys) == 0 {
+				// The type may be written out in full (org.example.Dao) while classes are
+				// indexed by their simple name.
+				simple := t[strings.LastIndex(t, ".")+1:]
+				keys = append(keys, r.proj.methods[simple+"."+fn.name]...)
+			}
+		}
+		if len(keys) == 0 {
+			cands := r.proj.byName[fn.name]
+			// A guess by method name is only reasonable for a distinctive name on a value
+			// of unknown class. toString, get or close exist on every library type, and a
+			// qualified library reference (Float.toString) is not a project class at all.
+			if commonMethods[fn.name] || r.qualified(fn.x, st) != "" {
+				return keys
+			}
+			if len(cands) == 0 || len(cands) > maxNameCandidates || (t != "" && r.proj.classes[t[strings.LastIndex(t, ".")+1:]] != "") {
+				return r.narrow(keys)
+			}
 			// The receiver's class is unknown. A method name that only a few classes
 			// define is a good enough guess; a common name like get or find would not be.
 			keys = append(keys, cands...)
 		}
 	}
-	return keys
+	return r.narrow(keys)
 }
 
 func (r *irRun) applyIR(c *expr, key string, sum *summary, args []taintSet, recvT taintSet) taintSet {
@@ -942,9 +1080,43 @@ func (r *irRun) stmt(s *stmt, st istate) {
 			}
 			r.checkPollution(l, st)
 			r.assign(l, v, st)
+			if l.kind == exprName {
+				r.strVars[l.name] = r.isString(s.rhs) || (s.aug && r.strVars[l.name])
+			}
+			if l.kind == exprName {
+				if cv, ok := r.constInt(s.rhs); ok && !s.aug && len(s.lhs) == 1 {
+					r.consts[l.name] = cv
+				} else {
+					delete(r.consts, l.name)
+				}
+			}
 			r.checkAssignMisuse(l, s.rhs)
 			if l.kind == exprName && !s.binds {
 				r.shadow[l.name] = true
+			}
+			if l.kind != exprName {
+				// session["k"] = v and flask.session[k] = v: both the key and the value are
+				// written into a store the application trusts.
+				container := lastName(l.x)
+				if l.kind == exprMember {
+					container = lastName(l.x)
+				}
+				k, ok := r.spec.assignRoots[container]
+				if !ok {
+					container = rootName(l)
+					k, ok = r.spec.assignRoots[container]
+				}
+				if ok && !r.shadow[container] {
+					written := t
+					if l.kind == exprIndex && len(l.args) > 0 {
+						written = merge(written, r.eval(l.args[0], st))
+					}
+					for _, at := range written {
+						if hit := at.kinds & k; hit != 0 {
+							r.reachSink(l.pos, container+"[...] = value", hit, at, nil)
+						}
+					}
+				}
 			}
 			if l.kind == exprName {
 				if k, ok := r.spec.nameSinks[l.name]; ok {
@@ -979,13 +1151,40 @@ func (r *irRun) stmt(s *stmt, st istate) {
 		}
 	case stmtReturn:
 		t := r.eval(s.rhs, st)
+		if r.fn != nil && r.fn.htmlRoute && s.rhs != nil && r.isString(s.rhs) {
+			for _, at := range t {
+				if hit := at.kinds & kXSS; hit != 0 {
+					r.reachSink(s.pos, "route response", hit, at, nil)
+				}
+			}
+		}
 		if r.ctx.litDeep == 0 {
 			r.ctx.ret = merge(r.ctx.ret, t)
 		}
 	case stmtJump:
 		r.eval(s.rhs, st)
+		if s.loop && r.loopAcc != nil {
+			r.loopAcc.union(st)
+		}
 	case stmtIf:
 		r.eval(s.cond, st)
+		if v, ok := r.constBool(s.cond); ok {
+			// The condition cannot go the other way, so only one branch runs.
+			if v {
+				r.block(s.then, st)
+			} else {
+				r.block(s.els, st)
+			}
+			break
+		}
+		forget := map[string]bool{}
+		assignedNames(s.then, forget)
+		assignedNames(s.els, forget)
+		defer func() {
+			for n := range forget {
+				delete(r.consts, n)
+			}
+		}()
 		then := st.clone()
 		if s.cond != nil {
 			r.markValid(r.validWhenTrue(s.cond), then)
@@ -1006,6 +1205,13 @@ func (r *irRun) stmt(s *stmt, st istate) {
 		}
 	case stmtLoop:
 		t := r.eval(s.rhs, st)
+		forget := map[string]bool{}
+		assignedNames(s.then, forget)
+		for n := range forget {
+			delete(r.consts, n)
+		}
+		prev := r.loopAcc
+		r.loopAcc = istate{}
 		for range 2 {
 			body := st.clone()
 			for _, l := range s.lhs {
@@ -1014,13 +1220,27 @@ func (r *irRun) stmt(s *stmt, st istate) {
 			r.block(s.then, body)
 			st.union(body)
 		}
+		// A break leaves with the state it had, which the end of the body never sees.
+		st.union(r.loopAcc)
+		r.loopAcc = prev
 	case stmtBranch:
 		entry := st.clone()
+		forget := map[string]bool{}
+		for _, arm := range s.arms {
+			assignedNames(arm, forget)
+		}
+		for n := range forget {
+			delete(r.consts, n)
+		}
+		prev := r.loopAcc
+		r.loopAcc = istate{}
 		for _, arm := range s.arms {
 			b := entry.clone()
 			r.block(arm, b)
 			st.union(b)
 		}
+		st.union(r.loopAcc)
+		r.loopAcc = prev
 	}
 }
 
@@ -1064,9 +1284,12 @@ func (r *irRun) analyze(f *funcIR) *summary {
 		r.ctx.label = f.class + "." + f.name
 	}
 	r.class = f.class
+	r.fn = f
+	r.strVars = map[string]bool{}
 	r.types = map[string]string{}
 	r.shadow = map[string]bool{}
 	r.checked = map[string]bool{}
+	r.consts = map[string]int64{}
 	r.xxeFactories, r.xxeHardened, r.lhsName = nil, false, ""
 	st := istate{}
 	if f.class != "" {
@@ -1138,4 +1361,26 @@ func analyzeModule(sh *shared, spec *langSpec, proj *project, m *module, base *a
 		sh.sums[funcKey(m, f)] = sum
 	}
 	return failed
+}
+
+// isString reports whether an expression is text the function built itself: a literal, a
+// concatenation, or a variable holding one. A flask handler returning that text sends it
+// as an HTML page; returning a Response object or a call's result does not.
+func (r *irRun) isString(e *expr) bool {
+	if e == nil {
+		return false
+	}
+	switch e.kind {
+	case exprStr, exprConcat:
+		return true
+	case exprName:
+		return r.strVars[e.name]
+	case exprCond, exprOr, exprAnd:
+		for _, a := range e.args {
+			if r.isString(a) {
+				return true
+			}
+		}
+	}
+	return false
 }

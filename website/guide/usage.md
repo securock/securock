@@ -375,6 +375,32 @@ define it. Calls into third-party libraries the rules do not name are assumed
 to pass their arguments through to the result. `sast` uses the same `accept`,
 `--exceptions`, and `--fail-on` flow as `audit`.
 
+### How accurate is sast
+
+Accuracy is measured against the OWASP Benchmark, a labeled suite of small web handlers
+that the analyzer was not written around. The score is the true-positive rate minus
+the false-positive rate; a tool that guesses scores 0.
+
+| Suite                       | True positives | False positives | Score |
+| --------------------------- | -------------- | --------------- | ----- |
+| BenchmarkJava 1.2 (2,740)   | 86%            | 15%             | +0.72 |
+| BenchmarkPython 0.1 (1,230) | 80%            | 22%             | +0.59 |
+
+The suites are not vendored. To reproduce, check one out and run
+`SECUROCK_OWASP_BENCHMARK=/path/to/BenchmarkJava go test ./internal/sast -run OWASPBenchmark -v`
+(or `SECUROCK_OWASP_BENCHMARK_PYTHON` for the Python suite). The test prints the rate for
+each category and fails if the score drops.
+
+Read the numbers with their limits in mind. Both suites are synthetic and contain
+constructs real code rarely has: a switch on a constant string, a list whose first
+element is removed before the second is read, a hash algorithm chosen from a properties
+file. The remaining false positives are mostly those, and the remaining misses are mostly
+configuration-driven (the algorithm or file name comes from a properties file, which is
+not read). Languages other than Java and Python have no labeled suite here, only the
+cases in `internal/sast/testdata/bench.txt` and runs over intentionally vulnerable
+applications (NodeGoat, Juice Shop, DVWA, railsgoat, WebGoat, pygoat), which were read
+by hand. Treat the results as a measured starting point, not a guarantee.
+
 `doctor` checks the setup around securock: the lockfile and policy,
 registry config (`.npmrc`, `.yarnrc.yml`, `nuget.config`) for plain
 http, disabled TLS and literal credentials, workflow actions that are

@@ -32,7 +32,7 @@ var javaSimpleTypes = func() map[string]string {
 
 func javaSinks() map[string]sink {
 	m := map[string]sink{
-		"java.lang.Runtime.exec":           {kind: kCmd, args: []int{0}},
+		"java.lang.Runtime.exec":           {kind: kCmd, args: []int{0, 1}}, /* the environment array can carry LD_PRELOAD=... */
 		"java.lang.ProcessBuilder":         {kind: kCmd, args: []int{0}, shellFrom: 1},
 		"java.io.FileInputStream":          {kind: kPath, args: []int{0}},
 		"java.io.FileOutputStream":         {kind: kPath, args: []int{0}},
@@ -57,7 +57,9 @@ func javaSinks() map[string]sink {
 		"org.apache.http.client.methods.HttpPost":                   {kind: kSSRF, args: []int{0}},
 
 		"java.io.PrintWriter.println": {kind: kXSS, args: []int{0}}, "java.io.PrintWriter.print": {kind: kXSS, args: []int{0}},
-		"java.io.PrintWriter.write": {kind: kXSS, args: []int{0}}, "java.io.PrintWriter.printf": {kind: kXSS, args: []int{0}, rest: true},
+		"java.io.PrintWriter.write":        {kind: kXSS, args: []int{0}},
+		"java.io.PrintWriter.format":       {kind: kXSS, args: []int{0}, rest: true},
+		"java.lang.ProcessBuilder.command": {kind: kCmd, args: []int{0}, rest: true}, "java.io.PrintWriter.printf": {kind: kXSS, args: []int{0}, rest: true},
 		"java.io.PrintWriter.append": {kind: kXSS, args: []int{0}},
 
 		"javax.servlet.http.HttpServletResponse.sendRedirect":   {kind: kRedirect, args: []int{0}},
@@ -76,9 +78,12 @@ func javaSinks() map[string]sink {
 		"?.createQuery": {kind: kSQL, args: []int{0}}, "?.createNativeQuery": {kind: kSQL, args: []int{0}},
 		"?.createSQLQuery": {kind: kSQL, args: []int{0}}, "?.addBatch": {kind: kSQL, args: []int{0}},
 		"?.queryForObject": {kind: kSQL, args: []int{0}}, "?.queryForList": {kind: kSQL, args: []int{0}},
-		"?.query":   {kind: kSQL, args: []int{0}, recv: []string{"jdbcTemplate", "jdbc", "template", "namedParameterJdbcTemplate"}},
-		"?.update":  {kind: kSQL, args: []int{0}, recv: []string{"jdbcTemplate", "jdbc", "template", "namedParameterJdbcTemplate"}},
-		"?.execute": {kind: kSQL, args: []int{0}, recv: []string{"statement", "stmt", "st", "jdbcTemplate", "jdbc", "template"}},
+		"?.queryForRowSet": {kind: kSQL, args: []int{0}}, "?.queryForMap": {kind: kSQL, args: []int{0}},
+		"?.queryForLong": {kind: kSQL, args: []int{0}}, "?.queryForInt": {kind: kSQL, args: []int{0}},
+		"?.batchUpdate": {kind: kSQL, args: []int{0}},
+		"?.query":       {kind: kSQL, args: []int{0}, recv: []string{"jdbcTemplate", "jdbc", "template", "namedParameterJdbcTemplate"}},
+		"?.update":      {kind: kSQL, args: []int{0}, recv: []string{"jdbcTemplate", "jdbc", "template", "namedParameterJdbcTemplate"}},
+		"?.execute":     {kind: kSQL, args: []int{0}, recv: []string{"statement", "stmt", "st", "jdbcTemplate", "jdbc", "template"}},
 	}
 	return m
 }
@@ -89,6 +94,7 @@ var javaRequestMethods = map[string]string{
 	"getRequestURI": "request URL", "getRequestURL": "request URL", "getPathInfo": "request path",
 	"getServletPath": "request path", "getCookies": "request cookie", "getInputStream": "request body",
 	"getReader": "request body", "getPart": "uploaded file", "getRemoteUser": "request user",
+	"getParameterNames": "request parameter", "getHeaderNames": "request header",
 }
 
 var javaSpec = &langSpec{
@@ -288,6 +294,8 @@ func (j *javaLower) stmt(n *node) []*stmt {
 		for _, c := range j.named(n) {
 			if kk := j.kind(c); kk == "assignment_expression" {
 				out = append(out, j.assignment(c))
+			} else if s := j.mapPut(c); s != nil {
+				out = append(out, s)
 			} else {
 				out = append(out, &stmt{kind: stmtExpr, pos: j.pos(c), rhs: j.expr(c)})
 			}
@@ -322,8 +330,10 @@ func (j *javaLower) stmt(n *node) []*stmt {
 			s.rhs = j.expr(cs[0])
 		}
 		return []*stmt{s}
-	case "throw_statement", "break_statement", "continue_statement", "yield_statement":
+	case "throw_statement", "yield_statement":
 		return []*stmt{{kind: stmtJump, pos: j.pos(n)}}
+	case "break_statement", "continue_statement":
+		return []*stmt{{kind: stmtJump, pos: j.pos(n), loop: true}}
 	case "if_statement":
 		s := &stmt{kind: stmtIf, pos: j.pos(n), cond: j.expr(j.field(n, "condition")), then: j.block(j.field(n, "consequence"))}
 		if alt := j.field(n, "alternative"); alt != nil {
@@ -464,7 +474,9 @@ func (j *javaLower) expr(n *node) *expr {
 			e.args = []*expr{l, r}
 			return e
 		case "==", "!=", "<", ">", "<=", ">=":
-			return j.mk(exprNum, n)
+			return j.bin(n, strings.TrimSpace(j.text(j.field(n, "operator"))), l, r)
+		case "-", "*", "/", "%":
+			return j.bin(n, strings.TrimSpace(j.text(j.field(n, "operator"))), l, r)
 		}
 		return j.other(n, l, r)
 	case "unary_expression":
@@ -480,7 +492,7 @@ func (j *javaLower) expr(n *node) *expr {
 			return j.expr(cs[len(cs)-1])
 		}
 	case "ternary_expression":
-		return j.other(n, j.expr(j.field(n, "consequence")), j.expr(j.field(n, "alternative")))
+		return j.cond(n, j.expr(j.field(n, "condition")), j.expr(j.field(n, "consequence")), j.expr(j.field(n, "alternative")))
 	case "assignment_expression":
 		return j.expr(j.field(n, "right"))
 	case "lambda_expression":
@@ -517,9 +529,32 @@ func (j *javaLower) expr(n *node) *expr {
 	return e
 }
 
+// mapPut turns map.put("key", value) into a write to that key of the map, so a value
+// stored under one key does not taint the others.
+func (j *javaLower) mapPut(c *node) *stmt {
+	if j.kind(c) != "method_invocation" || j.text(j.field(c, "name")) != "put" {
+		return nil
+	}
+	obj := j.field(c, "object")
+	args := j.named(j.field(c, "arguments"))
+	if obj == nil || len(args) != 2 || j.kind(args[0]) != "string_literal" {
+		return nil
+	}
+	m := j.mk(exprMember, c)
+	m.x = j.expr(obj)
+	m.name = j.expr(args[0]).str
+	return &stmt{kind: stmtAssign, pos: j.pos(c), lhs: []*expr{m}, rhs: j.expr(args[1]), binds: true}
+}
+
 func (j *javaLower) invoke(n *node) *expr {
 	name := j.text(j.field(n, "name"))
 	args := j.named(j.field(n, "arguments"))
+	if o := j.field(n, "object"); o != nil && name == "get" && len(args) == 1 && j.kind(args[0]) == "string_literal" {
+		m := j.mk(exprMember, n)
+		m.x = j.expr(o)
+		m.name = j.expr(args[0]).str
+		return m
+	}
 	// list.contains(x) / set.contains(x) is the membership check of an allowlist.
 	obj := j.field(n, "object")
 	if obj != nil && name == "startsWith" && len(args) == 1 {

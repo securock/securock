@@ -64,6 +64,17 @@ func (t taintSet) clear(k kind) taintSet {
 	return out
 }
 
+// keep returns the part of each atom that is in k.
+func (t taintSet) keep(k kind) taintSet {
+	var out taintSet
+	for _, a := range t {
+		if a.kinds &= k; a.kinds != 0 {
+			out = append(out, a)
+		}
+	}
+	return out
+}
+
 func (t taintSet) step(pos token.Pos, msg string) taintSet {
 	out := make(taintSet, len(t))
 	for i, a := range t {
@@ -197,6 +208,7 @@ func (s *summary) signature() string {
 type funcCtx struct {
 	oks     map[types.Object]ast.Expr // "v, ok := m[k]": ok validates k
 	cleaned map[types.Object]bool     // variables holding the result of filepath.Join/Clean/Abs
+	loopAcc state                     // states at break/continue in the innermost loop
 	name    string
 	label   string
 	ret     taintSet
@@ -904,8 +916,14 @@ func (a *analyzer) stmt(s ast.Stmt, st state) {
 		default:
 			st.replace(then, els)
 		}
+	case *ast.BranchStmt:
+		if (s.Tok == token.BREAK || s.Tok == token.CONTINUE) && a.ctx.loopAcc != nil {
+			a.ctx.loopAcc.union(st)
+		}
 	case *ast.ForStmt:
 		a.stmt2(s.Init, st)
+		prev := a.ctx.loopAcc
+		a.ctx.loopAcc = state{}
 		for range 2 {
 			a.eval(s.Cond, st)
 			body := st.clone()
@@ -913,8 +931,12 @@ func (a *analyzer) stmt(s ast.Stmt, st state) {
 			a.stmt2(s.Post, body)
 			st.union(body)
 		}
+		st.union(a.ctx.loopAcc)
+		a.ctx.loopAcc = prev
 	case *ast.RangeStmt:
 		t := a.eval(s.X, st)
+		prev := a.ctx.loopAcc
+		a.ctx.loopAcc = state{}
 		for range 2 {
 			body := st.clone()
 			if s.Key != nil {
@@ -926,6 +948,8 @@ func (a *analyzer) stmt(s ast.Stmt, st state) {
 			a.block(s.Body.List, body)
 			st.union(body)
 		}
+		st.union(a.ctx.loopAcc)
+		a.ctx.loopAcc = prev
 	case *ast.SwitchStmt:
 		a.stmt2(s.Init, st)
 		a.eval(s.Tag, st)

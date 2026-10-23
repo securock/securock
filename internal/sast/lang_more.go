@@ -5,10 +5,7 @@ package sast
 func init() {
 	logRecv := []string{"logger", "log", "logging", "LOG", "LOGGER", "_logger", "app", "winston", "pino", "bunyan", "Rails", "console"}
 	for _, sp := range []*langSpec{jsSpec, pySpec, javaSpec, phpSpec, rubySpec} {
-		sp.weakRNG = map[string]bool{}
-		sp.fsCheck = map[string]bool{}
-		sp.fsUse = map[string]bool{}
-		sp.xxeFactories = map[string]bool{}
+		ensureSets(sp)
 	}
 
 	// ---- JavaScript
@@ -145,4 +142,20 @@ func cut(s string) (string, string, bool) {
 		}
 	}
 	return s, "", false
+}
+
+// ensureSets makes the optional tables exist, whichever init runs first.
+func ensureSets(sp *langSpec) {
+	if sp.weakRNG == nil {
+		sp.weakRNG = map[string]bool{}
+	}
+	if sp.fsCheck == nil {
+		sp.fsCheck = map[string]bool{}
+	}
+	if sp.fsUse == nil {
+		sp.fsUse = map[string]bool{}
+	}
+	if sp.xxeFactories == nil {
+		sp.xxeFactories = map[string]bool{}
+	}
 }

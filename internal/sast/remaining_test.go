@@ -177,3 +177,43 @@ func TestDestructuredHandlerAndXMLOptions(t *testing.T) {
 		})
 	}
 }
+
+func TestFlowFixesFoundByTheOWASPBenchmark(t *testing.T) {
+	tests := []struct {
+		name  string
+		files map[string]string
+		want  []string
+	}{
+		{"java fully qualified types and calls", map[string]string{"A.java": "public class A extends javax.servlet.http.HttpServlet {\n  public void doPost(javax.servlet.http.HttpServletRequest request, javax.servlet.http.HttpServletResponse response) throws Exception {\n    String p = java.net.URLDecoder.decode(request.getParameter(\"x\"), \"UTF-8\");\n    new java.io.FileInputStream(\"/tmp/\" + p);\n  }\n}\n"}, []string{"sast:java/path-traversal"}},
+		{"java value assigned before a break reaches the code after the loop", map[string]string{"A.java": "import javax.servlet.http.*;\npublic class A extends HttpServlet {\n  public void doPost(HttpServletRequest request, HttpServletResponse response) throws Exception {\n    Cookie[] cs = request.getCookies();\n    String p = \"\";\n    for (Cookie c : cs) {\n      if (c.getName().equals(\"x\")) { p = c.getValue(); break; }\n    }\n    new java.io.FileInputStream(\"/tmp/\" + p);\n  }\n}\n"}, []string{"sast:java/path-traversal"}},
+		{"java dead branch by constant folding", map[string]string{"A.java": "import javax.servlet.http.*;\npublic class A extends HttpServlet {\n  public void doPost(HttpServletRequest request, HttpServletResponse response) throws Exception {\n    String p = request.getParameter(\"x\");\n    String bar;\n    int num = 86;\n    if ((7 * 42) - num > 200) bar = \"fixed\"; else bar = p;\n    new java.io.FileInputStream(\"/tmp/\" + bar);\n  }\n}\n"}, nil},
+		{"java map keys are tracked apart", map[string]string{"A.java": "import javax.servlet.http.*;\nimport java.util.*;\npublic class A extends HttpServlet {\n  public void doPost(HttpServletRequest request, HttpServletResponse response) throws Exception {\n    String p = request.getParameter(\"x\");\n    HashMap<String, Object> m = new HashMap<String, Object>();\n    m.put(\"a\", \"safe\");\n    m.put(\"b\", p);\n    String bar = (String) m.get(\"a\");\n    new java.io.FileInputStream(\"/tmp/\" + bar);\n  }\n}\n"}, nil},
+		{"unrelated classes with the same name do not share a summary", map[string]string{
+			"A.java": "import javax.servlet.http.*;\npublic class A extends HttpServlet {\n  public void doPost(HttpServletRequest request, HttpServletResponse response) throws Exception {\n    String p = request.getParameter(\"x\");\n    String bar = new Test().doSomething(p);\n    new java.io.FileInputStream(\"/tmp/\" + bar);\n  }\n  private class Test { public String doSomething(String s) { return \"fixed\"; } }\n}\n",
+			"B.java": "public class B {\n  private class Test { public String doSomething(String s) { return s; } }\n}\n"}, nil},
+		{"toString on a library value does not pull in a project method", map[string]string{
+			"A.java": "import javax.servlet.http.*;\npublic class A extends HttpServlet {\n  public void doPost(HttpServletRequest request, HttpServletResponse response) throws Exception {\n    String p = request.getParameter(\"x\");\n    String k = Float.toString(0.5f);\n    new java.io.FileInputStream(\"/tmp/\" + k);\n  }\n}\n",
+			"B.java": "public class B {\n  public String toString() { return \"fixed\"; }\n}\n"}, nil},
+		{"a project static call is still followed", map[string]string{
+			"A.java":      "import javax.servlet.http.*;\npublic class A extends HttpServlet {\n  public void doPost(HttpServletRequest request, HttpServletResponse response) throws Exception {\n    Runner.run(request.getParameter(\"c\"));\n  }\n}\n",
+			"Runner.java": "public class Runner {\n  public static void run(String c) throws Exception { Runtime.getRuntime().exec(c); }\n}\n"}, []string{"sast:java/command-injection"}},
+		{"flask route returning request data as a page", map[string]string{"a.py": "from flask import Flask, request\napp = Flask(__name__)\n@app.route('/')\ndef f():\n    name = request.args.get('n')\n    return 'Hello ' + name\n"}, []string{"sast:py/xss"}},
+		{"flask route returning escaped data", map[string]string{"a.py": "import html\nfrom flask import Flask, request\napp = Flask(__name__)\n@app.route('/')\ndef f():\n    name = request.args.get('n')\n    return 'Hello ' + html.escape(name)\n"}, nil},
+		{"flask route returning JSON", map[string]string{"a.py": "from flask import Flask, request, jsonify\napp = Flask(__name__)\n@app.route('/')\ndef f():\n    return jsonify({'n': request.args.get('n')})\n"}, nil},
+		{"flask session key from the request", map[string]string{"a.py": "import flask\nfrom flask import request\ndef f():\n    flask.session[request.args['k']] = '1'\n"}, []string{"sast:py/trust-boundary"}},
+		{"python weak random into a session", map[string]string{"a.py": "import random\nfrom flask import session\ndef f():\n    session['t'] = str(random.normalvariate())\n"}, []string{"sast:py/insecure-random"}},
+		{"python Path.read_text", map[string]string{"a.py": "from pathlib import Path\nfrom flask import request\ndef f():\n    return Path('/srv/' + request.args['f']).read_text()\n"}, []string{"sast:py/path-traversal"}},
+		{"lxml XPath constructor", map[string]string{"a.py": "import lxml.etree\nfrom flask import request\ndef f():\n    return lxml.etree.XPath(\"//u[@n='\" + request.args['n'] + \"']\")\n"}, []string{"sast:py/xpath-injection"}},
+		{"java session attribute is a trust boundary", map[string]string{"A.java": "import javax.servlet.http.*;\npublic class A extends HttpServlet {\n  public void doPost(HttpServletRequest request, HttpServletResponse response) throws Exception {\n    request.getSession().setAttribute(\"k\", request.getParameter(\"v\"));\n  }\n}\n"}, []string{"sast:java/trust-boundary"}},
+		{"java weak random in a cookie", map[string]string{"A.java": "import javax.servlet.http.*;\npublic class A extends HttpServlet {\n  public void doPost(HttpServletRequest request, HttpServletResponse response) throws Exception {\n    float r = new java.util.Random().nextFloat();\n    response.addCookie(new javax.servlet.http.Cookie(\"id\", Float.toString(r)));\n  }\n}\n"}, []string{"sast:java/insecure-random"}},
+		{"java secure random in a cookie", map[string]string{"A.java": "import javax.servlet.http.*;\npublic class A extends HttpServlet {\n  public void doPost(HttpServletRequest request, HttpServletResponse response) throws Exception {\n    float r = new java.security.SecureRandom().nextFloat();\n    response.addCookie(new javax.servlet.http.Cookie(\"id\", Float.toString(r)));\n  }\n}\n"}, nil},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := slices.Compact(analyze(t, tt.files))
+			if !slices.Equal(got, tt.want) {
+				t.Fatalf("got %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

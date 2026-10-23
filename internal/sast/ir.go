@@ -24,6 +24,8 @@ const (
 	exprAnd                    // Args[0] && Args[1]
 	exprOr                     // Args[0] || Args[1]
 	exprIn                     // Args[0] is a member of the collection X (a validation form)
+	exprBin                    // arithmetic or comparison: op in str, operands in Args
+	exprCond                   // x ? Args[0] : Args[1]
 	exprOther                  // anything else: taint of the children
 )
 
@@ -63,6 +65,9 @@ type stmt struct {
 	then []*stmt
 	els  []*stmt
 	arms [][]*stmt
+	// loop marks a break or continue: control leaves for the end of the loop, so the
+	// state at this point still reaches the code after it.
+	loop bool
 	// binds marks an assignment the frontend made up (a loop or callback parameter), which
 	// must not hide a request object of the same name.
 	binds bool
@@ -82,6 +87,9 @@ type funcIR struct {
 	params []param
 	body   []*stmt
 	pos    token.Pos
+	// htmlRoute marks a web handler whose returned string is sent as an HTML page
+	// (a Flask @app.route function), so what it returns is written to the browser.
+	htmlRoute bool
 }
 
 // module is one lowered source file.

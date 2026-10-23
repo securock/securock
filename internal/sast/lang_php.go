@@ -158,8 +158,10 @@ func (p *phpLower) stmt(n *node) []*stmt {
 			s.rhs = p.expr(cs[0])
 		}
 		return []*stmt{s}
-	case "throw_expression", "break_statement", "continue_statement", "exit_statement":
+	case "throw_expression", "exit_statement":
 		return []*stmt{{kind: stmtJump, pos: p.pos(n)}}
+	case "break_statement", "continue_statement":
+		return []*stmt{{kind: stmtJump, pos: p.pos(n), loop: true}}
 	case "if_statement":
 		s := &stmt{kind: stmtIf, pos: p.pos(n), cond: p.expr(p.field(n, "condition")), then: p.block(p.field(n, "body"))}
 		for _, c := range p.named(n) {
@@ -436,7 +438,7 @@ func (p *phpLower) expr(n *node) *expr {
 	case "assignment_expression":
 		return p.expr(p.field(n, "right"))
 	case "conditional_expression":
-		return p.other(n, p.expr(p.field(n, "body")), p.expr(p.field(n, "alternative")))
+		return p.cond(n, p.expr(p.field(n, "condition")), p.expr(p.field(n, "body")), p.expr(p.field(n, "alternative")))
 	case "arrow_function", "anonymous_function":
 		e := p.mk(exprLambda, n)
 		f := &funcIR{pos: p.pos(n)}

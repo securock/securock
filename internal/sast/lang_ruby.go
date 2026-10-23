@@ -146,7 +146,7 @@ func (r *rubyLower) stmt(n *node) []*stmt {
 		}
 		return []*stmt{s}
 	case "break", "next", "redo", "retry":
-		return []*stmt{{kind: stmtJump, pos: r.pos(n)}}
+		return []*stmt{{kind: stmtJump, pos: r.pos(n), loop: true}}
 	case "if", "unless", "elsif":
 		cond := r.expr(r.field(n, "condition"))
 		if k == "unless" && cond != nil {
@@ -405,7 +405,7 @@ func (r *rubyLower) expr(n *node) *expr {
 			return r.expr(cs[len(cs)-1])
 		}
 	case "conditional":
-		return r.other(n, r.expr(r.field(n, "consequence")), r.expr(r.field(n, "alternative")))
+		return r.cond(n, r.expr(r.field(n, "condition")), r.expr(r.field(n, "consequence")), r.expr(r.field(n, "alternative")))
 	case "lambda", "do_block", "block":
 		return r.blockExpr(n)
 	case "pair":

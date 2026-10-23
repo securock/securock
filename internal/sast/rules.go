@@ -30,9 +30,13 @@ const (
 	kProto
 	kLog
 	kCORS
+	kRand  // a predictable random value reaching a cookie, token or key
+	kTrust // request data stored where the application trusts it
 
-	kLast = kCORS
-	kAll  = kSQL | kCmd | kPath | kSSRF | kXSS | kRedirect | kCode | kDeser | kXPath | kLDAP | kRegex | kNoSQL | kNoSQLStr | kProto | kLog | kCORS
+	kLast = kTrust
+	kAll  = kSQL | kCmd | kPath | kSSRF | kXSS | kRedirect | kCode | kDeser | kXPath | kLDAP | kRegex | kNoSQL | kNoSQLStr | kProto | kLog | kCORS | kTrust
+	// kRand is not in kAll: request data is not random, and a sanitizer for request data
+	// does not make a predictable number unpredictable.
 )
 
 // objectDescs are the sources that can deliver a nested object, not just a string.
@@ -48,13 +52,23 @@ var objectDescs = map[string]bool{
 // to a database or a shell, so they carry only the path kind.
 const archiveDesc = "archive entry name"
 
+// randomDesc names a value from a predictable generator.
+const randomDesc = "predictable random value"
+
 // kindsFor is the set of injection classes data from a source can trigger.
 func kindsFor(desc string) kind {
 	if desc == archiveDesc {
 		return kPath
 	}
+	if desc == randomDesc {
+		return kRand
+	}
 	if objectDescs[desc] {
 		return kAll
+	}
+	if desc == "request URL" || desc == "request path" {
+		// The URL of the request itself is not a destination an attacker chose.
+		return kAll &^ (kNoSQL | kProto | kSSRF)
 	}
 	return kAll &^ (kNoSQL | kProto)
 }
@@ -83,6 +97,8 @@ var taintRules = map[kind]rule{
 	kProto:    {"sast:go/prototype-pollution", "CWE-1321", "Prototype pollution", "Reject the keys __proto__, constructor and prototype, build lookup objects with Object.create(null) or a Map, or use a merge library that guards them.", finding.SeverityHigh},
 	kLog:      {"sast:go/log-injection", "CWE-117", "Log injection", "Strip or encode line breaks (and quote the value) before writing untrusted text to a log.", finding.SeverityLow},
 	kCORS:     {"sast:go/cors-misconfiguration", "CWE-942", "Untrusted origin is allowed by CORS", "Compare the Origin header against an allowlist and echo it back only when it matches.", finding.SeverityMedium},
+	kRand:     {"sast:go/insecure-random", "CWE-338", "Predictable random value used for a secret", "Use the operating system's cryptographic generator (crypto/rand, secrets, SecureRandom, random_bytes).", finding.SeverityMedium},
+	kTrust:    {"sast:go/trust-boundary", "CWE-501", "Request data stored in a trusted place", "Validate request data before storing it in the session or another trusted store.", finding.SeverityLow},
 	kDeser:    {"sast:go/insecure-deserialization", "CWE-502", "Insecure deserialization", "Do not deserialize untrusted data with a format that can instantiate arbitrary types; use JSON or a schema-validated format.", finding.SeverityHigh},
 }
 

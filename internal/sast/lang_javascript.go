@@ -185,7 +185,7 @@ func (j *jsLower) stmt(n *node) []*stmt {
 		}
 		return []*stmt{s}
 	case "break_statement", "continue_statement":
-		return []*stmt{{kind: stmtJump, pos: j.pos(n)}}
+		return []*stmt{{kind: stmtJump, pos: j.pos(n), loop: true}}
 	case "if_statement":
 		s := &stmt{kind: stmtIf, pos: j.pos(n), cond: j.expr(j.field(n, "condition")), then: j.body(j.field(n, "consequence"))}
 		if alt := j.field(n, "alternative"); alt != nil {
@@ -719,7 +719,11 @@ func (j *jsLower) expr(n *node) *expr {
 			e := j.mk(exprIn, n)
 			e.x, e.args = r, []*expr{l}
 			return e
-		case "==", "===", "!=", "!==", "<", ">", "<=", ">=", "instanceof":
+		case "==", "===", "!=", "!==", "<", ">", "<=", ">=":
+			return j.bin(n, j.text(j.field(n, "operator")), l, r)
+		case "-", "*", "/", "%":
+			return j.bin(n, j.text(j.field(n, "operator")), l, r)
+		case "instanceof":
 			return j.mk(exprNum, n)
 		}
 		return j.other(n, l, r)
@@ -744,7 +748,7 @@ func (j *jsLower) expr(n *node) *expr {
 			return j.expr(cs[0])
 		}
 	case "ternary_expression":
-		return j.other(n, j.expr(j.field(n, "consequence")), j.expr(j.field(n, "alternative")))
+		return j.cond(n, j.expr(j.field(n, "condition")), j.expr(j.field(n, "consequence")), j.expr(j.field(n, "alternative")))
 	case "object":
 		// { origin: true, credentials: true } hands credentials to any website.
 		e := j.mk(exprOther, n)

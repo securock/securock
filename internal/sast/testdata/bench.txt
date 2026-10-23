@@ -1797,8 +1797,8 @@ public class S extends HttpServlet {
   }
 }
 
-=== java/gap-session-roundtrip
-// gap: sast:java/sql-injection
+=== java/trust-boundary-session
+// want: sast:java/trust-boundary
 import javax.servlet.http.*;
 import java.sql.*;
 

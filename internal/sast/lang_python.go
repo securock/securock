@@ -160,7 +160,7 @@ func (p *pyLower) stmt(n *node) []*stmt {
 		}
 		return []*stmt{s}
 	case "break_statement", "continue_statement":
-		return []*stmt{{kind: stmtJump, pos: p.pos(n)}}
+		return []*stmt{{kind: stmtJump, pos: p.pos(n), loop: true}}
 	case "if_statement":
 		return []*stmt{p.ifStmt(n)}
 	case "for_statement":
@@ -215,7 +215,7 @@ func (p *pyLower) stmt(n *node) []*stmt {
 		}
 		switch p.kind(def) {
 		case "function_definition":
-			p.function(def, p.decorators(n))
+			p.function(def, p.decorators(n), p.htmlRoute(n))
 		case "class_definition":
 			p.classDef(def)
 		}
@@ -370,8 +370,18 @@ func (p *pyLower) decorators(def *node) bool {
 	return false
 }
 
-func (p *pyLower) function(n *node, isRoute bool) {
-	f := &funcIR{name: p.text(p.field(n, "name")), class: p.class, pos: p.pos(n)}
+// htmlRoute reports a Flask-style route, whose string result is served as HTML.
+func (p *pyLower) htmlRoute(def *node) bool {
+	for _, c := range p.named(def) {
+		if p.kind(c) == "decorator" && strings.Contains(p.text(c), ".route(") {
+			return true
+		}
+	}
+	return false
+}
+
+func (p *pyLower) function(n *node, isRoute bool, html ...bool) {
+	f := &funcIR{name: p.text(p.field(n, "name")), class: p.class, pos: p.pos(n), htmlRoute: len(html) > 0 && html[0]}
 	if f.name == "__init__" {
 		f.name = "<init>"
 	}
@@ -447,7 +457,7 @@ func (p *pyLower) classDef(n *node) {
 			p.function(m, false)
 		case "decorated_definition":
 			if def := p.field(m, "definition"); def != nil && p.kind(def) == "function_definition" {
-				p.function(def, p.decorators(m))
+				p.function(def, p.decorators(m), p.htmlRoute(m))
 			}
 		}
 	}
