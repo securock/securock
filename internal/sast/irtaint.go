@@ -1477,6 +1477,16 @@ func (r *irRun) strOf(e *expr) (string, bool) {
 			b.WriteString(v)
 		}
 		return b.String(), true
+	case exprMember:
+		// cfg.SECRET where cfg is a project module.
+		if e.x != nil && e.x.kind == exprName && r.mod != nil {
+			if ref, ok := r.mod.locals[e.x.name]; ok && ref.name == "" {
+				if m := r.proj.resolveModule(r.mod, ref.spec); m != nil && m != r.mod {
+					v, ok := topStrs(m)[e.name]
+					return v, ok
+				}
+			}
+		}
 	case exprCall:
 		if e.x != nil && e.x.kind == exprMember && e.x.name == "getProperty" && len(e.args) > 0 && e.args[0].kind == exprStr {
 			if v, ok := r.proj.props[e.args[0].str]; ok {
@@ -1499,16 +1509,36 @@ func (r *irRun) argText(e *expr) (string, bool) {
 	return constText(e)
 }
 
-// moduleStrs are the module-level names that are assigned a string exactly once, so a
-// function that reads const SECRET = "..." sees its value. A name that is assigned again
-// at the top level is left out.
+// moduleStrs are the string constants a function can read without assigning them: its
+// module's own (const SECRET = "...") and the ones it imports from another project file.
 func (r *irRun) moduleStrs() map[string]string {
-	if r.mod.topStrs != nil {
-		return r.mod.topStrs
+	out := map[string]string{}
+	for k, v := range topStrs(r.mod) {
+		out[k] = v
+	}
+	for alias, ref := range r.mod.locals {
+		if ref.name == "" {
+			continue
+		}
+		if m := r.proj.resolveModule(r.mod, ref.spec); m != nil && m != r.mod {
+			if v, ok := topStrs(m)[ref.name]; ok {
+				out[alias] = v
+			}
+		}
+	}
+	return out
+}
+
+// topStrs are a module's top-level names that are assigned a string exactly once. A name
+// that is assigned again at the top level is left out.
+func topStrs(m *module) map[string]string {
+	if m.topStrs != nil {
+		return m.topStrs
 	}
 	out := map[string]string{}
+	m.topStrs = out
 	count := map[string]int{}
-	for _, s := range r.mod.top {
+	for _, s := range m.top {
 		if s.kind != stmtAssign {
 			continue
 		}
@@ -1518,14 +1548,36 @@ func (r *irRun) moduleStrs() map[string]string {
 			}
 		}
 	}
-	for _, s := range r.mod.top {
+	var eval func(e *expr) (string, bool)
+	eval = func(e *expr) (string, bool) {
+		switch {
+		case e == nil:
+			return "", false
+		case e.kind == exprStr:
+			return e.str, true
+		case e.kind == exprName:
+			v, ok := out[e.name]
+			return v, ok
+		case e.kind == exprConcat:
+			var b strings.Builder
+			for _, a := range e.args {
+				v, ok := eval(a)
+				if !ok {
+					return "", false
+				}
+				b.WriteString(v)
+			}
+			return b.String(), true
+		}
+		return "", false
+	}
+	for _, s := range m.top {
 		if s.kind != stmtAssign || s.aug || len(s.lhs) != 1 || s.lhs[0].kind != exprName || count[s.lhs[0].name] != 1 {
 			continue
 		}
-		if v, ok := r.strOf(s.rhs); ok {
+		if v, ok := eval(s.rhs); ok {
 			out[s.lhs[0].name] = v
 		}
 	}
-	r.mod.topStrs = out
 	return out
 }

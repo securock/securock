@@ -142,7 +142,7 @@ func literalArg(e *expr, constText func(*expr) (string, bool)) bool {
 	if e.kind == exprStr {
 		return len(e.str) >= 4
 	}
-	if e.kind != exprName {
+	if e.kind != exprName && e.kind != exprMember {
 		return false
 	}
 	have, ok := constText(e)

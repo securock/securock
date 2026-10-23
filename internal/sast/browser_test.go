@@ -101,3 +101,36 @@ func TestJSObjectOptionChecks(t *testing.T) {
 		})
 	}
 }
+
+func TestImportedStringConstants(t *testing.T) {
+	tests := []struct {
+		name  string
+		files map[string]string
+		want  []string
+	}{
+		{"named import", map[string]string{
+			"config.js": "module.exports.SECRET = 'shhh-secret';\nconst SECRET = 'shhh-secret';\nmodule.exports = { SECRET };",
+			"auth.js":   "const jwt = require('jsonwebtoken');\nconst { SECRET } = require('./config');\nfunction f(t) { return jwt.verify(t, SECRET); }",
+		}, []string{"sast:js/hardcoded-signing-key"}},
+		{"es module import", map[string]string{
+			"config.js": "export const KEY = 'shhh-secret';",
+			"auth.js":   "import jwt from 'jsonwebtoken';\nimport { KEY } from './config';\nexport function f(t) { return jwt.verify(t, KEY); }",
+		}, []string{"sast:js/hardcoded-signing-key"}},
+		{"module member", map[string]string{
+			"config.py": "ALGO = 'md5'\n",
+			"auth.py":   "import hashlib\nimport config\n\ndef f(p):\n    return hashlib.new(config.ALGO, p)\n",
+		}, []string{"sast:py/weak-crypto"}},
+		{"imported value from the environment", map[string]string{
+			"config.js": "export const KEY = process.env.KEY;",
+			"auth.js":   "import jwt from 'jsonwebtoken';\nimport { KEY } from './config';\nexport function f(t) { return jwt.verify(t, KEY); }",
+		}, nil},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := analyze(t, tt.files)
+			if !slices.Equal(got, tt.want) {
+				t.Fatalf("got %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
