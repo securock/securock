@@ -124,7 +124,7 @@ func matchesAny(have string, want []string) bool {
 	return false
 }
 
-func (m misuse) matches(c *expr) bool {
+func (m misuse) matches(c *expr, constText func(*expr) (string, bool)) bool {
 	if len(m.recv) > 0 {
 		if c.x == nil || c.x.kind != exprMember || !matchesName(rootName(c.x.x), m.recv) {
 			return false
@@ -217,7 +217,7 @@ func (r *irRun) checkMisuse(c *expr, qname, field string) {
 			continue
 		}
 		for _, m := range r.spec.misuse[key] {
-			if m.matches(c) {
+			if m.matches(c, r.argText) {
 				r.reportMisuse(c.pos, r.rulesFor(r.spec.name, m), m.detail)
 			}
 		}

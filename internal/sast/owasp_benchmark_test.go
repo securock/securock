@@ -28,7 +28,7 @@ func TestOWASPBenchmarkJava(t *testing.T) {
 	if dir == "" {
 		t.Skip("set SECUROCK_OWASP_BENCHMARK to a checkout of BenchmarkJava to run")
 	}
-	scoreBenchmark(t, filepath.Join(dir, "expectedresults-1.2.csv"), filepath.Join(dir, "src", "main", "java"), "sast:java/", map[string]string{
+	scoreBenchmark(t, filepath.Join(dir, "expectedresults-1.2.csv"), filepath.Join(dir, "src", "main"), "sast:java/", map[string]string{
 		"sqli": "sql-injection", "cmdi": "command-injection", "pathtraver": "path-traversal", "xss": "xss",
 		"ldapi": "ldap-injection", "xpathi": "xpath-injection", "hash": "weak-crypto", "crypto": "weak-crypto",
 		"weakrand": "insecure-random", "securecookie": "insecure-cookie", "trustbound": "trust-boundary",

@@ -57,7 +57,7 @@ func Analyze(root string) ([]finding.Finding, error) {
 	fset := token.NewFileSet()
 	var out []finding.Finding
 
-	pkgs, mods, incomplete, err := load(fset, abs)
+	pkgs, mods, props, incomplete, err := load(fset, abs)
 	if err != nil {
 		return nil, err
 	}
@@ -82,7 +82,7 @@ func Analyze(root string) ([]finding.Finding, error) {
 		}
 		return filepath.ToSlash(r)
 	}
-	out = append(out, taint(fset, abs, pkgs, mods, rel)...)
+	out = append(out, taint(fset, abs, pkgs, mods, props, rel)...)
 	for _, p := range pkgs {
 		out = append(out, astRules(fset, p, rel)...)
 	}
@@ -91,7 +91,7 @@ func Analyze(root string) ([]finding.Finding, error) {
 
 // taint runs the interprocedural analysis to a fixed point over function summaries.
 // Findings are taken from the final round only, once every summary is complete.
-func taint(fset *token.FileSet, root string, pkgs []*pkg, mods []*module, rel func(token.Pos) string) []finding.Finding {
+func taint(fset *token.FileSet, root string, pkgs []*pkg, mods []*module, props map[string]string, rel func(token.Pos) string) []finding.Finding {
 	type fn struct {
 		decl *ast.FuncDecl
 		name string
@@ -137,6 +137,7 @@ func taint(fset *token.FileSet, root string, pkgs []*pkg, mods []*module, rel fu
 		}
 	}
 	proj := newProject(mods)
+	proj.props = props
 	var found map[string]finding.Finding
 	var failed []finding.Finding
 	prev := ""
@@ -183,7 +184,8 @@ func taint(fset *token.FileSet, root string, pkgs []*pkg, mods []*module, rel fu
 	return out
 }
 
-func load(fset *token.FileSet, root string) ([]*pkg, []*module, []finding.Finding, error) {
+func load(fset *token.FileSet, root string) ([]*pkg, []*module, map[string]string, []finding.Finding, error) {
+	props := map[string]string{}
 	modDir, modPath := findModule(root)
 	var pkgs []*pkg
 	var mods []*module
@@ -209,6 +211,9 @@ func load(fset *token.FileSet, root string) ([]*pkg, []*module, []finding.Findin
 					return err
 				}
 				continue
+			}
+			if strings.HasSuffix(strings.ToLower(name), ".properties") {
+				readProperties(full, props)
 			}
 			if !lowValue && !skippedFile(name) && !strings.HasSuffix(name, "_test.go") {
 				incomplete = append(incomplete, scanSecrets(root, full, relPath(root, full), name)...)
@@ -268,10 +273,10 @@ func load(fset *token.FileSet, root string) ([]*pkg, []*module, []finding.Findin
 		return nil
 	}
 	if err := walk(root, false); err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, nil, err
 	}
 	sort.Slice(mods, func(i, j int) bool { return mods[i].path < mods[j].path })
-	return pkgs, mods, incomplete, nil
+	return pkgs, mods, props, incomplete, nil
 }
 
 // unanalyzed is the fail-closed result for a file the analyzer could not read: the
@@ -493,5 +498,30 @@ func collectDeclTypes(p *pkg, into map[types.Object]ast.Expr) {
 			}
 			return true
 		})
+	}
+}
+
+// readProperties adds the key=value lines of a Java properties file. The first definition
+// of a key wins, so a value read here is the one most likely to be in use.
+func readProperties(path string, into map[string]string) {
+	st, err := os.Stat(path)
+	if err != nil || st.Size() > 256<<10 {
+		return
+	}
+	b, err := os.ReadFile(path)
+	if err != nil {
+		return
+	}
+	for line := range strings.SplitSeq(string(b), "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" || line[0] == '#' || line[0] == '!' {
+			continue
+		}
+		if k, v, ok := strings.Cut(line, "="); ok {
+			k = strings.TrimSpace(k)
+			if _, dup := into[k]; !dup {
+				into[k] = strings.TrimSpace(v)
+			}
+		}
 	}
 }

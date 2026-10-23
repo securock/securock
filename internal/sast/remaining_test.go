@@ -308,3 +308,13 @@ func TestJavaCookieFlags(t *testing.T) {
 		})
 	}
 }
+
+func TestAlgorithmFromPropertiesAndConstants(t *testing.T) {
+	got := analyze(t, map[string]string{
+		"app.properties": "hashAlg=MD5\nsafeAlg=SHA-256\n",
+		"A.java":         "public class A {\n  void a() throws Exception {\n    java.util.Properties p = new java.util.Properties();\n    String alg = p.getProperty(\"hashAlg\", \"SHA-512\");\n    java.security.MessageDigest.getInstance(alg);\n  }\n  void b() throws Exception {\n    java.util.Properties p = new java.util.Properties();\n    java.security.MessageDigest.getInstance(p.getProperty(\"safeAlg\", \"MD5\"));\n  }\n  void c() throws Exception {\n    String alg = \"SHA-\" + \"1\";\n    java.security.MessageDigest.getInstance(alg);\n  }\n}\n",
+	})
+	if !slices.Equal(got, []string{"sast:java/weak-crypto", "sast:java/weak-crypto"}) {
+		t.Fatalf("got %v", got)
+	}
+}

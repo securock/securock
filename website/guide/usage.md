@@ -397,10 +397,9 @@ each category and fails if the score drops.
 
 Read the numbers with their limits in mind. Both suites are synthetic and contain
 constructs real code rarely has: a switch on a constant string, a list whose first
-element is removed before the second is read, a hash algorithm chosen from a properties
-file. The remaining false positives are mostly those, and the remaining misses are mostly
-configuration-driven (the algorithm or file name comes from a properties file, which is
-not read). Juice Shop also ships each security challenge in several flawed and one correct variant
+element is removed before the second is read. The remaining false positives are mostly those. Algorithms read from a `.properties`
+file with `getProperty("key", "default")` are resolved from the project's own properties
+files. Juice Shop also ships each security challenge in several flawed and one correct variant
 (`data/static/codefixes`), which makes a labeled set for JavaScript and TypeScript: the
 vulnerable variants of the injection, XSS and redirect challenges are found, and the
 parameterized SQL variants are not reported. Other languages have no labeled suite here, only the

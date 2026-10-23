@@ -155,6 +155,8 @@ type project struct {
 	// byName maps a bare method name to every class method with it, for calls on a value
 	// whose class is not known.
 	byName map[string][]string
+	// props holds the key=value pairs of the project's .properties files.
+	props map[string]string
 }
 
 func funcKey(m *module, f *funcIR) string {
@@ -250,8 +252,9 @@ type irRun struct {
 	lhsName                      string
 	loopAcc                      istate // states at break/continue in the innermost loop
 	fn                           *funcIR
-	strVars                      map[string]bool  // variables that hold a string built in this function
-	consts                       map[string]int64 // integer variables with a known value on this path
+	strVars                      map[string]bool   // variables that hold a string built in this function
+	consts                       map[string]int64  // integer variables with a known value on this path
+	strs                         map[string]string // string variables with a known value on this path
 	checked                      map[string]bool
 	xxeFactories                 []token.Pos
 	xxeHardened                  bool
@@ -1110,6 +1113,11 @@ func (r *irRun) stmt(s *stmt, st istate) {
 				r.strVars[l.name] = r.isString(s.rhs) || (s.aug && r.strVars[l.name])
 			}
 			if l.kind == exprName {
+				if sv, ok := r.strOf(s.rhs); ok && !s.aug && len(s.lhs) == 1 {
+					r.strs[l.name] = sv
+				} else {
+					delete(r.strs, l.name)
+				}
 				if cv, ok := r.constInt(s.rhs); ok && !s.aug && len(s.lhs) == 1 {
 					r.consts[l.name] = cv
 				} else {
@@ -1209,6 +1217,7 @@ func (r *irRun) stmt(s *stmt, st istate) {
 		defer func() {
 			for n := range forget {
 				delete(r.consts, n)
+				delete(r.strs, n)
 			}
 		}()
 		then := st.clone()
@@ -1235,6 +1244,7 @@ func (r *irRun) stmt(s *stmt, st istate) {
 		assignedNames(s.then, forget)
 		for n := range forget {
 			delete(r.consts, n)
+			delete(r.strs, n)
 		}
 		prev := r.loopAcc
 		r.loopAcc = istate{}
@@ -1257,6 +1267,7 @@ func (r *irRun) stmt(s *stmt, st istate) {
 		}
 		for n := range forget {
 			delete(r.consts, n)
+			delete(r.strs, n)
 		}
 		prev := r.loopAcc
 		r.loopAcc = istate{}
@@ -1316,6 +1327,7 @@ func (r *irRun) analyze(f *funcIR) *summary {
 	r.shadow = map[string]bool{}
 	r.checked = map[string]bool{}
 	r.consts = map[string]int64{}
+	r.strs = map[string]string{}
 	r.xxeFactories, r.xxeHardened, r.lhsName = nil, false, ""
 	r.cookies, r.cookieSecure, r.cookieHTTPOnly = nil, false, false
 	st := istate{}
@@ -1415,4 +1427,48 @@ func (r *irRun) isString(e *expr) bool {
 		}
 	}
 	return false
+}
+
+// strOf evaluates a string expression made of literals, known string variables, and
+// Properties.getProperty calls whose key the project's .properties files define.
+func (r *irRun) strOf(e *expr) (string, bool) {
+	if e == nil {
+		return "", false
+	}
+	switch e.kind {
+	case exprStr:
+		return e.str, true
+	case exprName:
+		v, ok := r.strs[e.name]
+		return v, ok
+	case exprConcat:
+		var b strings.Builder
+		for _, a := range e.args {
+			v, ok := r.strOf(a)
+			if !ok {
+				return "", false
+			}
+			b.WriteString(v)
+		}
+		return b.String(), true
+	case exprCall:
+		if e.x != nil && e.x.kind == exprMember && e.x.name == "getProperty" && len(e.args) > 0 && e.args[0].kind == exprStr {
+			if v, ok := r.proj.props[e.args[0].str]; ok {
+				return v, true
+			}
+			if len(e.args) > 1 {
+				return r.strOf(e.args[1])
+			}
+		}
+	}
+	return "", false
+}
+
+// argText is the lower-cased text of an argument for matching: a string the analysis can
+// work out, else the literal or name as written.
+func (r *irRun) argText(e *expr) (string, bool) {
+	if v, ok := r.strOf(e); ok {
+		return strings.ToLower(v), true
+	}
+	return constText(e)
 }
