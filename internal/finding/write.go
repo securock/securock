@@ -58,6 +58,12 @@ func WriteText(w io.Writer, r Report) {
 		if f.Subject != "" {
 			fmt.Fprintf(w, "  subject  %s\n", f.Subject)
 		}
+		if l := f.Location; l != nil {
+			fmt.Fprintf(w, "  at       %s:%d\n", l.File, l.Line)
+		}
+		for _, s := range f.Trace {
+			fmt.Fprintf(w, "    %s:%d  %s\n", s.File, s.Line, s.Message)
+		}
 		if f.Detail != "" {
 			fmt.Fprintf(w, "  detail   %s\n", f.Detail)
 		}
@@ -115,6 +121,19 @@ type sarifResult struct {
 	Properties          sarifProperties   `json:"properties"`
 	// Suppressions marks accepted findings so code scanning shows them as dismissed.
 	Suppressions []sarifSuppression `json:"suppressions,omitempty"`
+	CodeFlows    []sarifCodeFlow    `json:"codeFlows,omitempty"`
+}
+
+type sarifCodeFlow struct {
+	ThreadFlows []sarifThreadFlow `json:"threadFlows"`
+}
+
+type sarifThreadFlow struct {
+	Locations []sarifThreadFlowLocation `json:"locations"`
+}
+
+type sarifThreadFlowLocation struct {
+	Location sarifLocation `json:"location"`
 }
 
 type sarifSuppression struct {
@@ -134,12 +153,19 @@ type sarifMessage struct {
 }
 
 type sarifLocation struct {
+	Message          *sarifMessage          `json:"message,omitempty"`
 	PhysicalLocation *sarifPhysicalLocation `json:"physicalLocation,omitempty"`
 	LogicalLocations []sarifLogicalLocation `json:"logicalLocations,omitempty"`
 }
 
 type sarifPhysicalLocation struct {
 	ArtifactLocation sarifArtifactLocation `json:"artifactLocation"`
+	Region           *sarifRegion          `json:"region,omitempty"`
+}
+
+type sarifRegion struct {
+	StartLine   int `json:"startLine"`
+	StartColumn int `json:"startColumn,omitempty"`
 }
 
 type sarifArtifactLocation struct {
@@ -186,7 +212,16 @@ func WriteSARIF(w io.Writer, r Report) error {
 			PartialFingerprints: map[string]string{"securock/v1": fingerprint(f)},
 			Properties:          sarifProperties{Severity: f.Severity, Subject: f.Subject, Remediation: f.Remediation},
 		}
-		if loc, ok := sarifLocationOf(r.Location, f.Subject); ok {
+		if f.Location != nil {
+			res.Locations = []sarifLocation{sourceLocation(f.Location.File, f.Location.Line, f.Location.Column, "")}
+			if len(f.Trace) > 0 {
+				flow := sarifThreadFlow{}
+				for _, s := range f.Trace {
+					flow.Locations = append(flow.Locations, sarifThreadFlowLocation{Location: sourceLocation(s.File, s.Line, s.Column, s.Message)})
+				}
+				res.CodeFlows = []sarifCodeFlow{{ThreadFlows: []sarifThreadFlow{flow}}}
+			}
+		} else if loc, ok := sarifLocationOf(r.Location, f.Subject); ok {
 			res.Locations = []sarifLocation{loc}
 		}
 		if s := f.Suppressed; s != nil {
@@ -206,6 +241,17 @@ func WriteSARIF(w io.Writer, r Report) error {
 	enc := json.NewEncoder(w)
 	enc.SetIndent("", "  ")
 	return enc.Encode(log)
+}
+
+func sourceLocation(file string, line, col int, msg string) sarifLocation {
+	loc := sarifLocation{PhysicalLocation: &sarifPhysicalLocation{
+		ArtifactLocation: sarifArtifactLocation{URI: filepath.ToSlash(file)},
+		Region:           &sarifRegion{StartLine: line, StartColumn: col},
+	}}
+	if msg != "" {
+		loc.Message = &sarifMessage{Text: msg}
+	}
+	return loc
 }
 
 func sarifLocationOf(file, subject string) (sarifLocation, bool) {

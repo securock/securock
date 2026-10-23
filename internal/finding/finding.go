@@ -40,9 +40,28 @@ type Finding struct {
 	Subject     string   `json:"subject,omitempty"`
 	Remediation string   `json:"remediation,omitempty"`
 
+	// Location and Trace are set by source-code findings: where the issue is, and for
+	// dataflow findings the steps from the untrusted source to the dangerous sink.
+	Location *Location `json:"location,omitempty"`
+	Trace    []Step    `json:"trace,omitempty"`
+
 	// Suppressed is set when the finding has been accepted. Suppressed findings stay in
 	// the report but do not count toward severity totals or --fail-on.
 	Suppressed *Suppression `json:"suppressed,omitempty"`
+}
+
+// Location is a position in a source file. File is relative to the scanned directory
+// and uses forward slashes; Line and Column are 1-based.
+type Location struct {
+	File   string `json:"file"`
+	Line   int    `json:"line"`
+	Column int    `json:"column,omitempty"`
+}
+
+// Step is one hop of a dataflow trace.
+type Step struct {
+	Location
+	Message string `json:"message"`
 }
 
 type Suppression struct {
