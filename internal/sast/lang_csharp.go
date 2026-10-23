@@ -224,8 +224,11 @@ func (c *csLower) missingAntiforgery(m *node) bool {
 	return verb && !token
 }
 
+var reGlobalAntiforgery = regexp.MustCompile(`Filters\s*\.\s*Add\s*\(\s*new\s+(?:Auto)?ValidateAntiforgeryToken(?:Attribute)?\s*\(|AutoValidateAntiforgeryTokenAttribute`)
+
 func lowerCSharp(l *lowering) *module {
 	c := &csLower{lowering: l}
+	l.mod.globalCSRF = reGlobalAntiforgery.Match(l.src)
 	c.members(l.named(l.root))
 	return l.mod
 }

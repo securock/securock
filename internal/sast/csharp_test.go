@@ -92,3 +92,18 @@ func TestDebugOnlyInDevelopmentIsNotReported(t *testing.T) {
 		})
 	}
 }
+
+func TestGlobalAntiforgeryFilter(t *testing.T) {
+	controller := "public class C : Controller {\n  [HttpPost]\n  public IActionResult Save(string a) { return View(); }\n}\n"
+	got := analyze(t, map[string]string{"C.cs": controller})
+	if !slices.Equal(got, []string{"sast:cs/csrf-disabled"}) {
+		t.Fatalf("an unprotected action is reported: got %v", got)
+	}
+	got = analyze(t, map[string]string{
+		"C.cs":       controller,
+		"Startup.cs": "public class Startup { void S(IServiceCollection s) { s.AddControllersWithViews(o => o.Filters.Add(new AutoValidateAntiforgeryTokenAttribute())); } }\n",
+	})
+	if len(got) != 0 {
+		t.Fatalf("a global antiforgery filter protects every action: got %v", got)
+	}
+}

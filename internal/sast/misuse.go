@@ -273,6 +273,9 @@ func (r *irRun) reportMisuse(pos token.Pos, ru rule, detail string) {
 	if r.devDepth > 0 && strings.HasSuffix(ru.id, "/debug-enabled") {
 		return
 	}
+	if r.spec.name == "cs" && r.proj != nil && r.proj.globalCSRF && strings.HasSuffix(ru.id, "/csrf-disabled") {
+		return // every action is protected by a global filter
+	}
 	l := r.loc(pos)
 	key := fmt.Sprintf("%s|%s|%d|%d", ru.id, l.File, l.Line, l.Column)
 	if _, dup := r.found[key]; dup {

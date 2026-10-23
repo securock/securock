@@ -109,6 +109,8 @@ type module struct {
 	// supers maps class -> declared supertypes (extends, implements), so a call through
 	// an interface reaches the classes implementing it.
 	supers map[string][]string
+	// globalCSRF is set when the file registers an antiforgery filter for every action.
+	globalCSRF bool
 }
 
 type localRef struct {

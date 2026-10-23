@@ -161,6 +161,8 @@ type project struct {
 	byName map[string][]string
 	// props holds the key=value pairs of the project's .properties files.
 	props map[string]string
+	// globalCSRF is set when any file registers an antiforgery filter for every action.
+	globalCSRF bool
 }
 
 func funcKey(m *module, f *funcIR) string {
@@ -174,6 +176,7 @@ func newProject(mods []*module) *project {
 	p := &project{mods: map[string]*module{}, classes: map[string]string{}, methods: map[string][]string{}, byName: map[string][]string{}}
 	for _, m := range mods {
 		p.mods[m.path] = m
+		p.globalCSRF = p.globalCSRF || m.globalCSRF
 		for _, f := range m.funcs {
 			if f.class == "" {
 				continue
