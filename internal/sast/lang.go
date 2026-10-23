@@ -28,6 +28,8 @@ var extensions = map[string][2]string{
 	".php":  {"php", "php"},
 	".rb":   {"ruby", "rb"},
 	".cs":   {"c_sharp", "cs"},
+	".kt":   {"kotlin", "kt"},
+	".kts":  {"kotlin", "kt"},
 }
 
 // skippedFile reports files that are not first-party source: minified bundles,

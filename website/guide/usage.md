@@ -234,8 +234,8 @@ reported as `info`, so offline runs always have `info` findings.
 
 `sast` analyzes the project's own source, offline, and reports untrusted data
 that reaches a dangerous call along with the path it took. It reads Go,
-JavaScript and TypeScript (`js`), Python (`py`), Java (`java`), C# (`cs`), PHP (`php`),
-and Ruby (`rb`). Rule ids are `sast:LANGUAGE/RULE`:
+JavaScript and TypeScript (`js`), Python (`py`), Java (`java`), Kotlin (`kt`), C# (`cs`),
+PHP (`php`), and Ruby (`rb`). Rule ids are `sast:LANGUAGE/RULE`:
 
 | Rule                           | CWE  | Severity | Languages               |
 | ------------------------------ | ---- | -------- | ----------------------- |

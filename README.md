@@ -65,7 +65,7 @@ Those changes are easy to miss in a language lockfile diff.
   assignments, fields, closures, and calls across functions and files to SQL,
   command, code, path, NoSQL, request, response, and deserialization sinks
   (including zip slip and prototype pollution), and prints
-  the path it took. Go, JavaScript/TypeScript, Python, Java, C#, PHP, and Ruby,
+  the path it took. Go, JavaScript/TypeScript, Python, Java, Kotlin, C#, PHP, and Ruby,
   fully offline. It also checks Dockerfiles, Kubernetes and Compose manifests,
   Terraform, and GitHub Actions workflows for unsafe settings, and scans every
   text file for committed credentials. A file it cannot parse is reported
