@@ -104,12 +104,39 @@ func (s state) replace(a, b state) {
 	clear(s)
 	s.union(a)
 	s.union(b)
+	// A value is validated after the branches only if it was validated in both.
+	for k := range a {
+		if isMarker(k.field) {
+			if _, both := b[k]; both {
+				s[k] = a[k]
+			}
+		}
+	}
 }
 
 func (s state) union(o state) {
 	for k, v := range o {
+		if isMarker(k.field) {
+			continue
+		}
 		s[k] = merge(s[k], v)
 	}
+}
+
+// A marker records that a value has been validated on this path. Sources are recomputed
+// every time they are read (r.URL, f.Name), so clearing stored taint is not enough: the
+// read has to know the value passed a check.
+const markerPrefix = "\x00v:"
+
+func isMarker(field string) bool { return strings.HasPrefix(field, markerPrefix) }
+
+func (s state) mark(obj types.Object, field string) {
+	s[vkey{obj, markerPrefix + field}] = taintSet{{key: "valid"}}
+}
+
+func (s state) marked(obj types.Object, field string) bool {
+	_, ok := s[vkey{obj, markerPrefix + field}]
+	return ok
 }
 
 // related reports whether two field paths overlap: one is a prefix of the other.
@@ -168,6 +195,7 @@ func (s *summary) signature() string {
 
 type funcCtx struct {
 	oks     map[types.Object]ast.Expr // "v, ok := m[k]": ok validates k
+	cleaned map[types.Object]bool     // variables holding the result of filepath.Join/Clean/Abs
 	name    string
 	label   string
 	ret     taintSet
@@ -210,7 +238,7 @@ func (a *analyzer) lang() string {
 }
 
 func (a *analyzer) source(pos token.Pos, desc string) taintSet {
-	return taintSet{{key: fmt.Sprintf("s%d", pos), param: -1, kinds: kAll, flow: &flow{pos: pos, msg: "untrusted data: " + desc}}}
+	return taintSet{{key: fmt.Sprintf("s%d", pos), param: -1, kinds: kindsFor(desc), flow: &flow{pos: pos, msg: "untrusted data: " + desc}}}
 }
 
 func (a *analyzer) loc(pos token.Pos) *finding.Location {
@@ -393,7 +421,14 @@ func (a *analyzer) evalSelector(e *ast.SelectorExpr, st state) taintSet {
 			return nil
 		}
 	}
-	if desc, ok := requestFields[e.Sel.Name]; ok && isRequest(a.info.TypeOf(e.X)) {
+	validated := false
+	if obj, f, _, ok := a.pathOf(e); ok {
+		validated = st.marked(obj, f)
+	}
+	if e.Sel.Name == "Name" && isArchiveEntry(a.info.TypeOf(e.X)) && !validated {
+		return a.source(e.Pos(), archiveDesc)
+	}
+	if desc, ok := requestFields[e.Sel.Name]; ok && isRequest(a.info.TypeOf(e.X)) && !validated {
 		return a.source(e.Pos(), desc)
 	}
 	if obj, f, _, ok := a.pathOf(e); ok {
@@ -412,6 +447,22 @@ func (a *analyzer) evalSelector(e *ast.SelectorExpr, st state) taintSet {
 		return t
 	}
 	return a.eval(e.X, st)
+}
+
+// isArchiveEntry reports whether t is a zip or tar entry header, whose Name is attacker
+// chosen.
+func isArchiveEntry(t types.Type) bool {
+	if t == nil {
+		return false
+	}
+	if p, ok := t.(*types.Pointer); ok {
+		t = p.Elem()
+	}
+	switch types.TypeString(t, nil) {
+	case "archive/zip.File", "archive/zip.FileHeader", "archive/tar.Header":
+		return true
+	}
+	return false
 }
 
 func isRequest(t types.Type) bool {
@@ -907,7 +958,33 @@ func (a *analyzer) typeSwitch(s *ast.TypeSwitchStmt, st state) {
 	}
 }
 
+// noteCleaned records which variables now hold a cleaned path.
+func (a *analyzer) noteCleaned(s *ast.AssignStmt) {
+	if len(s.Lhs) != len(s.Rhs) {
+		return
+	}
+	for i, l := range s.Lhs {
+		obj, _, _, ok := a.pathOf(l)
+		if !ok {
+			continue
+		}
+		cleaned := false
+		if c, isCall := unparen(s.Rhs[i]).(*ast.CallExpr); isCall {
+			switch name, _ := a.calleeName(c.Fun); name {
+			case "path/filepath.Join", "path/filepath.Clean", "path/filepath.Abs", "path.Join", "path.Clean":
+				cleaned = true
+			}
+		}
+		if cleaned {
+			a.ctx.cleaned[obj] = true
+		} else {
+			delete(a.ctx.cleaned, obj)
+		}
+	}
+}
+
 func (a *analyzer) assignStmt(s *ast.AssignStmt, st state) {
+	defer a.noteCleaned(s)
 	a.noteOK(s)
 	if len(s.Rhs) == 1 && len(s.Lhs) > 1 {
 		t := a.eval(s.Rhs[0], st)
@@ -938,6 +1015,7 @@ func (a *analyzer) analyzeFunc(fd *ast.FuncDecl, name string) *summary {
 	a.ctx = &funcCtx{name: name, label: declName(fd)}
 	st := state{}
 	a.ctx.oks = map[types.Object]ast.Expr{}
+	a.ctx.cleaned = map[types.Object]bool{}
 	if fd.Recv != nil && len(fd.Recv.List) > 0 && len(fd.Recv.List[0].Names) > 0 {
 		if o, ok := a.info.Defs[fd.Recv.List[0].Names[0]].(*types.Var); ok && o.Name() != "_" {
 			st[vkey{o, ""}] = taintSet{{key: "pr", param: recvParam, kinds: kAll}}

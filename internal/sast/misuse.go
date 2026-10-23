@@ -23,6 +23,11 @@ type misuse struct {
 	kw map[string]string
 	// bare reports the call whatever its arguments are.
 	bare bool
+	// noKw makes the call unsafe only when this keyword argument is absent:
+	// tarfile.extractall without filter=.
+	noKw string
+	// recv limits a method misuse to receivers rooted at one of these variable names.
+	recv []string
 }
 
 // assignMisuse flags assigning one of the values to a property: verify_mode =
@@ -52,6 +57,8 @@ var (
 		"Keep CSRF protection on for state-changing requests, and exempt only endpoints that use another proof of origin.", finding.SeverityMedium}
 	ruleWorldWritable = rule{"sast:go/world-writable", "CWE-732", "File is made world-writable",
 		"Use the narrowest mode that works, such as 0600 for files and 0750 for directories.", finding.SeverityMedium}
+	ruleZipSlip = rule{"sast:go/zip-slip", "CWE-22", "Archive extraction can write outside the target directory",
+		"Resolve each entry against the destination and reject any that leaves it, or extract with a filter that does (tarfile filter=\"data\").", finding.SeverityHigh}
 	ruleExtract = rule{"sast:go/variable-extraction", "CWE-621", "Request data is imported into the variable scope",
 		"Read the specific parameters you need instead of extract()ing the request.", finding.SeverityHigh}
 )
@@ -75,6 +82,15 @@ func constText(e *expr) (string, bool) {
 	return "", false
 }
 
+func matchesName(have string, names []string) bool {
+	for _, n := range names {
+		if have == n {
+			return true
+		}
+	}
+	return false
+}
+
 func matchesAny(have string, want []string) bool {
 	for _, w := range want {
 		if exact, ok := strings.CutPrefix(w, "="); ok {
@@ -89,6 +105,19 @@ func matchesAny(have string, want []string) bool {
 }
 
 func (m misuse) matches(c *expr) bool {
+	if len(m.recv) > 0 {
+		if c.x == nil || c.x.kind != exprMember || !matchesName(rootName(c.x.x), m.recv) {
+			return false
+		}
+	}
+	if m.noKw != "" {
+		for _, k := range c.kw {
+			if k == m.noKw {
+				return false
+			}
+		}
+		return true
+	}
 	if m.bare {
 		for _, k := range c.kw {
 			if k == "usedforsecurity" {

@@ -25,10 +25,37 @@ const (
 	kXPath
 	kLDAP
 	kRegex
+	kNoSQL    // a request object used as a query filter
+	kNoSQLStr // a request string parsed into a query
+	kProto
 
-	kLast = kRegex
-	kAll  = kSQL | kCmd | kPath | kSSRF | kXSS | kRedirect | kCode | kDeser | kXPath | kLDAP | kRegex
+	kLast = kProto
+	kAll  = kSQL | kCmd | kPath | kSSRF | kXSS | kRedirect | kCode | kDeser | kXPath | kLDAP | kRegex | kNoSQL | kNoSQLStr | kProto
 )
+
+// objectDescs are the sources that can deliver a nested object, not just a string.
+// Express and PHP parse "a[$ne]=1" into one, a JSON body is one; a path segment, a header
+// or a Flask form field never is. NoSQL filters and deep merges are only exploitable
+// through the former, so the latter do not carry those kinds.
+var objectDescs = map[string]bool{
+	"request body": true, "request query": true, "request data": true, "HTTP request body": true,
+}
+
+// archiveDesc names entries read out of an archive. Their names are chosen by whoever
+// built the archive and can climb out of the extraction directory, but they mean nothing
+// to a database or a shell, so they carry only the path kind.
+const archiveDesc = "archive entry name"
+
+// kindsFor is the set of injection classes data from a source can trigger.
+func kindsFor(desc string) kind {
+	if desc == archiveDesc {
+		return kPath
+	}
+	if objectDescs[desc] {
+		return kAll
+	}
+	return kAll &^ (kNoSQL | kProto)
+}
 
 type rule struct {
 	id    string
@@ -49,6 +76,9 @@ var taintRules = map[kind]rule{
 	kXPath:    {"sast:go/xpath-injection", "CWE-643", "XPath injection", "Use a parameterized XPath API, or validate the value against a strict allowlist before building the expression.", finding.SeverityHigh},
 	kLDAP:     {"sast:go/ldap-injection", "CWE-90", "LDAP injection", "Escape the value for use in an LDAP filter, or build the filter with a library that does.", finding.SeverityHigh},
 	kRegex:    {"sast:go/regex-injection", "CWE-1333", "Regular expression built from untrusted input", "Escape the value with the language's regex-quoting function, or match it as a literal string.", finding.SeverityMedium},
+	kNoSQL:    {"sast:go/nosql-injection", "CWE-943", "NoSQL injection", "Cast request values to the type you expect (a string or a number) before putting them in a query filter, or strip operator keys with a sanitizer such as express-mongo-sanitize.", finding.SeverityHigh},
+	kNoSQLStr: {"sast:go/nosql-injection", "CWE-943", "NoSQL injection", "Do not parse request text as a query; build the filter from validated fields.", finding.SeverityHigh},
+	kProto:    {"sast:go/prototype-pollution", "CWE-1321", "Prototype pollution", "Reject the keys __proto__, constructor and prototype, build lookup objects with Object.create(null) or a Map, or use a merge library that guards them.", finding.SeverityHigh},
 	kDeser:    {"sast:go/insecure-deserialization", "CWE-502", "Insecure deserialization", "Do not deserialize untrusted data with a format that can instantiate arbitrary types; use JSON or a schema-validated format.", finding.SeverityHigh},
 }
 
@@ -76,6 +106,9 @@ type sink struct {
 	// recv limits a method-name sink ("?.send") to receivers whose variable has one of
 	// these names, so res.send(x) is a response but socket.send(x) is not.
 	recv []string
+	// recvUpper also admits receivers rooted at a capitalized name (a model class:
+	// User.findOne), in addition to those listed in recv.
+	recvUpper bool
 	// strArg skips arguments that are hashes or arrays: Ruby's where(name: x) is
 	// parameterized, where("name = '#{x}'") is not.
 	strArg bool
@@ -170,6 +203,17 @@ var sinks = map[string]sink{
 	"html/template.URL":               {kind: kXSS, args: []int{0}},
 
 	"net/http.Redirect": {kind: kRedirect, args: []int{2}},
+
+	"(*go.mongodb.org/mongo-driver/mongo.Collection).Find":             {kind: kNoSQL, args: []int{1}},
+	"(*go.mongodb.org/mongo-driver/mongo.Collection).FindOne":          {kind: kNoSQL, args: []int{1}},
+	"(*go.mongodb.org/mongo-driver/mongo.Collection).FindOneAndUpdate": {kind: kNoSQL, args: []int{1}},
+	"(*go.mongodb.org/mongo-driver/mongo.Collection).FindOneAndDelete": {kind: kNoSQL, args: []int{1}},
+	"(*go.mongodb.org/mongo-driver/mongo.Collection).UpdateOne":        {kind: kNoSQL, args: []int{1}},
+	"(*go.mongodb.org/mongo-driver/mongo.Collection).UpdateMany":       {kind: kNoSQL, args: []int{1}},
+	"(*go.mongodb.org/mongo-driver/mongo.Collection).DeleteOne":        {kind: kNoSQL, args: []int{1}},
+	"(*go.mongodb.org/mongo-driver/mongo.Collection).DeleteMany":       {kind: kNoSQL, args: []int{1}},
+	"(*go.mongodb.org/mongo-driver/mongo.Collection).CountDocuments":   {kind: kNoSQL, args: []int{1}},
+	"(*go.mongodb.org/mongo-driver/mongo.Collection).Aggregate":        {kind: kNoSQL, args: []int{1}},
 }
 
 // sanitizers return their input with the listed kinds neutralized. Numeric and boolean

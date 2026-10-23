@@ -63,6 +63,9 @@ type stmt struct {
 	then []*stmt
 	els  []*stmt
 	arms [][]*stmt
+	// binds marks an assignment the frontend made up (a loop or callback parameter), which
+	// must not hide a request object of the same name.
+	binds bool
 }
 
 type param struct {

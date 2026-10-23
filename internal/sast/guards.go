@@ -43,6 +43,13 @@ func (a *analyzer) validWhenTrue(cond ast.Expr) []ast.Expr {
 // validWhenFalse returns the values that are known good if cond is false.
 func (a *analyzer) validWhenFalse(cond ast.Expr) []ast.Expr {
 	switch c := unparen(cond).(type) {
+	case *ast.CallExpr:
+		// if strings.Contains(name, "..") { reject }
+		if name, _ := a.calleeName(c.Fun); name == "strings.Contains" && len(c.Args) == 2 {
+			if tv := a.info.Types[c.Args[1]]; tv.Value != nil && tv.Value.Kind() == constant.String && constant.StringVal(tv.Value) == ".." {
+				return []ast.Expr{c.Args[0]}
+			}
+		}
 	case *ast.UnaryExpr:
 		if c.Op == token.NOT {
 			return a.validWhenTrue(c.X)
@@ -74,6 +81,18 @@ func (a *analyzer) validatorCall(c *ast.CallExpr) []ast.Expr {
 	case "slices.Contains":
 		if len(c.Args) == 2 {
 			return []ast.Expr{c.Args[1]}
+		}
+	case "path/filepath.IsLocal":
+		if len(c.Args) == 1 {
+			return []ast.Expr{c.Args[0]}
+		}
+	case "strings.HasPrefix":
+		// A prefix check is only a containment check once the path has been cleaned:
+		// "/srv/" + name passes it for "../etc/passwd", filepath.Join("/srv", name) does not.
+		if len(c.Args) == 2 {
+			if obj, _, _, ok := a.pathOf(c.Args[0]); ok && a.ctx.cleaned[obj] {
+				return []ast.Expr{c.Args[0]}
+			}
 		}
 	case "(*regexp.Regexp).MatchString", "(*regexp.Regexp).Match":
 		if len(c.Args) == 1 && recv != nil && a.strictPattern(recv) {
@@ -141,6 +160,7 @@ func (a *analyzer) markValid(vals []ast.Expr, st state) {
 	for _, v := range vals {
 		if obj, field, _, ok := a.pathOf(v); ok {
 			st.write(obj, field, nil, false)
+			st.mark(obj, field)
 		}
 	}
 }

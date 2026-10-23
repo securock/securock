@@ -1072,8 +1072,8 @@ func h(db *sql.DB, r *http.Request) {
 	db.Query("SELECT " + col + " FROM t")
 }
 
-=== fp-gap-prefix-guard
-// fp-gap: sast:go/path-traversal
+=== safe-prefix-guard-after-join
+// want: none
 package main
 
 import (
@@ -2293,3 +2293,151 @@ API_SECRET=q8Zr4Lm2Vt9Xk7Pw3Nc
 PORT=8080
 API_SECRET=${API_SECRET}
 DB_PASSWORD=changeme-in-prod
+
+=== js/nosql-login-bypass
+// want: sast:js/nosql-injection
+app.post('/login', async (req, res) => {
+  const user = await User.findOne({ username: req.body.username, password: req.body.password });
+  res.json({ ok: !!user });
+});
+
+=== js/safe-nosql-string-cast
+// want: none
+app.post('/login', async (req, res) => {
+  const user = await User.findOne({ username: String(req.body.username) });
+  res.json({ ok: !!user });
+});
+
+=== js/safe-nosql-path-param
+// want: none
+app.get('/users/:id', async (req, res) => {
+  res.json(await User.findOne({ _id: req.params.id }));
+});
+
+=== js/prototype-pollution-merge
+// want: sast:js/prototype-pollution
+const _ = require('lodash');
+app.put('/settings', (req, res) => {
+  res.json(_.merge(currentSettings, req.body));
+});
+
+=== js/safe-merge-constants
+// want: none
+const _ = require('lodash');
+module.exports = _.merge({}, defaults, localOverrides);
+
+=== py/nosql-json-body
+# want: sast:py/nosql-injection
+from flask import request
+
+def login(users):
+    return users.find_one({"name": request.json["name"], "pw": request.json["pw"]})
+
+=== py/safe-nosql-form-field
+# want: none
+from flask import request
+
+def login(users):
+    return users.find_one({"name": request.form["name"]})
+
+=== py/tar-extractall
+# want: sast:py/zip-slip
+import tarfile
+
+def unpack(path, dest):
+    tar = tarfile.open(path)
+    tar.extractall(dest)
+
+=== py/safe-tar-filter
+# want: none
+import tarfile
+
+def unpack(path, dest):
+    tar = tarfile.open(path)
+    tar.extractall(dest, filter="data")
+
+=== java/zip-slip
+// want: sast:java/path-traversal
+import java.io.*;
+import java.util.zip.*;
+public class Unzip {
+  void run(ZipInputStream zis, File dest) throws Exception {
+    ZipEntry entry;
+    while ((entry = zis.getNextEntry()) != null) {
+      File out = new File(dest, entry.getName());
+      try (FileOutputStream fos = new FileOutputStream(out)) { zis.transferTo(fos); }
+    }
+  }
+}
+
+=== java/safe-zip-canonical-check
+// want: none
+import java.io.*;
+import java.util.zip.*;
+public class Unzip {
+  void run(ZipInputStream zis, File dest) throws Exception {
+    ZipEntry entry;
+    while ((entry = zis.getNextEntry()) != null) {
+      File out = new File(dest, entry.getName());
+      if (!out.getCanonicalPath().startsWith(dest.getCanonicalPath() + File.separator)) {
+        throw new IOException("entry escapes the target directory");
+      }
+      try (FileOutputStream fos = new FileOutputStream(out)) { zis.transferTo(fos); }
+    }
+  }
+}
+
+=== go/zip-zip-slip
+// want: sast:go/path-traversal
+package main
+
+import (
+	"archive/zip"
+	"os"
+	"path/filepath"
+)
+
+func Unzip(r *zip.Reader, dest string) error {
+	for _, f := range r.File {
+		p := filepath.Join(dest, f.Name)
+		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+=== go/zip-safe-prefix
+// want: none
+package main
+
+import (
+	"archive/zip"
+	"os"
+	"path/filepath"
+	"strings"
+)
+
+func Unzip(r *zip.Reader, dest string) error {
+	for _, f := range r.File {
+		p := filepath.Join(dest, f.Name)
+		if !strings.HasPrefix(p, filepath.Clean(dest)+string(os.PathSeparator)) {
+			continue
+		}
+		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+=== js/gap-recursive-merge
+// gap: sast:js/prototype-pollution
+function merge(target, source) {
+  for (const key in source) {
+    if (typeof source[key] === 'object') merge(target[key], source[key]);
+    else target[key] = source[key];
+  }
+  return target;
+}
+app.post('/s', (req, res) => res.json(merge({}, req.body)));

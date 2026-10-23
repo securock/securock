@@ -62,8 +62,8 @@ var rubySpec = &langSpec{
 		"Digest.SHA256.hexdigest": kAll, "Digest.MD5.hexdigest": kAll, "SecureRandom.hex": kAll,
 	},
 	sourceRoots: map[string]map[string]string{
-		"params": {"*": "request parameter"}, "cookies": {"*": "request cookie"}, "ARGV": {"*": "command-line arguments"},
-		"request": {"params": "request parameter", "headers": "request header", "env": "request header", "cookies": "request cookie",
+		"params": {"*": "request data"}, "cookies": {"*": "request cookie"}, "ARGV": {"*": "command-line arguments"},
+		"request": {"params": "request data", "headers": "request header", "env": "request header", "cookies": "request cookie",
 			"body": "request body", "query_string": "request query", "path": "request path", "url": "request URL",
 			"referer": "request header", "user_agent": "request header", "fullpath": "request path", "host": "request host",
 			"raw_post": "request body", "GET": "request parameter", "POST": "request body"},
@@ -438,6 +438,11 @@ func (r *rubyLower) call(n *node) *expr {
 			return guardOf(r.pos(n), e.x.x)
 		}
 	}
+	if recv != nil && method == "start_with?" && len(e.args) == 1 {
+		in := r.mk(exprIn, n)
+		in.x, in.args = e.args[0], []*expr{e.x.x}
+		return in
+	}
 	if recv != nil && (method == "include?" || method == "member?" || method == "key?" || method == "has_key?") && len(e.args) == 1 {
 		in := r.mk(exprIn, n)
 		in.x, in.args = e.x.x, []*expr{e.args[0]}
@@ -463,7 +468,7 @@ func (r *rubyLower) bindBlock(blk *expr, over *expr) *expr {
 	var pre []*stmt
 	for _, p := range f.params {
 		name := &expr{kind: exprName, pos: blk.pos, name: p.name}
-		pre = append(pre, &stmt{kind: stmtAssign, pos: blk.pos, lhs: []*expr{name}, rhs: over})
+		pre = append(pre, &stmt{kind: stmtAssign, pos: blk.pos, lhs: []*expr{name}, rhs: over, binds: true})
 	}
 	f.params = nil
 	f.body = append(pre, f.body...)

@@ -502,6 +502,12 @@ func (p *phpLower) callShape(n *node, e *expr) *expr {
 		if len(e.args) >= 2 && e.args[0].kind == exprStr && strictLiteral(e.args[0].str, phpDelim(e.args[0].str), false) {
 			return guardOf(p.pos(n), e.args[1])
 		}
+	case "str_starts_with":
+		if len(e.args) == 2 {
+			in := p.mk(exprIn, n)
+			in.x, in.args = e.args[1], []*expr{e.args[0]}
+			return in
+		}
 	case "in_array":
 		if len(e.args) >= 2 {
 			in := p.mk(exprIn, n)

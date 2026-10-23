@@ -248,6 +248,9 @@ and Ruby (`rb`). Rule ids are `sast:LANGUAGE/RULE`:
 | `xss`                       | 79   | medium   | all               |
 | `open-redirect`             | 601  | medium   | all               |
 | `regex-injection`           | 1333 | medium   | all but Go        |
+| `nosql-injection`           | 943  | high     | all               |
+| `prototype-pollution`       | 1321 | high     | JS                |
+| `zip-slip`                  | 22   | high     | Python            |
 | `code-injection`            | 94   | critical | all but Go        |
 | `insecure-deserialization`  | 502  | high     | all but Go        |
 | `weak-crypto`               | 327  | medium   | all               |
@@ -270,6 +273,24 @@ false, `Digest::MD5`) by its arguments. A call that states
 `usedforsecurity=False` is not flagged.
 
 `sast:analysis-incomplete` (info) marks a file that could not be analyzed.
+
+Three of these depend on what the data can be. `nosql-injection` fires when a
+request object reaches a query filter (`User.findOne({name: req.body.name})`,
+`users.find_one({"name": request.json["name"]})`), or when request text is parsed
+into a query (`Document.parse`). It does not fire for values that are always strings:
+a path parameter, a header, a Flask form field, a Java `getParameter`. Casting with
+`String(...)` clears it. In Go it covers the MongoDB driver and needs the module to be
+downloaded. `prototype-pollution` fires when request data reaches a deep merge
+(`_.merge`, `deepmerge`, `$.extend(true, ...)`), a `_.set` path, or a nested
+`obj[a][b] = v` write. A hand-written recursive merge is not followed yet.
+
+Zip slip is reported as `path-traversal` when an archive entry name (Go `zip.File.Name` and
+`tar.Header.Name`, Python `namelist()` and `ZipInfo.filename`, Java `ZipEntry.getName()`,
+`entry.path` in Node, PHP `getNameIndex`, Ruby `entry.name`) reaches a file operation. A
+check that keeps the path inside the destination ends it: `filepath.IsLocal`, rejecting
+`..`, a prefix check on a cleaned path, or `startsWith` on a canonical path. Python
+`tarfile.extractall` and `shutil.unpack_archive` without `filter=` are reported as
+`zip-slip`.
 
 `sast:secrets/*` reports credentials in any text file, not only source: provider
 tokens by their fixed shape (AWS, GitHub, GitLab, Slack, Stripe, Google, npm,

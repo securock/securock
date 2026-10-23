@@ -184,7 +184,11 @@ func init() {
 	rb.sanitizers["Regexp.escape"] = kRegex
 	rb.sanitizers["Net.LDAP.Filter.escape"] = kLDAP
 
-	// Names a rule table mentions without a qualifier must resolve as globals.
+	addBuiltins()
+}
+
+// addBuiltins makes every unqualified name a rule table mentions resolve as a global.
+func addBuiltins() {
 	for _, sp := range []*langSpec{jsSpec, pySpec, javaSpec, phpSpec, rubySpec} {
 		for k := range sp.misuse {
 			if !strings.HasPrefix(k, "?.") {

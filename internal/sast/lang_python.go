@@ -5,9 +5,9 @@ import (
 )
 
 var pyRequestRoot = map[string]string{
-	"GET": "request parameter", "POST": "request body", "body": "request body", "COOKIES": "request cookie",
+	"GET": "request parameter", "POST": "request form field", "body": "request body", "COOKIES": "request cookie",
 	"META": "request header", "FILES": "uploaded file", "headers": "request header", "args": "request parameter",
-	"form": "request body", "values": "request parameter", "json": "request body", "data": "request body",
+	"form": "request form field", "values": "request parameter", "json": "request body", "data": "request body",
 	"cookies": "request cookie", "query_params": "request parameter", "path_params": "request parameter",
 	"query": "request parameter", "path": "request path", "path_info": "request path", "url": "request URL",
 	"get_json": "request body", "get_data": "request body", "stream": "request body", "files": "uploaded file",
@@ -618,6 +618,11 @@ func (p *pyLower) call(n *node) *expr {
 		if raw := p.firstArgText(n); raw != "" && strictLiteral(e.args[0].str, "", false) {
 			return guardOf(p.pos(n), e.args[1])
 		}
+	}
+	if e.x.kind == exprMember && e.x.name == "startswith" && len(e.args) == 1 {
+		in := p.mk(exprIn, n)
+		in.x, in.args = e.args[0], []*expr{e.x.x}
+		return in
 	}
 	if e.x.kind == exprMember {
 		// "...{}".format(x) and "sep".join(xs) build strings out of their arguments.

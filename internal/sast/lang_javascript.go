@@ -9,7 +9,7 @@ import (
 type node = gotreesitter.Node
 
 var jsRequestRoot = map[string]string{
-	"query": "request query", "body": "request body", "params": "request parameter",
+	"query": "request query", "body": "request body", "params": "request path parameter",
 	"headers": "request header", "cookies": "request cookie", "signedCookies": "request cookie",
 	"url": "request URL", "originalUrl": "request URL", "path": "request path",
 	"hostname": "request host", "host": "request host", "baseUrl": "request URL",
@@ -99,8 +99,8 @@ var jsSpec = &langSpec{
 	},
 	sourceRoots: map[string]map[string]string{
 		"req": jsRequestRoot, "request": jsRequestRoot,
-		"ctx":          {"query": "request query", "params": "request parameter", "request": "request", "path": "request path", "querystring": "request query"},
-		"event":        {"queryStringParameters": "request query", "body": "request body", "pathParameters": "request parameter", "headers": "request header"},
+		"ctx":          {"query": "request query", "params": "request path parameter", "request": "request", "path": "request path", "querystring": "request query"},
+		"event":        {"queryStringParameters": "request query", "body": "request body", "pathParameters": "request path parameter", "headers": "request header"},
 		"searchParams": {"*": "request query"},
 		"context":      {"query": "request query", "params": "request parameter", "req": "request"},
 	},
@@ -117,7 +117,7 @@ var jsSpec = &langSpec{
 }
 
 var nestSources = map[string]string{
-	"Query": "request query", "Param": "request parameter", "Body": "request body",
+	"Query": "request query", "Param": "request path parameter", "Body": "request body",
 	"Headers": "request header", "Cookies": "request cookie", "UploadedFile": "uploaded file", "UploadedFiles": "uploaded file",
 }
 
@@ -659,7 +659,13 @@ func (j *jsLower) expr(n *node) *expr {
 func (j *jsLower) call(n *node, k exprKind, fn *node) *expr {
 	// list.includes(x) and set.has(x) are membership checks, the shape of an allowlist.
 	if k == exprCall && fn != nil && j.kind(fn) == "member_expression" {
-		if m := j.text(j.field(fn, "property")); m == "includes" || m == "has" {
+		if m := j.text(j.field(fn, "property")); m == "startsWith" {
+			if as := j.named(j.field(n, "arguments")); len(as) == 1 {
+				e := j.mk(exprIn, n)
+				e.x, e.args = j.expr(as[0]), []*expr{j.expr(j.field(fn, "object"))}
+				return e
+			}
+		} else if m == "includes" || m == "has" {
 			if as := j.named(j.field(n, "arguments")); len(as) == 1 {
 				e := j.mk(exprIn, n)
 				e.x, e.args = j.expr(j.field(fn, "object")), []*expr{j.expr(as[0])}

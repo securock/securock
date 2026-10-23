@@ -157,5 +157,5 @@ func bindCallback(lambda *expr, over *expr) {
 		return
 	}
 	name := &expr{kind: exprName, pos: lambda.pos, name: f.params[0].name}
-	f.body = append([]*stmt{{kind: stmtAssign, pos: lambda.pos, lhs: []*expr{name}, rhs: over}}, f.body...)
+	f.body = append([]*stmt{{kind: stmtAssign, pos: lambda.pos, lhs: []*expr{name}, rhs: over, binds: true}}, f.body...)
 }

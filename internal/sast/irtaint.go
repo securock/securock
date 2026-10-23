@@ -24,6 +24,9 @@ type langSpec struct {
 	// sourceRoots: variable name -> member -> description. The member "*" matches any
 	// member or index: req.query, $_GET["id"], params[:id].
 	sourceRoots map[string]map[string]string
+	// sourceMembers are attribute names that are untrusted on any receiver:
+	// ZipInfo.filename.
+	sourceMembers map[string]string
 	// sourceMethods are method names that read request data from any receiver:
 	// getParameter, get_argument.
 	sourceMethods map[string]string
@@ -63,14 +66,34 @@ func (s istate) clone() istate {
 
 func (s istate) union(o istate) {
 	for k, v := range o {
+		if isMarker(k.field) {
+			continue
+		}
 		s[k] = merge(s[k], v)
 	}
+}
+
+func (s istate) mark(name, field string) {
+	s[ikey{name, markerPrefix + field}] = taintSet{{key: "valid"}}
+}
+
+func (s istate) marked(name, field string) bool {
+	_, ok := s[ikey{name, markerPrefix + field}]
+	return ok
 }
 
 func (s istate) replace(a, b istate) {
 	clear(s)
 	s.union(a)
 	s.union(b)
+	// A value is validated after the branches only if it was validated in both.
+	for k := range a {
+		if isMarker(k.field) {
+			if _, both := b[k]; both {
+				s[k] = a[k]
+			}
+		}
+	}
 }
 
 func (s istate) read(name, field string) taintSet {
@@ -248,6 +271,11 @@ func (r *irRun) qualified(e *expr, st istate) string {
 		if st.has(e.name) || r.types[e.name] != "" {
 			return ""
 		}
+		for _, f := range r.mod.funcs {
+			if f.class == "" && f.name == e.name {
+				return "" // the project's own function shadows a library of the same name
+			}
+		}
 		if q, ok := r.spec.simpleTypes[e.name]; ok {
 			return q
 		}
@@ -372,7 +400,31 @@ func (r *irRun) eval(e *expr, st istate) taintSet {
 	return nil
 }
 
+// rootSource finds the source for a chain such as request.form.get: the root variable's
+// own table is more specific than the generic prefix of the module it was imported from
+// (flask.request.form is a string, flask.request.json an object).
+func (r *irRun) rootSource(e *expr) (string, bool) {
+	first := e
+	for first.kind == exprMember && first.x != nil && first.x.kind == exprMember {
+		first = first.x
+	}
+	if first.kind == exprMember && first.x != nil && first.x.kind == exprName && !r.shadow[first.x.name] {
+		d, ok := r.spec.sourceRoots[first.x.name][first.name]
+		return d, ok
+	}
+	return "", false
+}
+
 func (r *irRun) evalMember(e *expr, st istate) taintSet {
+	if name, f, ok := r.pathOf(e); ok && st.marked(name, f) {
+		return st.read(name, f)
+	}
+	if desc, ok := r.spec.sourceMembers[e.name]; ok && !r.shadow[rootName(e)] {
+		return r.source(e.pos, desc)
+	}
+	if desc, ok := r.rootSource(e); ok {
+		return r.source(e.pos, desc)
+	}
 	if q := r.qualified(e, st); q != "" {
 		if desc, ok := r.sourceByPrefix(q); ok {
 			return r.source(e.pos, desc)
@@ -443,6 +495,11 @@ func (r *irRun) evalCall(e *expr, st istate) taintSet {
 	if desc, ok := r.callSource(fn); ok {
 		return r.source(e.pos, desc)
 	}
+	if fn.kind == exprMember {
+		if desc, ok := r.rootSource(fn); ok {
+			return r.source(e.pos, desc)
+		}
+	}
 	if qname != "" {
 		if desc, ok := r.sourceByPrefix(qname); ok {
 			return r.source(e.pos, desc)
@@ -487,8 +544,12 @@ func (r *irRun) lookupSink(qname string, recv *expr, field string) (sink, string
 	if !ok {
 		return sink{}, "", false
 	}
-	if len(s.recv) > 0 && !slices.Contains(s.recv, rootName(recv)) {
-		return sink{}, "", false
+	if len(s.recv) > 0 || s.recvUpper {
+		root := rootName(recv)
+		upper := s.recvUpper && root != "" && root[0] >= 'A' && root[0] <= 'Z'
+		if !upper && !slices.Contains(s.recv, root) {
+			return sink{}, "", false
+		}
 	}
 	return s, "." + field, true
 }
@@ -757,6 +818,11 @@ func (r *irRun) markValid(vals []*expr, st istate) {
 	for _, v := range vals {
 		if name, f, ok := r.pathOf(v); ok {
 			st.write(name, f, nil, false)
+			st.mark(name, f)
+		} else if root := rootName(v); root != "" && !r.spec.self[root] {
+			// A check on dest.getCanonicalPath() or p.resolve(x) vouches for the variable
+			// it was derived from.
+			st.write(root, "", nil, false)
 		}
 	}
 }
@@ -772,9 +838,10 @@ func (r *irRun) stmt(s *stmt, st istate) {
 			if s.aug {
 				v = merge(r.eval(l, st), t)
 			}
+			r.checkPollution(l, st)
 			r.assign(l, v, st)
 			r.checkAssignMisuse(l, s.rhs)
-			if l.kind == exprName {
+			if l.kind == exprName && !s.binds {
 				r.shadow[l.name] = true
 			}
 			if l.kind == exprMember {
@@ -785,6 +852,9 @@ func (r *irRun) stmt(s *stmt, st istate) {
 						}
 					}
 				}
+			}
+			if l.kind == exprName && s.rhs == nil && l.ty != "" {
+				r.types[l.name] = r.resolveType(l.ty)
 			}
 			if l.kind == exprName && s.rhs != nil {
 				if l.ty != "" {

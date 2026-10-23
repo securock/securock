@@ -25,6 +25,8 @@ var javaSimpleTypes = func() map[string]string {
 	add("org.springframework.web.client", "RestTemplate")
 	add("org.hibernate", "Session")
 	add("java.util", "UUID")
+	add("java.util.zip", "ZipEntry", "ZipInputStream", "ZipFile")
+	add("java.util.jar", "JarEntry", "JarInputStream")
 	return m
 }()
 
@@ -299,13 +301,17 @@ func (j *javaLower) stmt(n *node) []*stmt {
 				continue
 			}
 			v := j.field(d, "value")
-			if v == nil {
-				continue
-			}
 			name := j.mk(exprName, d)
 			name.name = j.text(j.field(d, "name"))
 			if ty != "var" {
 				name.ty = ty
+			}
+			if v == nil {
+				// "ZipEntry e;" assigned later in a loop condition: keep the type.
+				if ty != "var" {
+					out = append(out, &stmt{kind: stmtAssign, pos: j.pos(d), lhs: []*expr{name}})
+				}
+				continue
 			}
 			out = append(out, &stmt{kind: stmtAssign, pos: j.pos(d), lhs: []*expr{name}, rhs: j.expr(v)})
 		}
@@ -327,6 +333,7 @@ func (j *javaLower) stmt(n *node) []*stmt {
 	case "enhanced_for_statement":
 		name := j.mk(exprName, n)
 		name.name = j.text(j.field(n, "name"))
+		name.ty = j.typeName(j.field(n, "type"))
 		return []*stmt{{kind: stmtLoop, pos: j.pos(n), lhs: []*expr{name}, rhs: j.expr(j.field(n, "value")), then: j.block(j.field(n, "body"))}}
 	case "for_statement":
 		var out []*stmt
@@ -515,6 +522,11 @@ func (j *javaLower) invoke(n *node) *expr {
 	args := j.named(j.field(n, "arguments"))
 	// list.contains(x) / set.contains(x) is the membership check of an allowlist.
 	obj := j.field(n, "object")
+	if obj != nil && name == "startsWith" && len(args) == 1 {
+		e := j.mk(exprIn, n)
+		e.x, e.args = j.expr(args[0]), []*expr{j.expr(obj)}
+		return e
+	}
 	if obj != nil && name == "contains" && len(args) == 1 {
 		e := j.mk(exprIn, n)
 		e.x, e.args = j.expr(obj), []*expr{j.expr(args[0])}
