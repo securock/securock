@@ -9,7 +9,7 @@ inputs:
     description: Project directory
     default: "."
   command:
-    description: "scan, verify, diff, audit, both (diff+verify), or all (scan+diff+verify)"
+    description: "scan, verify, diff, audit, sast, both (diff+verify), or all (scan+diff+verify)"
     default: all
   policy:
     description: Path to a policy file (mutually exclusive with profile)
@@ -27,7 +27,7 @@ inputs:
     description: "audit only: report releases newer than this as high findings, such as 7d (npm and PyPI)"
     default: ""
   sarif:
-    description: Upload an audit report to GitHub code scanning (needs security-events write permission)
+    description: Upload an audit report (a sast report when command is sast) to GitHub code scanning (needs security-events write permission)
     default: "false"
   sbom:
     description: Write the lockfile as a CycloneDX SBOM and return its path in the sbom-file output

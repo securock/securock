@@ -924,8 +924,8 @@ func h(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/login?next="+url.QueryEscape(r.URL.Path), http.StatusFound)
 }
 
-=== safe-logging-only
-// want: none
+=== log-injection-println
+// want: sast:go/log-injection
 package main
 
 import (
@@ -2431,8 +2431,8 @@ func Unzip(r *zip.Reader, dest string) error {
 	return nil
 }
 
-=== js/gap-recursive-merge
-// gap: sast:js/prototype-pollution
+=== js/prototype-pollution-recursive-merge
+// want: sast:js/prototype-pollution
 function merge(target, source) {
   for (const key in source) {
     if (typeof source[key] === 'object') merge(target[key], source[key]);
@@ -2441,3 +2441,129 @@ function merge(target, source) {
   return target;
 }
 app.post('/s', (req, res) => res.json(merge({}, req.body)));
+
+=== safe-logging-quoted
+// want: none
+package main
+
+import (
+	"log"
+	"net/http"
+	"strconv"
+)
+
+func h(w http.ResponseWriter, r *http.Request) {
+	log.Println("request for", strconv.Quote(r.FormValue("id")))
+}
+
+=== js/log-injection
+// want: sast:js/log-injection
+app.get('/login', (req, res) => {
+  console.log('login attempt for ' + req.query.user);
+  res.end();
+});
+
+=== js/safe-log-stripped
+// want: none
+app.get('/login', (req, res) => {
+  console.log('login attempt for ' + JSON.stringify(req.query.user));
+  res.end();
+});
+
+=== js/cors-reflected-origin
+// want: sast:js/cors-misconfiguration
+app.get('/api', (req, res) => {
+  res.setHeader('Access-Control-Allow-Origin', req.headers.origin);
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  res.json({});
+});
+
+=== js/safe-cors-fixed-origin
+// want: none
+app.get('/api', (req, res) => {
+  res.setHeader('Access-Control-Allow-Origin', 'https://app.example.com');
+  res.json({});
+});
+
+=== js/insecure-random-token
+// want: sast:js/insecure-random
+function newResetToken() {
+  return Math.random().toString(36).substring(2);
+}
+
+=== js/safe-random-for-ui
+// want: none
+function pickColor(colors) {
+  return colors[Math.floor(Math.random() * colors.length)];
+}
+
+=== py/insecure-random-session
+# want: sast:py/insecure-random
+import random
+import string
+
+def new_session_id():
+    return "".join(random.choice(string.ascii_letters) for _ in range(32))
+
+=== py/safe-secrets-token
+# want: none
+import secrets
+
+def new_session_id():
+    return secrets.token_urlsafe(32)
+
+=== py/toctou-remove
+# want: sast:py/toctou
+import os
+
+def clear(path):
+    if os.path.exists(path):
+        os.remove(path)
+
+=== java/xxe-document-builder
+// want: sast:java/xxe
+import javax.xml.parsers.*;
+public class P {
+  Object parse(java.io.InputStream in) throws Exception {
+    DocumentBuilderFactory f = DocumentBuilderFactory.newInstance();
+    return f.newDocumentBuilder().parse(in);
+  }
+}
+
+=== java/safe-xxe-hardened
+// want: none
+import javax.xml.parsers.*;
+public class P {
+  Object parse(java.io.InputStream in) throws Exception {
+    DocumentBuilderFactory f = DocumentBuilderFactory.newInstance();
+    f.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+    return f.newDocumentBuilder().parse(in);
+  }
+}
+
+=== go/insecure-random-token
+// want: sast:go/insecure-random
+package main
+
+import "math/rand"
+
+func newAPIToken() string {
+	const letters = "abcdefghijklmnopqrstuvwxyz"
+	b := make([]byte, 32)
+	for i := range b {
+		b[i] = letters[rand.Intn(len(letters))]
+	}
+	return string(b)
+}
+
+=== go/toctou-stat-then-remove
+// want: sast:go/toctou
+package main
+
+import "os"
+
+func Clear(path string) {
+	if _, err := os.Stat(path); err == nil {
+		os.Remove(path)
+	}
+}

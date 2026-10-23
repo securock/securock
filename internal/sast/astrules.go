@@ -75,6 +75,14 @@ func astRules(fset *token.FileSet, p *pkg, rel func(token.Pos) string) []finding
 				continue
 			}
 			r.fn = declName(fd)
+			checked := map[types.Object]bool{}
+			reported := map[token.Pos]bool{}
+			weak := func(pos token.Pos, name string) {
+				if !reported[pos] {
+					reported[pos] = true
+					r.add(pos, ruleInsecureRandom, name+" is predictable and is used to make a "+secretWord(r.fn))
+				}
+			}
 			ast.Inspect(fd, func(n ast.Node) bool {
 				switch n := n.(type) {
 				case *ast.CallExpr:
@@ -83,6 +91,25 @@ func astRules(fset *token.FileSet, p *pkg, rel func(token.Pos) string) []finding
 						if id, ok := sel.X.(*ast.Ident); ok {
 							if pn, ok := p.info.Uses[id].(*types.PkgName); ok {
 								name = pn.Imported().Path() + "." + sel.Sel.Name
+							}
+						}
+					}
+					if strings.HasPrefix(name, "math/rand.") || strings.HasPrefix(name, "math/rand/v2.") {
+						if secretish.MatchString(r.fn) {
+							weak(n.Pos(), shortName(name))
+						}
+					}
+					if len(n.Args) > 0 {
+						if id, ok := n.Args[0].(*ast.Ident); ok {
+							if obj := p.info.Uses[id]; obj != nil {
+								switch name {
+								case "os.Stat", "os.Lstat", "syscall.Access":
+									checked[obj] = true
+								case "os.Remove", "os.RemoveAll", "os.Rename", "os.WriteFile", "os.OpenFile", "os.Create", "os.Chmod", "io/ioutil.WriteFile":
+									if checked[obj] {
+										r.add(n.Pos(), ruleToctou, shortName(name)+" acts on a path that was checked earlier in this function")
+									}
+								}
 							}
 						}
 					}
@@ -111,6 +138,24 @@ func astRules(fset *token.FileSet, p *pkg, rel func(token.Pos) string) []finding
 						r.checkSecret(k.Name, n.Value, n.Pos(), p.info)
 					}
 				case *ast.AssignStmt:
+					if len(n.Lhs) == len(n.Rhs) {
+						for i, l := range n.Lhs {
+							if id, ok := l.(*ast.Ident); ok && secretish.MatchString(id.Name) {
+								ast.Inspect(n.Rhs[i], func(x ast.Node) bool {
+									if c, ok := x.(*ast.CallExpr); ok {
+										if sel, ok := c.Fun.(*ast.SelectorExpr); ok {
+											if pid, ok := sel.X.(*ast.Ident); ok {
+												if pn, ok := p.info.Uses[pid].(*types.PkgName); ok && strings.HasPrefix(pn.Imported().Path(), "math/rand") {
+													weak(c.Pos(), shortName(pn.Imported().Path()+"."+sel.Sel.Name))
+												}
+											}
+										}
+									}
+									return true
+								})
+							}
+						}
+					}
 					if len(n.Lhs) != len(n.Rhs) {
 						return true
 					}

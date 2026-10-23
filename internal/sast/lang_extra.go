@@ -176,7 +176,8 @@ func init() {
 	rb.misuse["skip_before_action"] = []misuse{md(ruleCSRF, "verify_authenticity_token is skipped", map[int][]string{0: {"verify_authenticity_token"}})}
 	rb.misuse["File.chmod"] = []misuse{md(ruleWorldWritable, "the mode makes the file writable by everyone", map[int][]string{0: worldBits})}
 	rb.assignMisuse["verify_mode"] = assignMisuse{rule: ruleTLS, detail: "verify_mode is VERIFY_NONE", vals: []string{"verify_none"}}
-	rb.assignMisuse["consider_all_requests_local"] = assignMisuse{rule: ruleDebug, detail: "full error pages are shown to every client", vals: []string{"=true"}}
+	rb.assignMisuse["consider_all_requests_local"] = assignMisuse{rule: ruleDebug, detail: "full error pages are shown to every client", vals: []string{"=true"},
+		skip: []string{"development", "test", "dev.rb", "local"}}
 	rb.sinks["?.xpath"] = sink{kind: kXPath, args: []int{0}}
 	rb.sinks["?.at_xpath"] = sink{kind: kXPath, args: []int{0}}
 	rb.sinks["Regexp.new"] = sink{kind: kRegex, args: []int{0}}

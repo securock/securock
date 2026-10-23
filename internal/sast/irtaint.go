@@ -48,6 +48,12 @@ type langSpec struct {
 	// misuse and assignMisuse list unsafe calls and assignments that need no tainted data.
 	misuse       map[string][]misuse
 	assignMisuse map[string]assignMisuse
+	// weakRNG are calls to a predictable random number generator.
+	weakRNG map[string]bool
+	// fsCheck and fsUse are file checks and destructive file operations, for TOCTOU.
+	fsCheck, fsUse map[string]bool
+	// xxeFactories create an XML parser that resolves external entities unless hardened.
+	xxeFactories map[string]bool
 	// builtins are global functions that may be named without an import.
 	builtins map[string]bool
 }
@@ -229,6 +235,11 @@ type irRun struct {
 	// shadow marks names assigned in the function, so a local called "params" is not
 	// mistaken for the request parameters.
 	shadow map[string]bool
+	// per-function state for the checks that look at order and context
+	lhsName      string
+	checked      map[string]bool
+	xxeFactories []token.Pos
+	xxeHardened  bool
 }
 
 // maxNameCandidates bounds the name-based guess for a call on a value of unknown class.
@@ -243,6 +254,9 @@ func (r *irRun) selfName(e *expr) bool {
 
 // pathOf resolves a chain of member accesses on a name to a state key.
 func (r *irRun) pathOf(e *expr) (name, field string, ok bool) {
+	if e == nil {
+		return "", "", false
+	}
 	switch e.kind {
 	case exprName:
 		if r.spec.self[e.name] {
@@ -260,6 +274,9 @@ func (r *irRun) pathOf(e *expr) (name, field string, ok bool) {
 // qualified returns the dotted qualified name of an expression that names a module,
 // function or global, or "" when it is a plain variable.
 func (r *irRun) qualified(e *expr, st istate) string {
+	if e == nil {
+		return ""
+	}
 	switch e.kind {
 	case exprName:
 		if q, ok := r.mod.imports[e.name]; ok {
@@ -292,6 +309,9 @@ func (r *irRun) qualified(e *expr, st istate) string {
 
 // typeOf is the qualified or project-local type of an expression, when known.
 func (r *irRun) typeOf(e *expr, st istate) string {
+	if e == nil {
+		return ""
+	}
 	switch e.kind {
 	case exprName:
 		if t, ok := r.types[e.name]; ok {
@@ -483,6 +503,7 @@ func (r *irRun) evalCall(e *expr, st istate) taintSet {
 		r.checkSink(e, name, s, args, recvT)
 	}
 	r.checkMisuse(e, qname, field)
+	r.checkExtras(e, qname, field, fn, st)
 	if fn.kind == exprMember && r.spec.mutators[fn.name] {
 		var added taintSet
 		for _, t := range args {
@@ -492,17 +513,19 @@ func (r *irRun) evalCall(e *expr, st istate) taintSet {
 			st.write(name, f, added, true)
 		}
 	}
+	// A call on request data returns request data, unless the call is itself a sanitizer
+	// (req.query.u.replace(...) strips what it strips).
 	if desc, ok := r.callSource(fn); ok {
-		return r.source(e.pos, desc)
+		return r.sanitized(r.source(e.pos, desc), qname, field, recvExpr)
 	}
 	if fn.kind == exprMember {
 		if desc, ok := r.rootSource(fn); ok {
-			return r.source(e.pos, desc)
+			return r.sanitized(r.source(e.pos, desc), qname, field, recvExpr)
 		}
 	}
 	if qname != "" {
 		if desc, ok := r.sourceByPrefix(qname); ok {
-			return r.source(e.pos, desc)
+			return r.sanitized(r.source(e.pos, desc), qname, field, recvExpr)
 		}
 	}
 	all := recvT
@@ -520,6 +543,22 @@ func (r *irRun) evalCall(e *expr, st istate) taintSet {
 		return nil
 	}
 	if keys := r.targets(fn, e, st); len(keys) > 0 {
+		for _, key := range keys {
+			if key != r.ctx.name {
+				continue
+			}
+			// merge(target[key], source[key]) inside merge: a recursive deep merge that
+			// descends into whatever key the input names, __proto__ included.
+			for _, a := range e.args {
+				if a.kind == exprIndex && len(a.args) > 0 {
+					for _, at := range r.eval(a.args[0], st) {
+						if hit := at.kinds & kProto; hit != 0 {
+							r.reachSink(e.pos, "recursive merge", hit, at, nil)
+						}
+					}
+				}
+			}
+		}
 		var out taintSet
 		for _, key := range keys {
 			if sum, ok := r.sums[key]; ok {
@@ -581,6 +620,17 @@ func (r *irRun) callSource(fn *expr) (string, bool) {
 	}
 	d, ok := r.spec.sourceMethods[fn.name]
 	return d, ok
+}
+
+// sanitized clears the kinds the callee neutralizes from t.
+func (r *irRun) sanitized(t taintSet, qname, field string, recvExpr *expr) taintSet {
+	if k, ok := r.spec.sanitizers[qname]; ok {
+		return t.clear(k)
+	}
+	if k, ok := r.spec.sanitizers["?."+field]; ok && field != "" && recvExpr != nil {
+		return t.clear(k)
+	}
+	return t
 }
 
 // targets are the summary keys of the project functions a call may reach.
@@ -707,6 +757,14 @@ func (r *irRun) funcByKey(key string) *funcIR {
 }
 
 func (r *irRun) checkSink(c *expr, name string, s sink, args []taintSet, recv taintSet) {
+	for i, want := range s.when {
+		if i >= len(c.args) {
+			return
+		}
+		if have, ok := constText(c.args[i]); !ok || !matchesAny(have, want) {
+			return
+		}
+	}
 	if s.solo && len(c.args) != 1 {
 		return
 	}
@@ -832,7 +890,15 @@ func (r *irRun) stmt(s *stmt, st istate) {
 	case stmtExpr:
 		r.eval(s.rhs, st)
 	case stmtAssign:
+		r.lhsName = ""
+		if len(s.lhs) == 1 {
+			switch l := s.lhs[0]; l.kind {
+			case exprName, exprMember:
+				r.lhsName = l.name
+			}
+		}
 		t := r.eval(s.rhs, st)
+		r.lhsName = ""
 		for _, l := range s.lhs {
 			v := t
 			if s.aug {
@@ -955,6 +1021,8 @@ func (r *irRun) analyze(f *funcIR) *summary {
 	r.class = f.class
 	r.types = map[string]string{}
 	r.shadow = map[string]bool{}
+	r.checked = map[string]bool{}
+	r.xxeFactories, r.xxeHardened, r.lhsName = nil, false, ""
 	st := istate{}
 	if f.class != "" {
 		st[ikey{recvName, ""}] = taintSet{{key: "pr", param: recvParam, kinds: kAll}}
@@ -973,6 +1041,11 @@ func (r *irRun) analyze(f *funcIR) *summary {
 		st[ikey{p.name, ""}] = t
 	}
 	r.block(f.body, st)
+	if !r.xxeHardened {
+		for _, pos := range r.xxeFactories {
+			r.reportMisuse(pos, ruleFor2(r.spec.name, ruleXXE), "the XML parser factory is used without disabling DTDs or external entities")
+		}
+	}
 	sum := &summary{ret: r.ctx.ret}
 	seen := map[string]bool{}
 	for _, k := range r.ctx.sinks {
@@ -1007,14 +1080,14 @@ func (r *irRun) safely(f *funcIR) (sum *summary, ok bool) {
 
 // analyzeModule runs every function of a module, plus its top-level code, and returns
 // the functions whose analysis failed.
-func analyzeModule(sh *shared, spec *langSpec, proj *project, m *module, base *analyzer) (failed []token.Pos) {
+func analyzeModule(sh *shared, spec *langSpec, proj *project, m *module, base *analyzer) (failed []string) {
 	run := &irRun{analyzer: base, spec: spec, proj: proj, mod: m}
 	run.langName = spec.name
 	all := append([]*funcIR{{name: "<module>", body: m.top}}, m.funcs...)
 	for _, f := range all {
 		sum, ok := run.safely(f)
 		if !ok {
-			failed = append(failed, f.pos)
+			failed = append(failed, m.path)
 			continue
 		}
 		sh.sums[funcKey(m, f)] = sum

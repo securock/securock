@@ -38,6 +38,8 @@ type assignMisuse struct {
 	vals   []string
 	// file limits the check to paths containing this text: DEBUG = True in settings.py.
 	file string
+	// skip excludes paths containing any of these: development.rb is meant to show errors.
+	skip []string
 }
 
 var (
@@ -189,6 +191,11 @@ func (r *irRun) checkAssignMisuse(lhs, rhs *expr) {
 	am, ok := r.spec.assignMisuse[lhs.name]
 	if !ok || (am.file != "" && !strings.Contains(strings.ToLower(r.mod.path), am.file)) {
 		return
+	}
+	for _, s := range am.skip {
+		if strings.Contains(strings.ToLower(r.mod.path), s) {
+			return
+		}
 	}
 	have, ok := constText(rhs)
 	if !ok || !matchesAny(have, am.vals) {

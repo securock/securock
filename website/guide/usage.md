@@ -237,34 +237,38 @@ that reaches a dangerous call along with the path it took. It reads Go,
 JavaScript and TypeScript (`js`), Python (`py`), Java (`java`), PHP (`php`),
 and Ruby (`rb`). Rule ids are `sast:LANGUAGE/RULE`:
 
-| Rule                        | CWE  | Severity | Languages         |
-| --------------------------- | ---- | -------- | ----------------- |
-| `sql-injection`             | 89   | high     | all               |
-| `command-injection`         | 78   | high     | all               |
-| `path-traversal`            | 22   | high     | all               |
-| `xpath-injection`           | 643  | high     | all but Go        |
-| `ldap-injection`            | 90   | high     | all but Go        |
-| `ssrf`                      | 918  | medium   | all               |
-| `xss`                       | 79   | medium   | all               |
-| `open-redirect`             | 601  | medium   | all               |
-| `regex-injection`           | 1333 | medium   | all but Go        |
-| `nosql-injection`           | 943  | high     | all               |
-| `prototype-pollution`       | 1321 | high     | JS                |
-| `zip-slip`                  | 22   | high     | Python            |
-| `code-injection`            | 94   | critical | all but Go        |
-| `insecure-deserialization`  | 502  | high     | all but Go        |
-| `weak-crypto`               | 327  | medium   | all               |
-| `tls-verification-disabled` | 295  | medium   | all               |
-| `jwt-unverified`            | 347  | high     | JS, Python        |
-| `xxe`                       | 611  | high     | Python, Java      |
-| `debug-enabled`             | 489  | medium   | Python, PHP, Ruby |
-| `insecure-cookie`           | 614  | medium   | Python, Java      |
-| `mass-assignment`           | 915  | medium   | Ruby              |
-| `csrf-disabled`             | 352  | medium   | Ruby              |
-| `variable-extraction`       | 621  | high     | PHP               |
-| `insecure-temp-file`        | 377  | low      | Python            |
-| `world-writable`            | 732  | medium   | all               |
-| `hardcoded-secret`          | 798  | medium   | Go                |
+| Rule                        | CWE  | Severity | Languages               |
+| --------------------------- | ---- | -------- | ----------------------- |
+| `sql-injection`             | 89   | high     | all                     |
+| `command-injection`         | 78   | high     | all                     |
+| `path-traversal`            | 22   | high     | all                     |
+| `xpath-injection`           | 643  | high     | all but Go              |
+| `ldap-injection`            | 90   | high     | all but Go              |
+| `ssrf`                      | 918  | medium   | all                     |
+| `xss`                       | 79   | medium   | all                     |
+| `open-redirect`             | 601  | medium   | all                     |
+| `regex-injection`           | 1333 | medium   | all but Go              |
+| `nosql-injection`           | 943  | high     | all                     |
+| `prototype-pollution`       | 1321 | high     | JS                      |
+| `zip-slip`                  | 22   | high     | Python                  |
+| `log-injection`             | 117  | low      | all                     |
+| `cors-misconfiguration`     | 942  | medium   | all but PHP, Ruby       |
+| `insecure-random`           | 338  | medium   | all                     |
+| `toctou`                    | 367  | low      | all                     |
+| `code-injection`            | 94   | critical | all but Go              |
+| `insecure-deserialization`  | 502  | high     | all but Go              |
+| `weak-crypto`               | 327  | medium   | all                     |
+| `tls-verification-disabled` | 295  | medium   | all                     |
+| `jwt-unverified`            | 347  | high     | JS, Python              |
+| `xxe`                       | 611  | high     | Python, Java, PHP, Ruby |
+| `debug-enabled`             | 489  | medium   | Python, PHP, Ruby       |
+| `insecure-cookie`           | 614  | medium   | Python, Java            |
+| `mass-assignment`           | 915  | medium   | Ruby                    |
+| `csrf-disabled`             | 352  | medium   | Ruby                    |
+| `variable-extraction`       | 621  | high     | PHP                     |
+| `insecure-temp-file`        | 377  | low      | Python                  |
+| `world-writable`            | 732  | medium   | all                     |
+| `hardcoded-secret`          | 798  | medium   | Go                      |
 
 The `weak-crypto`, `tls-verification-disabled` and similar rules need no untrusted
 data: they flag the call (`hashlib.md5`, `requests.get(verify=False)`,
@@ -280,9 +284,19 @@ request object reaches a query filter (`User.findOne({name: req.body.name})`,
 into a query (`Document.parse`). It does not fire for values that are always strings:
 a path parameter, a header, a Flask form field, a Java `getParameter`. Casting with
 `String(...)` clears it. In Go it covers the MongoDB driver and needs the module to be
-downloaded. `prototype-pollution` fires when request data reaches a deep merge
-(`_.merge`, `deepmerge`, `$.extend(true, ...)`), a `_.set` path, or a nested
-`obj[a][b] = v` write. A hand-written recursive merge is not followed yet.
+downloaded. `insecure-random` flags a predictable generator (`Math.random`, `random.*`,
+`math/rand`, `rand`, `java.util.Random`) only where the result is named like a secret
+(a token, password, session, nonce, salt, key, OTP), either in the variable or the
+function name. `toctou` flags a destructive file operation on a path that the same
+function checked earlier (`os.Stat` then `os.Remove`); idempotent creation such as
+`MkdirAll` is not flagged. `cors-misconfiguration` flags an `Access-Control-Allow-Origin`
+header filled from the request, and `cors({origin: true, credentials: true})`. `xxe` in
+Java flags a parser factory created without disabling DTDs or external entities in the
+same function. `prototype-pollution` fires when request data reaches a deep merge
+(`_.merge`, `deepmerge`, `$.extend(true, ...)`), a `_.set` path, a nested
+`obj[a][b] = v` write, or a hand-written recursive merge (`merge(t[k], s[k])` inside
+`merge`). `log-injection` is rated low so it does not fail the default `--fail-on high`;
+newline stripping, `JSON.stringify` and quoting clear it.
 
 Zip slip is reported as `path-traversal` when an archive entry name (Go `zip.File.Name` and
 `tar.Header.Name`, Python `namelist()` and `ZipInfo.filename`, Java `ZipEntry.getName()`,
@@ -339,6 +353,10 @@ anchored regular expression that admits only letters, digits and a few
 separators) counts as validated. Channels, reflection, sessions and other
 storage round trips, and field-level state of a method receiver are not
 modeled, so a clean run is not proof of safety.
+
+JavaScript functions are followed whether they are declared, assigned to a `const`, or
+written in the older constructor style (`function Dao(db) { this.find = (x) => {...} }`
+and `Dao.prototype.find = function (x) {...}`).
 
 Go is type-checked, so callees are resolved exactly; for the other languages
 callees are resolved through imports and declared types, and a call on a value

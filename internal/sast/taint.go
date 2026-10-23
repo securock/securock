@@ -3,6 +3,7 @@ package sast
 import (
 	"fmt"
 	"go/ast"
+	"go/constant"
 	"go/token"
 	"go/types"
 	"regexp"
@@ -598,7 +599,24 @@ func (a *analyzer) applyFill(c *ast.CallExpr, f fill, argT []taintSet, recvT tai
 	}
 }
 
+// whenHolds reports whether a call's constant string arguments match a sink's condition.
+func (a *analyzer) whenHolds(c *ast.CallExpr, when map[int][]string) bool {
+	for i, want := range when {
+		if i >= len(c.Args) {
+			return false
+		}
+		tv := a.info.Types[c.Args[i]]
+		if tv.Value == nil || tv.Value.Kind() != constant.String || !matchesAny(strings.ToLower(constant.StringVal(tv.Value)), want) {
+			return false
+		}
+	}
+	return true
+}
+
 func (a *analyzer) checkSink(c *ast.CallExpr, name string, s sink, argT []taintSet) {
+	if len(s.when) > 0 && !a.whenHolds(c, s.when) {
+		return
+	}
 	if s.writer && (len(c.Args) == 0 || types.TypeString(a.info.TypeOf(c.Args[0]), nil) != "net/http.ResponseWriter") {
 		return
 	}

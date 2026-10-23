@@ -155,9 +155,8 @@ func taint(fset *token.FileSet, root string, pkgs []*pkg, mods []*module, rel fu
 		base := &analyzer{shared: sh, fset: fset, rel: rel, found: found}
 		for _, m := range mods {
 			spec := frontends[m.lang].spec
-			for _, pos := range analyzeModule(sh, spec, proj, m, base) {
-				l := base.loc(pos)
-				failed = append(failed, unanalyzed(root, filepath.Join(root, l.File), "analyzing a function in it failed"))
+			for _, path := range analyzeModule(sh, spec, proj, m, base) {
+				failed = append(failed, unanalyzed(root, filepath.Join(root, path), "analyzing a function in it failed"))
 			}
 		}
 		// Summaries and global taint only grow, so a round that changes neither is final.

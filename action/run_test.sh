@@ -51,6 +51,20 @@ case "${1:-}" in
     fi
     echo "audit ok"
     ;;
+  sast)
+    prev=""
+    for arg in "$@"; do
+      if [ "$prev" = "--output" ]; then
+        echo '{"version":"2.1.0"}' >"$arg"
+      fi
+      prev="$arg"
+    done
+    if [ "${FAIL_SAST:-0}" = 1 ]; then
+      echo "sast failed" >&2
+      exit 1
+    fi
+    echo "sast ok"
+    ;;
   sbom)
     if [ "${FAIL_SBOM:-0}" = 1 ]; then
       echo "sbom failed" >&2
@@ -176,6 +190,20 @@ mkdir -p "$tmp/sarif_dir/project"
 run_case sarif_dir env COMMAND=scan WORKDIR=project REACHABILITY=true MIN_RELEASE_AGE=3d \
   SARIF_FILE="$tmp/sarif_dir/out.sarif" bash -c 'cd "$1" && shift && bash "$@"' _ "$tmp/sarif_dir" "$root/action/run.sh"
 assert_contains "$tmp/sarif_dir/calls" "args:audit project --format sarif --output $tmp/sarif_dir/out.sarif --no-fail --reachability --min-release-age 3d"
+# A sast run uploads its own report, without the audit-only flags.
+run_case sast env COMMAND=sast MIN_RELEASE_AGE=7d \
+  bash "$root/action/run.sh"
+assert_contains "$tmp/sast/calls" "args:sast"
+assert_not_contains "$tmp/sast/calls" "--min-release-age"
+assert_contains "$tmp/sast/github_output" "failed=false"
+run_case sast_fail env COMMAND=sast FAIL_SAST=1 \
+  bash "$root/action/run.sh"
+assert_contains "$tmp/sast_fail/github_output" "failed=true"
+run_case sast_sarif env COMMAND=sast MIN_RELEASE_AGE=7d SARIF_FILE="$tmp/sast_sarif/out.sarif" \
+  bash "$root/action/run.sh"
+assert_contains "$tmp/sast_sarif/calls" "args:sast . --format sarif --output $tmp/sast_sarif/out.sarif --no-fail"
+assert_not_contains "$tmp/sast_sarif/calls" "args:audit"
+assert_contains "$tmp/sast_sarif/github_output" "sarif-file=$tmp/sast_sarif/out.sarif"
 run_case sarif_off env COMMAND=scan \
   bash "$root/action/run.sh"
 assert_not_contains "$tmp/sarif_off/calls" "--format sarif"

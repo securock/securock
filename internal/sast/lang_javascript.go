@@ -55,7 +55,7 @@ var jsSpec = &langSpec{
 		"fetch": {kind: kSSRF, args: []int{0}}, "node-fetch": {kind: kSSRF, args: []int{0}},
 		"got": {kind: kSSRF, args: []int{0}}, "got.get": {kind: kSSRF, args: []int{0}}, "got.post": {kind: kSSRF, args: []int{0}},
 		"request": {kind: kSSRF, args: []int{0}}, "request.get": {kind: kSSRF, args: []int{0}},
-		"needle.get": {kind: kSSRF, args: []int{1}},
+		"needle.get": {kind: kSSRF, args: []int{0}},
 		"http.get":   {kind: kSSRF, args: []int{0}}, "http.request": {kind: kSSRF, args: []int{0}},
 		"https.get": {kind: kSSRF, args: []int{0}}, "https.request": {kind: kSSRF, args: []int{0}},
 
@@ -240,7 +240,9 @@ func (j *jsLower) stmt(n *node) []*stmt {
 			return j.stmt(cs[len(cs)-1])
 		}
 	case "function_declaration", "generator_function_declaration":
-		j.mod.funcs = append(j.mod.funcs, j.function(n, j.text(j.field(n, "name"))))
+		name := j.text(j.field(n, "name"))
+		j.mod.funcs = append(j.mod.funcs, j.function(n, name))
+		j.constructorMethods(name, j.field(n, "body"))
 	case "class_declaration":
 		j.classDecl(n)
 	case "export_statement":
@@ -255,8 +257,65 @@ func (j *jsLower) stmt(n *node) []*stmt {
 	return nil
 }
 
+// isFunc reports whether a node is a function expression.
+func (j *jsLower) isFunc(n *node) bool {
+	switch j.kind(n) {
+	case "arrow_function", "function_expression", "function", "generator_function":
+		return true
+	}
+	return false
+}
+
+// constructorMethods registers the methods of the older class idiom: a function whose
+// body assigns this.name = function/arrow, as in
+//
+//	function AllocationsDAO(db) { this.getByUser = (id, cb) => {...} }
+func (j *jsLower) constructorMethods(class string, body *node) {
+	if body == nil || class == "" || class[0] < 'A' || class[0] > 'Z' {
+		return
+	}
+	prev := j.class
+	j.class = class
+	defer func() { j.class = prev }()
+	for _, st := range j.named(body) {
+		if j.kind(st) != "expression_statement" {
+			continue
+		}
+		for _, a := range j.named(st) {
+			if j.kind(a) != "assignment_expression" {
+				continue
+			}
+			left, right := j.field(a, "left"), j.field(a, "right")
+			if left == nil || right == nil || j.kind(left) != "member_expression" || !j.isFunc(right) {
+				continue
+			}
+			if obj := j.field(left, "object"); obj != nil && j.kind(obj) == "this" {
+				j.mod.funcs = append(j.mod.funcs, j.function(right, j.text(j.field(left, "property"))))
+			}
+		}
+	}
+}
+
+// prototypeMethod handles X.prototype.name = function() {...}.
+func (j *jsLower) prototypeMethod(a *node) {
+	left, right := j.field(a, "left"), j.field(a, "right")
+	if left == nil || right == nil || j.kind(left) != "member_expression" || !j.isFunc(right) {
+		return
+	}
+	obj := j.field(left, "object")
+	if obj == nil || j.kind(obj) != "member_expression" || j.text(j.field(obj, "property")) != "prototype" {
+		return
+	}
+	class := j.text(j.field(obj, "object"))
+	prev := j.class
+	j.class = class
+	j.mod.funcs = append(j.mod.funcs, j.function(right, j.text(j.field(left, "property"))))
+	j.class = prev
+}
+
 func (j *jsLower) exprStmt(n *node) *stmt {
 	if k := j.kind(n); k == "assignment_expression" || k == "augmented_assignment_expression" {
+		j.prototypeMethod(n)
 		return j.assignment(n)
 	}
 	return &stmt{kind: stmtExpr, pos: j.pos(n), rhs: j.expr(n)}
@@ -319,6 +378,12 @@ func (j *jsLower) declarator(d *node) []*stmt {
 	s := &stmt{kind: stmtAssign, pos: j.pos(d), rhs: j.expr(value), lhs: j.targets(name)}
 	if ty != "" && len(s.lhs) == 1 {
 		s.lhs[0].ty = ty
+	}
+	// const handler = (req) => {...} defines a function other code calls by name.
+	if j.isFunc(value) && j.kind(name) == "identifier" {
+		fname := j.text(name)
+		j.mod.funcs = append(j.mod.funcs, j.function(value, fname))
+		j.constructorMethods(fname, j.field(value, "body"))
 	}
 	return []*stmt{s}
 }
@@ -615,7 +680,43 @@ func (j *jsLower) expr(n *node) *expr {
 		}
 	case "ternary_expression":
 		return j.other(n, j.expr(j.field(n, "consequence")), j.expr(j.field(n, "alternative")))
+	case "object":
+		// { origin: true, credentials: true } hands credentials to any website.
+		e := j.mk(exprOther, n)
+		var origin, creds *node
+		for _, c := range j.named(n) {
+			if x := j.expr(c); x != nil {
+				e.args = append(e.args, x)
+			}
+			if j.kind(c) == "pair" {
+				switch strings.Trim(j.text(j.field(c, "key")), `"'`) {
+				case "origin":
+					origin = j.field(c, "value")
+				case "credentials":
+					creds = j.field(c, "value")
+				}
+			}
+		}
+		if origin != nil && creds != nil {
+			call := j.mk(exprCall, n)
+			fn := j.mk(exprName, n)
+			fn.name = "corsConfig"
+			call.x = fn
+			call.args = []*expr{j.expr(origin), j.expr(creds)}
+			call.kw = []string{"", ""}
+			e.args = append(e.args, call)
+		}
+		return e
 	case "pair":
+		if strings.Trim(j.text(j.field(n, "key")), `"'`) == "$where" {
+			call := j.mk(exprCall, n)
+			fn := j.mk(exprName, n)
+			fn.name = "mongoWhere"
+			call.x = fn
+			call.args = []*expr{j.expr(j.field(n, "value"))}
+			call.kw = []string{""}
+			return call
+		}
 		// { rejectUnauthorized: false } is a call to a misuse check; any other pair is
 		// just its value.
 		if j.text(j.field(n, "key")) == "rejectUnauthorized" {

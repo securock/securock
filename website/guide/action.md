@@ -38,7 +38,7 @@ branch and is not the security-first default.
 | Input             | Default                | Description                                                                   |
 | ----------------- | ---------------------- | ----------------------------------------------------------------------------- |
 | `path`            | `.`                    | Project directory to scan                                                     |
-| `command`         | `all`                  | `all`, `scan`, `diff`, `verify`, `audit`, or `both`                           |
+| `command`         | `all`                  | `all`, `scan`, `diff`, `verify`, `audit`, `sast`, or `both`                   |
 | `policy`          | _(empty)_              | Path to a policy file (`--policy`; exclusive with `profile`)                  |
 | `profile`         | _(empty)_              | Built-in profile `default` or `strict` (`--profile`)                          |
 | `offline`         | `false`                | Pass `--offline` to the CLI                                                   |
@@ -74,8 +74,11 @@ steps:
 ```
 
 - `command: audit` fails the job on findings at or above `high`, like `securock audit`.
-- `sarif: "true"` runs `securock audit --format sarif` from the repository root, so locations
-  match the repository, and uploads it to code scanning. The upload never fails the job on its
+- `command: sast` runs `securock sast` on the project's own source and fails the job on
+  findings at or above `high`.
+- `sarif: "true"` runs `securock audit --format sarif` (`securock sast --format sarif` when
+  `command` is `sast`) from the repository root, so locations match the repository, and
+  uploads it to code scanning. The upload never fails the job on its
   own. The report is also returned in the `sarif-file` output.
 - `sbom: "true"` runs `securock sbom export`, so `securock.lock` must exist.
 - `min-release-age` and `command: audit` are the only way to pass the audit-only flag; other

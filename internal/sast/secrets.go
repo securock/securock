@@ -62,6 +62,14 @@ func skippedForSecrets(name string) bool {
 	return strings.HasSuffix(low, ".min.js") || strings.HasSuffix(low, ".min.css")
 }
 
+func isCodeFile(name string) bool {
+	switch strings.ToLower(filepath.Ext(name)) {
+	case ".js", ".jsx", ".mjs", ".cjs", ".ts", ".tsx", ".py", ".java", ".php", ".rb", ".kt", ".cs", ".rs", ".go", ".gradle":
+		return true
+	}
+	return false
+}
+
 // keyedFile reports files where "name = literal" is configuration or code worth checking.
 func keyedFile(name string) (check bool, isGo bool) {
 	low := strings.ToLower(name)
@@ -124,8 +132,14 @@ func scanSecrets(root, full, rel, name string) []finding.Finding {
 		if !keyed || isGo {
 			continue // Go literals are reported by the typed analysis
 		}
-		for _, re := range []*regexp.Regexp{reKeyedQuoted, reKeyedBare} {
-			if m := re.FindStringSubmatch(line); m != nil && !notSecret.MatchString(m[1]) && !referenceLike.MatchString(m[2]) && looksLikeSecret(m[2]) {
+		res := []*regexp.Regexp{reKeyedQuoted}
+		if !isCodeFile(name) {
+			// "KEY=value" with no quotes is configuration; in code it is an expression.
+			res = append(res, reKeyedBare)
+		}
+		for _, re := range res {
+			if m := re.FindStringSubmatch(line); m != nil && !notSecret.MatchString(m[1]) && !referenceLike.MatchString(m[2]) &&
+				!strings.ContainsAny(m[2], "()[]{};,<>\"'`") && looksLikeSecret(m[2]) {
 				add("hardcoded-credential", i+1, finding.SeverityMedium, m[1]+" is set to a literal that looks like a secret")
 				break
 			}

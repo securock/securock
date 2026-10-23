@@ -73,6 +73,9 @@ case "$command" in
   audit)
     run_cmd "securock audit" securock audit ${audit_flags[@]+"${audit_flags[@]}"}
     ;;
+  sast)
+    run_cmd "securock sast" securock sast
+    ;;
   both)
     # Drift-only path for callers that intentionally skip current-state
     # policy checks (for example offline fixtures with unknown evidence).
@@ -97,12 +100,20 @@ esac
 # Optional artifacts. They are written from the directory the job started in, so paths in
 # the SARIF report are relative to the repository root, which code scanning needs.
 if [ -n "$sarif_file" ]; then
-  # --no-fail: the report is for code scanning; the audit step above decides pass or fail.
-  if (cd "$origin" && securock audit "$workdir" --format sarif --output "$sarif_file" --no-fail \
-      ${flags[@]+"${flags[@]}"} ${audit_flags[@]+"${audit_flags[@]}"}) >>"$report" 2>&1; then
+  # The code scanning report matches the command: source findings for sast, dependency
+  # findings for everything else.
+  sarif_cmd=audit
+  sarif_flags=(${audit_flags[@]+"${audit_flags[@]}"})
+  if [ "$command" = "sast" ]; then
+    sarif_cmd=sast
+    sarif_flags=()
+  fi
+  # --no-fail: the report is for code scanning; the step above decides pass or fail.
+  if (cd "$origin" && securock "$sarif_cmd" "$workdir" --format sarif --output "$sarif_file" --no-fail \
+      ${flags[@]+"${flags[@]}"} ${sarif_flags[@]+"${sarif_flags[@]}"}) >>"$report" 2>&1; then
     echo "sarif-file=$sarif_file" >>"$GITHUB_OUTPUT"
   else
-    echo "securock audit --format sarif failed" >>"$report"
+    echo "securock $sarif_cmd --format sarif failed" >>"$report"
     failed=true
   fi
 fi

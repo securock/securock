@@ -28,9 +28,11 @@ const (
 	kNoSQL    // a request object used as a query filter
 	kNoSQLStr // a request string parsed into a query
 	kProto
+	kLog
+	kCORS
 
-	kLast = kProto
-	kAll  = kSQL | kCmd | kPath | kSSRF | kXSS | kRedirect | kCode | kDeser | kXPath | kLDAP | kRegex | kNoSQL | kNoSQLStr | kProto
+	kLast = kCORS
+	kAll  = kSQL | kCmd | kPath | kSSRF | kXSS | kRedirect | kCode | kDeser | kXPath | kLDAP | kRegex | kNoSQL | kNoSQLStr | kProto | kLog | kCORS
 )
 
 // objectDescs are the sources that can deliver a nested object, not just a string.
@@ -79,6 +81,8 @@ var taintRules = map[kind]rule{
 	kNoSQL:    {"sast:go/nosql-injection", "CWE-943", "NoSQL injection", "Cast request values to the type you expect (a string or a number) before putting them in a query filter, or strip operator keys with a sanitizer such as express-mongo-sanitize.", finding.SeverityHigh},
 	kNoSQLStr: {"sast:go/nosql-injection", "CWE-943", "NoSQL injection", "Do not parse request text as a query; build the filter from validated fields.", finding.SeverityHigh},
 	kProto:    {"sast:go/prototype-pollution", "CWE-1321", "Prototype pollution", "Reject the keys __proto__, constructor and prototype, build lookup objects with Object.create(null) or a Map, or use a merge library that guards them.", finding.SeverityHigh},
+	kLog:      {"sast:go/log-injection", "CWE-117", "Log injection", "Strip or encode line breaks (and quote the value) before writing untrusted text to a log.", finding.SeverityLow},
+	kCORS:     {"sast:go/cors-misconfiguration", "CWE-942", "Untrusted origin is allowed by CORS", "Compare the Origin header against an allowlist and echo it back only when it matches.", finding.SeverityMedium},
 	kDeser:    {"sast:go/insecure-deserialization", "CWE-502", "Insecure deserialization", "Do not deserialize untrusted data with a format that can instantiate arbitrary types; use JSON or a schema-validated format.", finding.SeverityHigh},
 }
 
@@ -106,6 +110,9 @@ type sink struct {
 	// recv limits a method-name sink ("?.send") to receivers whose variable has one of
 	// these names, so res.send(x) is a response but socket.send(x) is not.
 	recv []string
+	// when limits the sink to calls whose constant arguments match: setHeader is a CORS
+	// sink only for Access-Control-Allow-Origin. Matching follows misuse.args.
+	when map[int][]string
 	// recvUpper also admits receivers rooted at a capitalized name (a model class:
 	// User.findOne), in addition to those listed in recv.
 	recvUpper bool
@@ -204,6 +211,17 @@ var sinks = map[string]sink{
 
 	"net/http.Redirect": {kind: kRedirect, args: []int{2}},
 
+	"log.Print": {kind: kLog, args: []int{0}, rest: true}, "log.Printf": {kind: kLog, args: []int{0}, rest: true},
+	"log.Println": {kind: kLog, args: []int{0}, rest: true}, "log.Fatal": {kind: kLog, args: []int{0}, rest: true},
+	"log.Fatalf": {kind: kLog, args: []int{0}, rest: true}, "log.Fatalln": {kind: kLog, args: []int{0}, rest: true},
+	"log.Panic": {kind: kLog, args: []int{0}, rest: true}, "log.Panicf": {kind: kLog, args: []int{0}, rest: true},
+	"(*log.Logger).Print": {kind: kLog, args: []int{0}, rest: true}, "(*log.Logger).Printf": {kind: kLog, args: []int{0}, rest: true},
+	"(*log.Logger).Println": {kind: kLog, args: []int{0}, rest: true},
+	"log/slog.Info":         {kind: kLog, args: []int{0}}, "log/slog.Warn": {kind: kLog, args: []int{0}},
+	"log/slog.Error": {kind: kLog, args: []int{0}}, "log/slog.Debug": {kind: kLog, args: []int{0}},
+	"(net/http.Header).Set": {kind: kCORS, args: []int{1}, when: map[int][]string{0: {"access-control-allow-origin"}}},
+	"(net/http.Header).Add": {kind: kCORS, args: []int{1}, when: map[int][]string{0: {"access-control-allow-origin"}}},
+
 	"(*go.mongodb.org/mongo-driver/mongo.Collection).Find":             {kind: kNoSQL, args: []int{1}},
 	"(*go.mongodb.org/mongo-driver/mongo.Collection).FindOne":          {kind: kNoSQL, args: []int{1}},
 	"(*go.mongodb.org/mongo-driver/mongo.Collection).FindOneAndUpdate": {kind: kNoSQL, args: []int{1}},
@@ -227,6 +245,9 @@ var sanitizers = map[string]kind{
 	"net/url.PathEscape":             kXSS | kPath | kRedirect | kSSRF,
 	"path/filepath.Base":             kPath,
 	"path.Base":                      kPath,
+	"strconv.Quote":                  kLog,
+	"strings.ReplaceAll":             kLog,
+	"strings.Replace":                kLog,
 
 	// Parsed values are structured data, not text that can carry a payload.
 	"net.ParseIP":           kAll,
