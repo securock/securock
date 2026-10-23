@@ -137,7 +137,7 @@ func parseFile(fset *token.FileSet, abs, rel string, src []byte) (m *module, had
 	}
 	lang := entry.Language()
 	if info[1] == "kt" {
-		src = blankClassRefs(src)
+		src = blankExtensionAnnotations(blankClassRefs(src))
 	}
 	tree, err := gotreesitter.NewParser(lang).Parse(src)
 	if err != nil || tree == nil {
@@ -185,4 +185,24 @@ var reClassRef = regexp.MustCompile(`::class(\.java|\.kotlin)?`)
 // and a class literal carries no data, so positions stay and nothing is lost.
 func blankClassRefs(src []byte) []byte {
 	return reClassRef.ReplaceAllFunc(src, func(m []byte) []byte { return bytes.Repeat([]byte{' '}, len(m)) })
+}
+
+var reExtensionAnnotations = regexp.MustCompile(`(?m)((?:^[ \t]*@[\w.:]+(?:\([^)\n]*\))?[ \t]*\n)+)([ \t]*(?:\w+[ \t]+)*fun[ \t]+(?:<[^>\n]*>[ \t]+)?[\w.<>?, ]+\.\w+[ \t]*[(<])`)
+
+// blankExtensionAnnotations blanks the annotation lines that precede an extension
+// function: after another annotated declaration the Kotlin grammar reads the function as
+// an anonymous function and loses the rest of the file. Annotations on extension
+// functions (@Serializable, @Suppress, @OptIn) carry no request mapping, so nothing the
+// analysis uses is lost.
+func blankExtensionAnnotations(src []byte) []byte {
+	return reExtensionAnnotations.ReplaceAllFunc(src, func(m []byte) []byte {
+		sub := reExtensionAnnotations.FindSubmatch(m)
+		out := append([]byte(nil), m...)
+		for i := range sub[1] {
+			if out[i] != '\n' {
+				out[i] = ' '
+			}
+		}
+		return out
+	})
 }
