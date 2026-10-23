@@ -150,6 +150,16 @@ func parseFile(fset *token.FileSet, abs, rel string, src []byte) (m *module, had
 	return fe.lower(l), hadError, nil
 }
 
+// synthCall is a statement that calls a marker function; a misuse table entry for the
+// marker turns an annotation or decorator the analysis would otherwise not see into a finding.
+func synthCall(l *lowering, n *node, name string) *stmt {
+	call := l.mk(exprCall, n)
+	fn := l.mk(exprName, n)
+	fn.name = name
+	call.x = fn
+	return &stmt{kind: stmtExpr, pos: l.pos(n), rhs: call}
+}
+
 // bindCallback makes the first parameter of a lambda an element of the collection it is
 // applied to, so ids.map(id => ...) sees the taint of ids.
 func bindCallback(lambda *expr, over *expr) {

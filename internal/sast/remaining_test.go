@@ -404,3 +404,33 @@ func TestRazorAspxAndConnectionStrings(t *testing.T) {
 		})
 	}
 }
+
+func TestAnnotationsAndDecorators(t *testing.T) {
+	tests := []struct {
+		name  string
+		files map[string]string
+		want  []string
+	}{
+		{"java wildcard origin with credentials", map[string]string{"A.java": "@RestController\npublic class A {\n  @CrossOrigin(origins = \"*\", allowCredentials = \"true\")\n  @GetMapping(\"/x\")\n  public String f() { return \"x\"; }\n}\n"}, []string{"sast:java/cors-misconfiguration"}},
+		{"java credentials without origins", map[string]string{"A.java": "@RestController\npublic class A {\n  @CrossOrigin(allowCredentials = \"true\")\n  public String f() { return \"x\"; }\n}\n"}, []string{"sast:java/cors-misconfiguration"}},
+		{"java named origin with credentials", map[string]string{"A.java": "@RestController\npublic class A {\n  @CrossOrigin(origins = \"https://app.example.com\", allowCredentials = \"true\")\n  public String f() { return \"x\"; }\n}\n"}, nil},
+		{"java wildcard origin without credentials", map[string]string{"A.java": "@RestController\npublic class A {\n  @CrossOrigin(\"*\")\n  public String f() { return \"x\"; }\n}\n"}, nil},
+		{"java class level cors", map[string]string{"A.java": "@RestController\n@CrossOrigin(allowCredentials = \"true\")\npublic class A {\n  public String f() { return \"x\"; }\n}\n"}, []string{"sast:java/cors-misconfiguration"}},
+		{"django csrf_exempt", map[string]string{"v.py": "from django.views.decorators.csrf import csrf_exempt\n@csrf_exempt\ndef pay(request):\n    return None\n"}, []string{"sast:py/csrf-disabled"}},
+		{"flask csrf.exempt", map[string]string{"v.py": "@csrf.exempt\n@app.route('/hook', methods=['POST'])\ndef hook():\n    return 'ok'\n"}, []string{"sast:py/csrf-disabled"}},
+		{"django normal view", map[string]string{"v.py": "def pay(request):\n    return None\n"}, nil},
+		{"mvc post without antiforgery", map[string]string{"C.cs": "public class C : Controller {\n  [HttpPost]\n  public IActionResult Save(string a) { return View(); }\n}\n"}, []string{"sast:cs/csrf-disabled"}},
+		{"mvc post with antiforgery", map[string]string{"C.cs": "public class C : Controller {\n  [HttpPost]\n  [ValidateAntiForgeryToken]\n  public IActionResult Save(string a) { return View(); }\n}\n"}, nil},
+		{"mvc class with auto validation", map[string]string{"C.cs": "[AutoValidateAntiforgeryToken]\npublic class C : Controller {\n  [HttpPost]\n  public IActionResult Save(string a) { return View(); }\n}\n"}, nil},
+		{"api controller is exempt", map[string]string{"C.cs": "[ApiController]\npublic class C : ControllerBase {\n  [HttpPost]\n  public IActionResult Save(string a) { return Ok(); }\n}\n"}, nil},
+		{"mvc get action", map[string]string{"C.cs": "public class C : Controller {\n  [HttpGet]\n  public IActionResult Show() { return View(); }\n}\n"}, nil},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := analyze(t, tt.files)
+			if !slices.Equal(got, tt.want) {
+				t.Fatalf("got %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

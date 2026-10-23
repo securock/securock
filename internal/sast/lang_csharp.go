@@ -184,6 +184,8 @@ func init() {
 	}
 	csSpec.misuse["?.UseDeveloperExceptionPage"] = []misuse{bare(ruleDebug, "the developer exception page shows stack traces and source to anyone")}
 	csSpec.misuse["?.UseDatabaseErrorPage"] = []misuse{bare(ruleDebug, "the database error page shows queries and schema to anyone")}
+	csSpec.misuse["csrfUnprotected"] = []misuse{bare(ruleCSRF, "this action changes state without [ValidateAntiForgeryToken]")}
+	csSpec.builtins["csrfUnprotected"] = true
 	csSpec.misuse["weakAllowlist"] = []misuse{bare(ruleWeakAllowlist, "the URL is accepted when it merely contains or starts with an allowed one")}
 	csSpec.builtins["weakAllowlist"] = true
 	addBuiltins()
@@ -192,6 +194,34 @@ func init() {
 type csLower struct {
 	*lowering
 	class string
+	// mvc is set inside a Controller (not ControllerBase or an [ApiController]) whose class
+	// has no antiforgery attribute, where a state-changing action needs its own.
+	mvc bool
+}
+
+var csUnsafeVerbs = map[string]bool{"HttpPost": true, "HttpPut": true, "HttpDelete": true, "HttpPatch": true}
+
+// missingAntiforgery reports an MVC action that changes state without an antiforgery check.
+func (c *csLower) missingAntiforgery(m *node) bool {
+	if !c.mvc {
+		return false
+	}
+	verb, token := false, false
+	for _, al := range c.named(m) {
+		if c.kind(al) != "attribute_list" {
+			continue
+		}
+		for _, a := range c.named(al) {
+			name := c.text(c.field(a, "name"))
+			if csUnsafeVerbs[name] {
+				verb = true
+			}
+			if strings.Contains(name, "AntiForgery") || strings.Contains(name, "Antiforgery") {
+				token = true
+			}
+		}
+	}
+	return verb && !token
 }
 
 func lowerCSharp(l *lowering) *module {
@@ -245,10 +275,25 @@ func (c *csLower) usingDirective(n *node) {
 
 func (c *csLower) classDecl(n *node) {
 	name := c.text(c.field(n, "name"))
-	prev := c.class
+	prev, prevMVC := c.class, c.mvc
 	c.class = name
-	defer func() { c.class = prev }()
+	defer func() { c.class, c.mvc = prev, prevMVC }()
 	controller := false
+	c.mvc = false
+	classToken, apiController := false, false
+	for _, al := range c.named(n) {
+		if c.kind(al) == "attribute_list" {
+			for _, a := range c.named(al) {
+				t := c.text(c.field(a, "name"))
+				if strings.Contains(t, "AntiForgery") || strings.Contains(t, "Antiforgery") {
+					classToken = true
+				}
+				if t == "ApiController" {
+					apiController = true
+				}
+			}
+		}
+	}
 	for _, ch := range c.named(n) {
 		if c.kind(ch) == "base_list" {
 			for _, b := range c.named(ch) {
@@ -256,6 +301,15 @@ func (c *csLower) classDecl(n *node) {
 				c.mod.supers[name] = append(c.mod.supers[name], t)
 				if strings.HasSuffix(t, "Controller") || strings.HasSuffix(t, "ControllerBase") || strings.HasSuffix(t, "PageModel") {
 					controller = true
+				}
+			}
+		}
+	}
+	for _, ch := range c.named(n) {
+		if c.kind(ch) == "base_list" {
+			for _, b := range c.named(ch) {
+				if c.text(b) == "Controller" {
+					c.mvc = !classToken && !apiController
 				}
 			}
 		}
@@ -364,6 +418,9 @@ func (c *csLower) method(m *node, class string, controller bool) {
 		}
 	} else {
 		f.body = c.block(body)
+	}
+	if c.missingAntiforgery(m) {
+		f.body = append([]*stmt{synthCall(c.lowering, m, "csrfUnprotected")}, f.body...)
 	}
 	c.mod.funcs = append(c.mod.funcs, f)
 }

@@ -271,11 +271,16 @@ and Ruby (`rb`). Rule ids are `sast:LANGUAGE/RULE`:
 | `weak-allowlist`               | 601  | medium   | JS, Python, Java, Ruby  |
 | `directory-listing`            | 548  | medium   | JS                      |
 | `prompt-injection`             | 1427 | medium   | JS, Python              |
-| `csrf-disabled`                | 352  | medium   | Ruby, Java              |
+| `csrf-disabled`                | 352  | medium   | Ruby, Java, Python, C#  |
 | `variable-extraction`          | 621  | high     | PHP                     |
 | `insecure-temp-file`           | 377  | low      | Python                  |
 | `world-writable`               | 732  | medium   | all                     |
 | `hardcoded-secret`             | 798  | medium   | Go                      |
+
+Annotations and decorators are read where they matter: Spring `@CrossOrigin` with
+`allowCredentials` for any origin, Django `@csrf_exempt` and Flask `@csrf.exempt`, and an
+ASP.NET MVC `[HttpPost]` action without `[ValidateAntiForgeryToken]` (not in an
+`[ApiController]`, and not when the class has `[AutoValidateAntiforgeryToken]`).
 
 `debug-enabled` is not reported inside a branch that asks which environment the code runs in
 (`env.IsDevelopment()`, `NODE_ENV`, `FLASK_ENV`), since that is where debug settings belong.

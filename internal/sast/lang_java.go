@@ -1,6 +1,7 @@
 package sast
 
 import (
+	"regexp"
 	"strings"
 )
 
@@ -133,6 +134,8 @@ func init() { frontends["java"] = &frontend{spec: javaSpec, lower: lowerJava} }
 type javaLower struct {
 	*lowering
 	class string
+	// classCORS is set while lowering a class annotated @CrossOrigin(... allowCredentials ...) for any origin.
+	classCORS bool
 }
 
 func lowerJava(l *lowering) *module {
@@ -165,9 +168,9 @@ func (j *javaLower) importDecl(n *node) {
 
 func (j *javaLower) classDecl(n *node) {
 	name := j.text(j.field(n, "name"))
-	prev := j.class
-	j.class = name
-	defer func() { j.class = prev }()
+	prev, prevCORS := j.class, j.classCORS
+	j.class, j.classCORS = name, j.anyOriginWithCredentials(n)
+	defer func() { j.class, j.classCORS = prev, prevCORS }()
 	// supertypes
 	for _, f := range []string{"superclass", "interfaces", "extends_interfaces"} {
 		if s := j.field(n, f); s != nil {
@@ -233,6 +236,25 @@ var javaSourceAnnotations = map[string]string{
 	"HeaderParam": "request header", "CookieParam": "request cookie", "RequestPart": "uploaded file",
 }
 
+var reCredentials = regexp.MustCompile(`allowCredentials\s*=\s*"?true"?`)
+var reSpecificOrigin = regexp.MustCompile(`origins?\s*=\s*\{?\s*"[^*"]`)
+
+// anyOriginWithCredentials reports a @CrossOrigin that lets any origin send credentials.
+func (j *javaLower) anyOriginWithCredentials(m *node) bool {
+	for _, mod := range j.named(m) {
+		if j.kind(mod) != "modifiers" {
+			continue
+		}
+		for _, a := range j.named(mod) {
+			t := j.text(a)
+			if strings.Contains(t, "CrossOrigin") && reCredentials.MatchString(t) && !reSpecificOrigin.MatchString(t) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 func (j *javaLower) method(m *node, class string) {
 	f := &funcIR{name: j.text(j.field(m, "name")), class: class, pos: j.pos(m)}
 	if j.kind(m) == "constructor_declaration" {
@@ -272,6 +294,9 @@ func (j *javaLower) method(m *node, class string) {
 		return // an interface or abstract method has nothing to analyze
 	}
 	f.body = j.block(j.field(m, "body"))
+	if j.anyOriginWithCredentials(m) || j.classCORS {
+		f.body = append([]*stmt{synthCall(j.lowering, m, "corsAnyOrigin")}, f.body...)
+	}
 	j.mod.funcs = append(j.mod.funcs, f)
 }
 

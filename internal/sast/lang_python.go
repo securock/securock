@@ -215,7 +215,12 @@ func (p *pyLower) stmt(n *node) []*stmt {
 		}
 		switch p.kind(def) {
 		case "function_definition":
+			before := len(p.mod.funcs)
 			p.function(def, p.decorators(n), p.htmlRoute(n))
+			if p.csrfExempt(n) && len(p.mod.funcs) > before {
+				f := p.mod.funcs[len(p.mod.funcs)-1]
+				f.body = append([]*stmt{synthCall(p.lowering, def, "csrfUnprotected")}, f.body...)
+			}
 		case "class_definition":
 			p.classDef(def)
 		}
@@ -363,6 +368,19 @@ func (p *pyLower) decorators(def *node) bool {
 		t := p.text(c)
 		for _, m := range []string{".route(", ".get(", ".post(", ".put(", ".delete(", ".patch(", ".api_route(", ".websocket("} {
 			if strings.Contains(t, m) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// csrfExempt reports a view decorated to skip CSRF protection (@csrf_exempt, @csrf.exempt).
+func (p *pyLower) csrfExempt(def *node) bool {
+	for _, c := range p.named(def) {
+		if p.kind(c) == "decorator" {
+			t := p.text(c)
+			if strings.Contains(t, "csrf_exempt") || strings.Contains(t, "csrf.exempt") {
 				return true
 			}
 		}

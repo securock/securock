@@ -41,6 +41,12 @@ func init() {
 		rb.sinks["?."+m] = mergeSink(rb.sinks["?."+m], sink{kind: kMass, args: []int{0}, recvUpper: true, direct: true})
 	}
 
+	jvMarker := javaSpec
+	jvMarker.misuse["corsAnyOrigin"] = []misuse{bare(ruleCORS, "@CrossOrigin allows any origin together with credentials")}
+	jvMarker.builtins["corsAnyOrigin"] = true
+	pySpec.misuse["csrfUnprotected"] = []misuse{bare(ruleCSRF, "this view is exempt from CSRF protection")}
+	pySpec.builtins["csrfUnprotected"] = true
+
 	// ---- Python
 	py := pySpec
 	py.sinks["llmPrompt"] = sink{kind: kPrompt, args: []int{0}}
