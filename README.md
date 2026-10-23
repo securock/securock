@@ -69,7 +69,9 @@ Those changes are easy to miss in a language lockfile diff.
   fully offline. It also checks Dockerfiles, Kubernetes and Compose manifests,
   Terraform, and GitHub Actions workflows for unsafe settings, and scans every
   text file for committed credentials. A file it cannot parse is reported
-  rather than skipped
+  rather than skipped. Accuracy is measured only for Java (91% detected, 15% false
+  positives on OWASP BenchmarkJava) and Python (80% and 22%); the other languages are
+  experimental. See [how accurate is sast](https://securock.dev/guide/usage#how-accurate-is-sast)
 
 **Exports**
 

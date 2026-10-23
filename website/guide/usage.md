@@ -423,15 +423,31 @@ each category and fails if the score drops.
 
 Read the numbers with their limits in mind. Both suites are synthetic and contain
 constructs real code rarely has: a switch on a constant string, a list whose first
-element is removed before the second is read. The remaining false positives are mostly those. Algorithms read from a `.properties`
-file with `getProperty("key", "default")` are resolved from the project's own properties
-files. Juice Shop also ships each security challenge in several flawed and one correct variant
-(`data/static/codefixes`), which makes a labeled set for JavaScript and TypeScript: the
-vulnerable variants of the injection, XSS and redirect challenges are found, and the
-parameterized SQL variants are not reported. Two other public sets were used as spot checks: njsscan's Node.js true-negative samples (1 of 65 files reported, and that one is a log-injection note) and gosec's Go samples, where the SQL injection, TLS and RSA key size cases are covered. Other languages have no labeled suite here, only the
-cases in `internal/sast/testdata/bench.txt` and runs over intentionally vulnerable
-applications (NodeGoat, Juice Shop, DVWA, railsgoat, WebGoat, pygoat), which were read
-by hand. Treat the results as a measured starting point, not a guarantee.
+element is removed before the second is read. The remaining false positives are mostly those.
+
+Only Java and Python have a labeled score. For the other languages the evidence is weaker,
+and `sast` should be treated as experimental there:
+
+| Language              | What it was checked against                                                                                                                                                                                                                    |
+| --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Java                  | OWASP BenchmarkJava (score above), WebGoat                                                                                                                                                                                                     |
+| Python                | OWASP BenchmarkPython (score above), pygoat, django.nV                                                                                                                                                                                         |
+| JavaScript/TypeScript | Juice Shop's `codefixes` (flawed and fixed variants; the injection, XSS and redirect challenges are found, parameterized SQL variants are not reported), njsscan true negatives (1 of 65 files reported, a log-injection note), NodeGoat, dvna |
+| Go                    | gosec's samples (SQL injection, TLS and RSA key size covered; rules that need no tainted data are only partly matched), go-test-bench with `--assume-params`                                                                                   |
+| PHP, Ruby, C#, Kotlin | Intentionally vulnerable applications read by hand (DVWA, railsgoat, WebGoat.NET, ktor-samples, spring-petclinic-kotlin) and the cases in `internal/sast/testdata/bench.txt`; no labeled score                                                 |
+
+Known limits:
+
+- Rules that fire without tainted data (hard-coded keys, weak algorithms, insecure flags) match
+  the API calls the tables list. An API the tables do not name is not reported.
+- A value that reaches a sink only through a library the rules do not model is assumed to pass
+  through, which can add false positives.
+- A file the grammar cannot parse is reported as `sast:analysis-incomplete` and not analyzed.
+  Kotlin has the most such files because its grammar rejects some constructs, which `sast`
+  rewrites around where it can.
+- `#nosec`-style comments are not read. Use `accept` and the exceptions file.
+
+Treat the results as a measured starting point, not a guarantee.
 
 `doctor` checks the setup around securock: the lockfile and policy,
 registry config (`.npmrc`, `.yarnrc.yml`, `nuget.config`) for plain
