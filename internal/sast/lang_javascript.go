@@ -814,6 +814,13 @@ func (j *jsLower) expr(n *node) *expr {
 			call.kw = []string{""}
 			return call
 		}
+		if key := strings.Trim(j.text(j.field(n, "key")), `"'`); (key == "httpOnly" || key == "secure") && j.text(j.field(n, "value")) == "false" {
+			call := j.mk(exprCall, n)
+			fn := j.mk(exprName, n)
+			fn.name = "cookieFlag"
+			call.x = fn
+			return call
+		}
 		if key := strings.Trim(j.text(j.field(n, "key")), `"'`); key == "autoescape" || key == "noent" {
 			call := j.mk(exprCall, n)
 			fn := j.mk(exprName, n)

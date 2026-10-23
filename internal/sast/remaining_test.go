@@ -250,3 +250,41 @@ func TestJuiceShopFixVariants(t *testing.T) {
 		})
 	}
 }
+
+func TestWeakAPIChecks(t *testing.T) {
+	tests := []struct {
+		name  string
+		files map[string]string
+		want  []string
+	}{
+		{"py set_cookie without flags", map[string]string{"a.py": "def f(r):\n    r.set_cookie('a', 'b')\n"}, []string{"sast:py/insecure-cookie"}},
+		{"py set_cookie with flags", map[string]string{"a.py": "def f(r):\n    r.set_cookie('a', 'b', secure=True, httponly=True)\n"}, nil},
+		{"py weak ssl version", map[string]string{"a.py": "import ssl\ndef f(s):\n    return ssl.wrap_socket(s, ssl_version=ssl.PROTOCOL_TLSv1)\n"}, []string{"sast:py/tls-verification-disabled"}},
+		{"py ECB mode", map[string]string{"a.py": "from cryptography.hazmat.primitives.ciphers import modes\ndef f():\n    return modes.ECB()\n"}, []string{"sast:py/weak-crypto"}},
+		{"php md5 of a password", map[string]string{"a.php": "<?php\n$h = md5($password);\n$k = md5($cacheKey);\n"}, []string{"sast:php/weak-crypto"}},
+		{"php anonymous ldap bind", map[string]string{"a.php": "<?php\nldap_bind($conn);\nldap_bind($conn, 'u', 'p');\n"}, []string{"sast:php/weak-crypto"}},
+		{"php curl url from the request", map[string]string{"a.php": "<?php\ncurl_setopt($ch, CURLOPT_URL, $_POST['u']);\n"}, []string{"sast:php/ssrf"}},
+		{"php file_get_contents of a fixed prefix is not ssrf", map[string]string{"a.php": "<?php\n$d = file_get_contents('/srv/' . $_GET['f']);\n"}, []string{"sast:php/path-traversal"}},
+		{"ruby finder option from params", map[string]string{"a.rb": "class C < ApplicationController\n  def x\n    Product.find(:all, :order => params[:o])\n  end\nend\n"}, []string{"sast:rb/sql-injection"}},
+		{"ruby force_ssl false", map[string]string{"a.rb": "config.force_ssl = false\n"}, []string{"sast:rb/https-not-enforced"}},
+		{"ruby jwt without verify", map[string]string{"a.rb": "def f(t)\n  JWT.decode t, secret, false\nend\n"}, []string{"sast:rb/jwt-unverified"}},
+		{"java weak SSLContext", map[string]string{"A.java": "import javax.net.ssl.SSLContext;\npublic class A {\n  void f() throws Exception { SSLContext.getInstance(\"TLSv1\"); SSLContext.getInstance(\"TLSv1.3\"); }\n}\n"}, []string{"sast:java/tls-verification-disabled"}},
+		{"java NullCipher", map[string]string{"A.java": "public class A {\n  void f() { new javax.crypto.NullCipher(); }\n}\n"}, []string{"sast:java/weak-crypto"}},
+		{"js cookie option off", map[string]string{"a.js": "app.use(session({ cookie: { httpOnly: false } }));\n"}, []string{"sast:js/insecure-cookie"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := analyze(t, tt.files)
+			if !slices.Equal(got, tt.want) {
+				t.Fatalf("got %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestGoCookieLiterals(t *testing.T) {
+	got := analyze(t, map[string]string{"main.go": "package main\nimport \"net/http\"\nfunc a() *http.Cookie { return &http.Cookie{Name: \"s\", Value: \"v\"} }\nfunc b() *http.Cookie { return &http.Cookie{Name: \"s\", Secure: true, HttpOnly: true} }\nfunc c() *http.Cookie { return &http.Cookie{Name: \"s\", MaxAge: -1} }\n"})
+	if !slices.Equal(got, []string{"sast:go/insecure-cookie"}) {
+		t.Fatalf("got %v", got)
+	}
+}

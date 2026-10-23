@@ -64,6 +64,9 @@ func (r *reporter) add(pos token.Pos, ru rule, detail string) {
 	})
 }
 
+var ruleCookieGo = rule{"sast:go/insecure-cookie", "CWE-614", "Cookie is sent without the Secure or HttpOnly flag",
+	"Set Secure and HttpOnly on session and authentication cookies.", finding.SeverityMedium}
+
 const skipVerifyDetail = "InsecureSkipVerify is true, so any certificate is accepted and connections can be intercepted"
 
 func astRules(fset *token.FileSet, p *pkg, rel func(token.Pos) string) []finding.Finding {
@@ -122,6 +125,33 @@ func astRules(fset *token.FileSet, p *pkg, rel func(token.Pos) string) []finding
 					}
 					if why, ok := weakCrypto[name]; ok {
 						r.add(n.Pos(), ruleWeakCrypto, why+" ("+shortName(name)+")")
+					}
+				case *ast.CompositeLit:
+					// http.Cookie{...} and sessions.Options{...} without Secure and HttpOnly.
+					if t := p.info.TypeOf(n); t != nil {
+						ts := types.TypeString(t, nil)
+						if ts == "net/http.Cookie" || strings.HasSuffix(ts, "/sessions.Options") {
+							has := map[string]bool{}
+							deleting := false
+							for _, el := range n.Elts {
+								if kv, ok := el.(*ast.KeyValueExpr); ok {
+									if k, ok := kv.Key.(*ast.Ident); ok {
+										val := isTrue(p.info, kv.Value)
+										has[k.Name] = val
+										if k.Name == "MaxAge" {
+											if tv := p.info.Types[kv.Value]; tv.Value != nil && tv.Value.Kind() == constant.Int {
+												if v, exact := constant.Int64Val(tv.Value); exact && v < 0 {
+													deleting = true // a cookie being removed needs no flags
+												}
+											}
+										}
+									}
+								}
+							}
+							if !deleting && (!has["Secure"] || !has["HttpOnly"]) {
+								r.add(n.Pos(), ruleCookieGo, "the cookie is created without Secure and HttpOnly set to true")
+							}
+						}
 					}
 				case *ast.KeyValueExpr:
 					if k, ok := n.Key.(*ast.Ident); ok {

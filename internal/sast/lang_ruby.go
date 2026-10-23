@@ -409,8 +409,30 @@ func (r *rubyLower) expr(n *node) *expr {
 	case "lambda", "do_block", "block":
 		return r.blockExpr(n)
 	case "pair":
+		key := strings.TrimPrefix(strings.Trim(r.text(r.field(n, "key")), `":`), ":")
+		key = strings.TrimSuffix(key, ":")
+		val := r.expr(r.field(n, "value"))
+		switch key {
+		case "order", "conditions", "group", "having", "joins", "select", "from", "lock":
+			// Product.find(:all, :order => params[:o]): the option is raw SQL.
+			call := r.mk(exprCall, n)
+			fn := r.mk(exprName, n)
+			fn.name = "sqlOption"
+			call.x = fn
+			call.args = []*expr{val}
+			call.kw = []string{""}
+			return call
+		case "session_http_only", "httponly", "http_only", "secure", "session_secure":
+			if v, ok := constText(val); ok && v == "false" {
+				call := r.mk(exprCall, n)
+				fn := r.mk(exprName, n)
+				fn.name = "cookieFlag"
+				call.x = fn
+				return call
+			}
+		}
 		// where(name: x) passes a hash: Other, so a string-only sink skips it.
-		return r.other(n, r.expr(r.field(n, "value")))
+		return r.other(n, val)
 	}
 	e := r.mk(exprOther, n)
 	for _, c := range r.named(n) {

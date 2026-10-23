@@ -136,6 +136,10 @@ type sink struct {
 	// recvUpper also admits receivers rooted at a capitalized name (a model class:
 	// User.findOne), in addition to those listed in recv.
 	recvUpper bool
+	// directFor lists kinds that count only when the argument is the tainted value itself:
+	// file_get_contents($url) fetches an attacker's URL, file_get_contents("/srv/".$name)
+	// does not.
+	directFor kind
 	// direct limits the sink to an argument that is the object itself (req.body), not a
 	// literal that picks fields out of it.
 	direct bool

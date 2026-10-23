@@ -3,6 +3,7 @@ package sast
 import (
 	"fmt"
 	"go/token"
+	"regexp"
 	"strings"
 
 	"github.com/securock/securock/internal/finding"
@@ -26,6 +27,15 @@ type misuse struct {
 	// noKw makes the call unsafe only when this keyword argument is absent:
 	// tarfile.extractall without filter=.
 	noKw string
+	// argc limits the misuse to calls with exactly this many arguments: ldap_bind($conn)
+	// binds anonymously.
+	argc int
+	// missingKw makes the call unsafe when any of these keyword arguments is absent or
+	// false: set_cookie(name, value) without secure=True.
+	missingKw []string
+	// argRe maps an argument index to a pattern its variable name must match:
+	// md5($password) matters, md5($cacheKey) does not.
+	argRe map[int]*regexp.Regexp
 	// recv limits a method misuse to receivers rooted at one of these variable names.
 	recv []string
 }
@@ -63,6 +73,12 @@ var (
 		"Resolve each entry against the destination and reject any that leaves it, or extract with a filter that does (tarfile filter=\"data\").", finding.SeverityHigh}
 	ruleEscape = rule{"sast:go/template-autoescape-disabled", "CWE-79", "Template auto-escaping is turned off",
 		"Leave auto-escaping on and mark individual trusted values as safe instead.", finding.SeverityMedium}
+	ruleHTTPS = rule{"sast:go/https-not-enforced", "CWE-319", "HTTPS is not enforced",
+		"Force TLS (force_ssl, HSTS, a redirect to https) so credentials and cookies never travel in clear text.", finding.SeverityMedium}
+	ruleCipherMisuse = rule{"sast:go/weak-crypto", "CWE-327", "Weak cryptographic primitive",
+		"Use AES-GCM or ChaCha20-Poly1305 with a random nonce, and SHA-256 or better for hashing.", finding.SeverityMedium}
+	ruleDeserCfg = rule{"sast:go/insecure-deserialization", "CWE-502", "Insecure deserialization is configured",
+		"Use a data-only serializer such as JSON.", finding.SeverityHigh}
 	ruleExtract = rule{"sast:go/variable-extraction", "CWE-621", "Request data is imported into the variable scope",
 		"Read the specific parameters you need instead of extract()ing the request.", finding.SeverityHigh}
 )
@@ -114,6 +130,42 @@ func (m misuse) matches(c *expr) bool {
 			return false
 		}
 	}
+	if m.argc != 0 && len(c.args) != m.argc {
+		return false
+	}
+	for i, re := range m.argRe {
+		if i >= len(c.args) {
+			return false
+		}
+		name := ""
+		switch c.args[i].kind {
+		case exprName, exprMember:
+			name = c.args[i].name
+		}
+		if name == "" || !re.MatchString(name) {
+			return false
+		}
+		if len(m.args) == 0 && len(m.kw) == 0 && len(m.missingKw) == 0 {
+			return true
+		}
+	}
+	if len(m.missingKw) > 0 {
+		for _, want := range m.missingKw {
+			ok := false
+			for i, k := range c.kw {
+				if k == want {
+					ok = true
+					if have, isConst := constText(c.args[i]); isConst && (have == "false" || have == "0") {
+						ok = false
+					}
+				}
+			}
+			if !ok {
+				return true
+			}
+		}
+		return false
+	}
 	if m.noKw != "" {
 		for _, k := range c.kw {
 			if k == m.noKw {
@@ -128,6 +180,9 @@ func (m misuse) matches(c *expr) bool {
 				return false
 			}
 		}
+		return true
+	}
+	if m.argc != 0 && len(m.args) == 0 && len(m.kw) == 0 {
 		return true
 	}
 	for i, want := range m.args {

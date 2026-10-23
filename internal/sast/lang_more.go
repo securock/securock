@@ -146,6 +146,36 @@ func cut(s string) (string, string, bool) {
 
 // ensureSets makes the optional tables exist, whichever init runs first.
 func ensureSets(sp *langSpec) {
+	if sp.sinks == nil {
+		sp.sinks = map[string]sink{}
+	}
+	if sp.sanitizers == nil {
+		sp.sanitizers = map[string]kind{}
+	}
+	if sp.builtins == nil {
+		sp.builtins = map[string]bool{}
+	}
+	if sp.misuse == nil {
+		sp.misuse = map[string][]misuse{}
+	}
+	if sp.assignMisuse == nil {
+		sp.assignMisuse = map[string]assignMisuse{}
+	}
+	if sp.simpleTypes == nil {
+		sp.simpleTypes = map[string]string{}
+	}
+	if sp.sourceRoots == nil {
+		sp.sourceRoots = map[string]map[string]string{}
+	}
+	if sp.sourcePrefixes == nil {
+		sp.sourcePrefixes = map[string]string{}
+	}
+	if sp.sourceMethods == nil {
+		sp.sourceMethods = map[string]string{}
+	}
+	if sp.returns == nil {
+		sp.returns = map[string]string{}
+	}
 	if sp.weakRNG == nil {
 		sp.weakRNG = map[string]bool{}
 	}

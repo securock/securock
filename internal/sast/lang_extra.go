@@ -67,10 +67,9 @@ func init() {
 	py.misuse["jwt.decode"] = []misuse{kwm(ruleJWT, "verify=False skips signature verification", map[string]string{"verify": "false"})}
 	py.misuse["tempfile.mktemp"] = []misuse{bare(ruleTempFile, "mktemp returns a name another process can claim first")}
 	py.misuse["os.chmod"] = []misuse{md(ruleWorldWritable, "the mode makes the file writable by everyone", map[int][]string{1: worldBits})}
-	py.misuse["?.set_cookie"] = []misuse{
+	py.misuse["?.set_cookie"] = append(py.misuse["?.set_cookie"],
 		kwm(ruleCookie, "secure=False", map[string]string{"secure": "false"}),
-		kwm(ruleCookie, "httponly=False", map[string]string{"httponly": "false"}),
-	}
+		kwm(ruleCookie, "httponly=False", map[string]string{"httponly": "false"}))
 	py.misuse["lxml.etree.XMLParser"] = []misuse{kwm(ruleXXE, "resolve_entities is enabled", map[string]string{"resolve_entities": "true"})}
 	py.misuse["xml.sax.make_parser"] = nil
 	py.assignMisuse["verify_mode"] = assignMisuse{rule: ruleTLS, detail: "verify_mode is CERT_NONE", vals: []string{"cert_none"}}

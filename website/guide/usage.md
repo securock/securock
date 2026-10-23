@@ -263,7 +263,8 @@ and Ruby (`rb`). Rule ids are `sast:LANGUAGE/RULE`:
 | `jwt-unverified`               | 347  | high     | JS, Python              |
 | `xxe`                          | 611  | high     | Python, Java, PHP, Ruby |
 | `debug-enabled`                | 489  | medium   | Python, PHP, Ruby       |
-| `insecure-cookie`              | 614  | medium   | Python, Java            |
+| `insecure-cookie`              | 614  | medium   | all but Ruby, PHP       |
+| `https-not-enforced`           | 319  | medium   | Ruby                    |
 | `mass-assignment`              | 915  | medium   | JS, Ruby                |
 | `weak-allowlist`               | 601  | medium   | JS, Python, Java, Ruby  |
 | `directory-listing`            | 548  | medium   | JS                      |

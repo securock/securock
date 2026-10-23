@@ -998,8 +998,13 @@ func (r *irRun) checkSink(c *expr, name string, s sink, args []taintSet, recv ta
 		if s.direct && c.args[i].kind != exprName && c.args[i].kind != exprMember && c.args[i].kind != exprIndex {
 			continue
 		}
+		isDirect := c.args[i].kind == exprName || c.args[i].kind == exprMember || c.args[i].kind == exprIndex
 		for _, at := range args[i] {
-			if hit := at.kinds & s.kind; hit != 0 {
+			hit := at.kinds & s.kind
+			if !isDirect {
+				hit &^= s.directFor
+			}
+			if hit != 0 {
 				r.reachSink(c.pos, name, hit, at, nil)
 			}
 		}
