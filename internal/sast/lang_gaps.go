@@ -11,6 +11,8 @@ func init() {
 	js := jsSpec
 	js.misuse["autoescape"] = []misuse{md(ruleEscape, "autoescape is false, so template output is not HTML-escaped", map[int][]string{0: {"=false"}})}
 	js.builtins["autoescape"] = true
+	js.misuse["errorhandler"] = []misuse{bare(ruleDebug, "the errorhandler middleware sends stack traces to the client")}
+	js.builtins["errorhandler"] = true
 	js.misuse["noent"] = []misuse{md(ruleXXE, "noent substitutes external entities", map[int][]string{0: {"=true"}})}
 	js.builtins["noent"] = true
 

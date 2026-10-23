@@ -247,7 +247,32 @@ func (r *irRun) checkMisuse(c *expr, qname, field string) {
 	}
 }
 
+var envName = regexp.MustCompile(`(?i)(isdevelopment|isproduction|isstaging|isdev\b|node_env|app_env|rails_env|flask_env|django_debug|\bdebug\b|environment)`)
+
+// envConditional reports whether a condition asks which environment the code runs in.
+// Debug settings inside such a branch are meant for development and are not reported.
+func envConditional(e *expr) bool {
+	if e == nil {
+		return false
+	}
+	if (e.kind == exprName || e.kind == exprMember || e.kind == exprStr) && envName.MatchString(e.name+e.str) {
+		return true
+	}
+	if envConditional(e.x) {
+		return true
+	}
+	for _, a := range e.args {
+		if envConditional(a) {
+			return true
+		}
+	}
+	return false
+}
+
 func (r *irRun) reportMisuse(pos token.Pos, ru rule, detail string) {
+	if r.devDepth > 0 && strings.HasSuffix(ru.id, "/debug-enabled") {
+		return
+	}
 	l := r.loc(pos)
 	key := fmt.Sprintf("%s|%s|%d|%d", ru.id, l.File, l.Line, l.Column)
 	if _, dup := r.found[key]; dup {

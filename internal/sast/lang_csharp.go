@@ -182,6 +182,8 @@ func init() {
 	for _, cb := range []string{"ServerCertificateValidationCallback", "ServerCertificateCustomValidationCallback", "RemoteCertificateValidationCallback"} {
 		csSpec.assignMisuse[cb] = assignMisuse{rule: ruleTLS, detail: "the certificate check always succeeds", vals: []string{"lambda:true", "dangerousacceptany"}}
 	}
+	csSpec.misuse["?.UseDeveloperExceptionPage"] = []misuse{bare(ruleDebug, "the developer exception page shows stack traces and source to anyone")}
+	csSpec.misuse["?.UseDatabaseErrorPage"] = []misuse{bare(ruleDebug, "the database error page shows queries and schema to anyone")}
 	csSpec.misuse["weakAllowlist"] = []misuse{bare(ruleWeakAllowlist, "the URL is accepted when it merely contains or starts with an allowed one")}
 	csSpec.builtins["weakAllowlist"] = true
 	addBuiltins()

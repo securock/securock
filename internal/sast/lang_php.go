@@ -412,7 +412,7 @@ func (p *phpLower) expr(n *node) *expr {
 			e.args = []*expr{l, r}
 			return e
 		case "==", "===", "!=", "!==", "<", ">", "<=", ">=", "<>":
-			return p.mk(exprNum, n)
+			return p.bin(n, op, l, r)
 		}
 		return p.other(n, l, r)
 	case "unary_op_expression":

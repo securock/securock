@@ -68,3 +68,27 @@ func TestCSharpConfiguration(t *testing.T) {
 		})
 	}
 }
+
+func TestDebugOnlyInDevelopmentIsNotReported(t *testing.T) {
+	tests := []struct {
+		name  string
+		files map[string]string
+		want  []string
+	}{
+		{"cs developer page everywhere", map[string]string{"S.cs": "public class S { void C(IApplicationBuilder app) { app.UseDeveloperExceptionPage(); } }\n"}, []string{"sast:cs/debug-enabled"}},
+		{"cs developer page in development", map[string]string{"S.cs": "public class S { void C(IApplicationBuilder app, IWebHostEnvironment env) { if (env.IsDevelopment()) { app.UseDeveloperExceptionPage(); } } }\n"}, nil},
+		{"cs developer page in else of production", map[string]string{"S.cs": "public class S { void C(IApplicationBuilder app, IWebHostEnvironment env) { if (env.IsProduction()) { app.UseHsts(); } else { app.UseDeveloperExceptionPage(); } } }\n"}, nil},
+		{"js errorhandler everywhere", map[string]string{"a.js": "const errorhandler = require('errorhandler');\napp.use(errorhandler());\n"}, []string{"sast:js/debug-enabled"}},
+		{"js errorhandler outside production", map[string]string{"a.js": "const errorhandler = require('errorhandler');\nif (process.env.NODE_ENV !== 'production') { app.use(errorhandler()); }\n"}, nil},
+		{"flask debug in a main guard that checks the environment", map[string]string{"a.py": "import os\nfrom flask import Flask\napp = Flask(__name__)\nif os.environ.get('FLASK_ENV') == 'development':\n    app.run(debug=True)\n"}, nil},
+		{"flask debug unconditional", map[string]string{"a.py": "from flask import Flask\napp = Flask(__name__)\napp.run(debug=True)\n"}, []string{"sast:py/debug-enabled"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := analyze(t, tt.files)
+			if !slices.Equal(got, tt.want) {
+				t.Fatalf("got %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

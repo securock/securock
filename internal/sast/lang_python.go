@@ -545,6 +545,7 @@ func (p *pyLower) expr(n *node) *expr {
 				not.x = in
 				return not
 			}
+			return p.bin(n, "==", p.expr(cs[0]), p.expr(cs[1]))
 		}
 		return p.mk(exprNum, n)
 	case "lambda":

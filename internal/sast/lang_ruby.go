@@ -388,7 +388,7 @@ func (r *rubyLower) expr(n *node) *expr {
 			}
 			return r.mk(exprNum, n)
 		case "==", "!=", "<", ">", "<=", ">=", "!~", "===":
-			return r.mk(exprNum, n)
+			return r.bin(n, strings.TrimSpace(string(r.src[l.EndByte():rr.StartByte()])), le, re)
 		}
 		return r.other(n, le, re)
 	case "unary":

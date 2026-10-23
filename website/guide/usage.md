@@ -277,6 +277,9 @@ and Ruby (`rb`). Rule ids are `sast:LANGUAGE/RULE`:
 | `world-writable`               | 732  | medium   | all                     |
 | `hardcoded-secret`             | 798  | medium   | Go                      |
 
+`debug-enabled` is not reported inside a branch that asks which environment the code runs in
+(`env.IsDevelopment()`, `NODE_ENV`, `FLASK_ENV`), since that is where debug settings belong.
+
 The `weak-crypto`, `tls-verification-disabled` and similar rules need no untrusted
 data: they flag the call (`hashlib.md5`, `requests.get(verify=False)`,
 `MessageDigest.getInstance("MD5")`, `curl_setopt` with `CURLOPT_SSL_VERIFYPEER`

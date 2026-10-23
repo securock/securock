@@ -259,6 +259,7 @@ type irRun struct {
 	strVars                      map[string]bool   // variables that hold a string built in this function
 	consts                       map[string]int64  // integer variables with a known value on this path
 	strs                         map[string]string // string variables with a known value on this path
+	devDepth                     int               // > 0 inside a branch that depends on the environment (IsDevelopment, NODE_ENV)
 	checked                      map[string]bool
 	xxeFactories                 []token.Pos
 	xxeHardened                  bool
@@ -1212,6 +1213,10 @@ func (r *irRun) stmt(s *stmt, st istate) {
 		}
 	case stmtIf:
 		r.eval(s.cond, st)
+		if envConditional(s.cond) {
+			r.devDepth++
+			defer func() { r.devDepth-- }()
+		}
 		if v, ok := r.constBool(s.cond); ok {
 			// The condition cannot go the other way, so only one branch runs.
 			if v {
