@@ -215,10 +215,13 @@ type impl struct {
 
 // shared holds what every function analysis in a run reads and extends.
 type shared struct {
-	sums    map[string]*summary
-	methods map[string][]impl // method name -> concrete methods, for interface calls
-	globals map[types.Object]taintSet
-	regexps map[types.Object]string
+	// declTypes holds the type as written for each parameter and variable, so a method
+	// call on a value whose package is not available can still be named by the import path.
+	declTypes map[types.Object]ast.Expr
+	sums      map[string]*summary
+	methods   map[string][]impl // method name -> concrete methods, for interface calls
+	globals   map[types.Object]taintSet
+	regexps   map[types.Object]string
 }
 
 type analyzer struct {
@@ -351,6 +354,9 @@ func (a *analyzer) calleeName(fun ast.Expr) (name string, recv ast.Expr) {
 				return normalize(fn.FullName()), f.X
 			}
 		}
+		if name := a.unresolvedMethod(f); name != "" {
+			return name, f.X
+		}
 		return "", f.X
 	}
 	return "", nil
@@ -452,6 +458,43 @@ func (a *analyzer) evalSelector(e *ast.SelectorExpr, st state) taintSet {
 
 // isArchiveEntry reports whether t is a zip or tar entry header, whose Name is attacker
 // chosen.
+// unresolvedMethod names a method call such as c.FindOne(...) when c's type comes from a
+// package that could not be loaded, from the type as it was written: "(*pkg.Type).Method".
+func (a *analyzer) unresolvedMethod(f *ast.SelectorExpr) string {
+	id, ok := f.X.(*ast.Ident)
+	if !ok {
+		return ""
+	}
+	if b, isBasic := a.info.TypeOf(id).(*types.Basic); a.info.TypeOf(id) != nil && !(isBasic && b.Kind() == types.Invalid) {
+		return ""
+	}
+	te := a.declTypes[a.info.Uses[id]]
+	if te == nil {
+		return ""
+	}
+	ptr := false
+	if st, isStar := te.(*ast.StarExpr); isStar {
+		te, ptr = st.X, true
+	}
+	se, ok := te.(*ast.SelectorExpr)
+	if !ok {
+		return ""
+	}
+	pkgID, ok := se.X.(*ast.Ident)
+	if !ok {
+		return ""
+	}
+	pn, ok := a.info.Uses[pkgID].(*types.PkgName)
+	if !ok {
+		return ""
+	}
+	typ := normalize(pn.Imported().Path()) + "." + se.Sel.Name
+	if ptr {
+		return "(*" + typ + ")." + f.Sel.Name
+	}
+	return "(" + typ + ")." + f.Sel.Name
+}
+
 func isArchiveEntry(t types.Type) bool {
 	if t == nil {
 		return false

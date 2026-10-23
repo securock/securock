@@ -61,6 +61,8 @@ var (
 		"Use the narrowest mode that works, such as 0600 for files and 0750 for directories.", finding.SeverityMedium}
 	ruleZipSlip = rule{"sast:go/zip-slip", "CWE-22", "Archive extraction can write outside the target directory",
 		"Resolve each entry against the destination and reject any that leaves it, or extract with a filter that does (tarfile filter=\"data\").", finding.SeverityHigh}
+	ruleEscape = rule{"sast:go/template-autoescape-disabled", "CWE-79", "Template auto-escaping is turned off",
+		"Leave auto-escaping on and mark individual trusted values as safe instead.", finding.SeverityMedium}
 	ruleExtract = rule{"sast:go/variable-extraction", "CWE-621", "Request data is imported into the variable scope",
 		"Read the specific parameters you need instead of extract()ing the request.", finding.SeverityHigh}
 )

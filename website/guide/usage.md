@@ -237,38 +237,39 @@ that reaches a dangerous call along with the path it took. It reads Go,
 JavaScript and TypeScript (`js`), Python (`py`), Java (`java`), PHP (`php`),
 and Ruby (`rb`). Rule ids are `sast:LANGUAGE/RULE`:
 
-| Rule                        | CWE  | Severity | Languages               |
-| --------------------------- | ---- | -------- | ----------------------- |
-| `sql-injection`             | 89   | high     | all                     |
-| `command-injection`         | 78   | high     | all                     |
-| `path-traversal`            | 22   | high     | all                     |
-| `xpath-injection`           | 643  | high     | all but Go              |
-| `ldap-injection`            | 90   | high     | all but Go              |
-| `ssrf`                      | 918  | medium   | all                     |
-| `xss`                       | 79   | medium   | all                     |
-| `open-redirect`             | 601  | medium   | all                     |
-| `regex-injection`           | 1333 | medium   | all but Go              |
-| `nosql-injection`           | 943  | high     | all                     |
-| `prototype-pollution`       | 1321 | high     | JS                      |
-| `zip-slip`                  | 22   | high     | Python                  |
-| `log-injection`             | 117  | low      | all                     |
-| `cors-misconfiguration`     | 942  | medium   | all but PHP, Ruby       |
-| `insecure-random`           | 338  | medium   | all                     |
-| `toctou`                    | 367  | low      | all                     |
-| `code-injection`            | 94   | critical | all but Go              |
-| `insecure-deserialization`  | 502  | high     | all but Go              |
-| `weak-crypto`               | 327  | medium   | all                     |
-| `tls-verification-disabled` | 295  | medium   | all                     |
-| `jwt-unverified`            | 347  | high     | JS, Python              |
-| `xxe`                       | 611  | high     | Python, Java, PHP, Ruby |
-| `debug-enabled`             | 489  | medium   | Python, PHP, Ruby       |
-| `insecure-cookie`           | 614  | medium   | Python, Java            |
-| `mass-assignment`           | 915  | medium   | Ruby                    |
-| `csrf-disabled`             | 352  | medium   | Ruby                    |
-| `variable-extraction`       | 621  | high     | PHP                     |
-| `insecure-temp-file`        | 377  | low      | Python                  |
-| `world-writable`            | 732  | medium   | all                     |
-| `hardcoded-secret`          | 798  | medium   | Go                      |
+| Rule                           | CWE  | Severity | Languages               |
+| ------------------------------ | ---- | -------- | ----------------------- |
+| `sql-injection`                | 89   | high     | all                     |
+| `command-injection`            | 78   | high     | all                     |
+| `path-traversal`               | 22   | high     | all                     |
+| `xpath-injection`              | 643  | high     | all but Go              |
+| `ldap-injection`               | 90   | high     | all but Go              |
+| `ssrf`                         | 918  | medium   | all                     |
+| `xss`                          | 79   | medium   | all                     |
+| `open-redirect`                | 601  | medium   | all                     |
+| `regex-injection`              | 1333 | medium   | all but Go              |
+| `nosql-injection`              | 943  | high     | all                     |
+| `prototype-pollution`          | 1321 | high     | JS                      |
+| `zip-slip`                     | 22   | high     | Python                  |
+| `template-autoescape-disabled` | 79   | medium   | JS, Python              |
+| `log-injection`                | 117  | low      | all                     |
+| `cors-misconfiguration`        | 942  | medium   | all but PHP, Ruby       |
+| `insecure-random`              | 338  | medium   | all                     |
+| `toctou`                       | 367  | low      | all                     |
+| `code-injection`               | 94   | critical | all but Go              |
+| `insecure-deserialization`     | 502  | high     | all but Go              |
+| `weak-crypto`                  | 327  | medium   | all                     |
+| `tls-verification-disabled`    | 295  | medium   | all                     |
+| `jwt-unverified`               | 347  | high     | JS, Python              |
+| `xxe`                          | 611  | high     | Python, Java, PHP, Ruby |
+| `debug-enabled`                | 489  | medium   | Python, PHP, Ruby       |
+| `insecure-cookie`              | 614  | medium   | Python, Java            |
+| `mass-assignment`              | 915  | medium   | Ruby                    |
+| `csrf-disabled`                | 352  | medium   | Ruby                    |
+| `variable-extraction`          | 621  | high     | PHP                     |
+| `insecure-temp-file`           | 377  | low      | Python                  |
+| `world-writable`               | 732  | medium   | all                     |
+| `hardcoded-secret`             | 798  | medium   | Go                      |
 
 The `weak-crypto`, `tls-verification-disabled` and similar rules need no untrusted
 data: they flag the call (`hashlib.md5`, `requests.get(verify=False)`,
@@ -305,6 +306,15 @@ check that keeps the path inside the destination ends it: `filepath.IsLocal`, re
 `..`, a prefix check on a cleaned path, or `startsWith` on a canonical path. Python
 `tarfile.extractall` and `shutil.unpack_archive` without `filter=` are reported as
 `zip-slip`.
+
+`sast:template/unescaped-output` (low) reports a template that prints a value without
+HTML escaping: the `safe` filter in Jinja2, Django and Nunjucks, the `raw` filter in
+Twig, `autoescape off`, EJS `<%-`, Handlebars triple braces, Mustache `&` tags, Blade `!!`
+tags, ERB `<%==`, `raw` and `html_safe`, Pug `!=`, Vue `v-html`, and Angular `[innerHTML]`.
+It is a pattern, not
+dataflow: a raw print of a string literal, an `inspect`ed value or a CSRF token is not
+reported, anything else is. In PHP, a variable called `$html` or `$output` is treated as
+a page buffer, so appending request data to it is reported as `xss`.
 
 `sast:secrets/*` reports credentials in any text file, not only source: provider
 tokens by their fixed shape (AWS, GitHub, GitLab, Slack, Stripe, Google, npm,

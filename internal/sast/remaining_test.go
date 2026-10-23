@@ -85,3 +85,95 @@ func TestRemainingChecks(t *testing.T) {
 		})
 	}
 }
+
+func TestGapsFoundOnRealApplications(t *testing.T) {
+	tests := []struct {
+		name  string
+		files map[string]string
+		want  []string
+	}{
+		{"php $html collects output that a template prints", map[string]string{"a.php": "<?php\n$html .= '<p>Hello ' . $_GET['name'] . '</p>';\n"}, []string{"sast:php/xss"}},
+		{"php $html with an escaped value", map[string]string{"a.php": "<?php\n$html .= '<p>Hello ' . htmlspecialchars($_GET['name']) . '</p>';\n"}, nil},
+		{"py xml.sax external entities", map[string]string{"a.py": "from xml.sax import make_parser\nfrom xml.sax.handler import feature_external_ges\ndef f():\n    p = make_parser()\n    p.setFeature(feature_external_ges, True)\n"}, []string{"sast:py/xxe"}},
+		{"py xml.sax external entities off", map[string]string{"a.py": "from xml.sax import make_parser\nfrom xml.sax.handler import feature_external_ges\ndef f():\n    p = make_parser()\n    p.setFeature(feature_external_ges, False)\n"}, nil},
+		{"py class-based view", map[string]string{"a.py": "from django.views import View\nclass V(View):\n    def get(self, request):\n        return self.db.execute(\"SELECT '\" + self.request.GET['n'] + \"'\")\n"}, []string{"sast:py/sql-injection"}},
+		{"ruby scope lambda", map[string]string{"model.rb": "class Analytics < ApplicationRecord\n  scope :hits, ->(ip, col = \"*\") { select(\"#{col}\").where(ip: ip) }\nend\n", "ctl.rb": "class AdminController < ApplicationController\n  def index\n    @a = Analytics.hits(params[:ip], params[:fields])\n  end\nend\n"}, []string{"sast:rb/sql-injection"}},
+		{"ruby try with a request-chosen method", map[string]string{"a.rb": "class C < ApplicationController\n  def x\n    self.try(params[:graph])\n  end\nend\n"}, []string{"sast:rb/code-injection"}},
+		{"js table dispatch on a request key", map[string]string{"a.js": "const handlers = { a: () => 1 };\napp.get('/', (req, res) => { handlers[req.query.action](); });\n"}, []string{"sast:js/code-injection"}},
+		{"js autoescape off", map[string]string{"a.js": "const swig = require('swig');\nswig.setDefaults({ autoescape: false });\n"}, []string{"sast:js/template-autoescape-disabled"}},
+		{"js autoescape on", map[string]string{"a.js": "const swig = require('swig');\nswig.setDefaults({ autoescape: true });\n"}, nil},
+		{"py jinja Environment autoescape False", map[string]string{"a.py": "from jinja2 import Environment\nenv = Environment(autoescape=False)\n"}, []string{"sast:py/template-autoescape-disabled"}},
+		{"php call_user_func with the request", map[string]string{"a.php": "<?php\ncall_user_func($_GET['fn']);\n"}, []string{"sast:php/code-injection"}},
+		{"java Class.forName", map[string]string{"A.java": "import javax.servlet.http.*;\npublic class A {\n  void f(HttpServletRequest req) throws Exception { Class.forName(req.getParameter(\"c\")); }\n}\n"}, []string{"sast:java/code-injection"}},
+		{"python getattr with a request name", map[string]string{"a.py": "import handlers\nfrom flask import request\ndef f():\n    return getattr(handlers, request.args['a'])()\n"}, []string{"sast:py/code-injection"}},
+
+		// template files
+		{"jinja |safe", map[string]string{"templates/p.html": "<p>{{ comment|safe }}</p>\n"}, []string{"sast:template/unescaped-output"}},
+		{"jinja default escaping", map[string]string{"templates/p.html": "<p>{{ comment }}</p>\n"}, nil},
+		{"jinja |safe on a literal", map[string]string{"templates/p.html": "<p>{{ '<b>hi</b>'|safe }}</p>\n"}, nil},
+		{"ejs unescaped", map[string]string{"views/p.ejs": "<div><%- body %></div>\n"}, []string{"sast:template/unescaped-output"}},
+		{"ejs escaped", map[string]string{"views/p.ejs": "<div><%= body %></div>\n"}, nil},
+		{"handlebars triple", map[string]string{"views/p.hbs": "<div>{{{ body }}}</div>\n"}, []string{"sast:template/unescaped-output"}},
+		{"blade raw", map[string]string{"views/p.blade.php": "<div>{!! $body !!}</div>\n"}, []string{"sast:template/unescaped-output"}},
+		{"erb raw and html_safe", map[string]string{"views/p.html.erb": "<%= raw @body %>\n<%= @x.html_safe %>\n"}, []string{"sast:template/unescaped-output", "sast:template/unescaped-output"}},
+		{"erb html_safe on a literal or an inspected value", map[string]string{"views/p.html.erb": "<%= u.admin ? '<i class=\"ok\"></i>'.html_safe : 'x'.html_safe %>\n<%= path.inspect.html_safe %>\n"}, nil},
+		{"jinja csrf token marked safe", map[string]string{"templates/p.html": "<script>const t = \"{{ csrf_token|safe }}\";</script>\n"}, nil},
+		{"vue v-html", map[string]string{"src/C.vue": "<template><div v-html=\"body\"></div></template>\n"}, []string{"sast:template/unescaped-output"}},
+		{"not-equal in an html inline script is not pug", map[string]string{"index.html": "<script>\nif (a != b) { go(); }\n</script>\n"}, nil},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := analyze(t, tt.files)
+			if !slices.Equal(got, tt.want) {
+				t.Fatalf("got %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestFallbackOperatorsKeepTaint(t *testing.T) {
+	tests := []struct {
+		name  string
+		files map[string]string
+		want  []string
+	}{
+		{"js or", map[string]string{"a.js": "app.get('/', (req, res) => { const q = req.query.q || ''; db.query('SELECT ' + q); });\n"}, []string{"sast:js/sql-injection"}},
+		{"js nullish", map[string]string{"a.js": "app.get('/', (req, res) => { const q = req.query.q ?? 'x'; db.query('SELECT ' + q); });\n"}, []string{"sast:js/sql-injection"}},
+		{"js and", map[string]string{"a.js": "app.get('/', (req, res) => { const q = req.query.ok && req.query.q; db.query('SELECT ' + q); });\n"}, []string{"sast:js/sql-injection"}},
+		{"py or", map[string]string{"a.py": "from flask import request\ndef f(cur):\n    q = request.args.get('q') or ''\n    cur.execute('SELECT ' + q)\n"}, []string{"sast:py/sql-injection"}},
+		{"php null coalescing", map[string]string{"a.php": "<?php\n$q = $_GET['q'] ?? '';\nmysqli_query($c, \"SELECT \" . $q);\n"}, []string{"sast:php/sql-injection"}},
+		{"ruby or", map[string]string{"a.rb": "class C < ApplicationController\n  def x\n    q = params[:q] || ''\n    User.find_by_sql(\"SELECT #{q}\")\n  end\nend\n"}, []string{"sast:rb/sql-injection"}},
+		{"js or with constants stays clean", map[string]string{"a.js": "app.get('/', (req, res) => { const q = limit || 'x'; db.query('SELECT ' + q); });\n"}, nil},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := slices.Compact(analyze(t, tt.files))
+			if !slices.Equal(got, tt.want) {
+				t.Fatalf("got %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestDestructuredHandlerAndXMLOptions(t *testing.T) {
+	tests := []struct {
+		name  string
+		files map[string]string
+		want  []string
+	}{
+		{"typed destructured request", map[string]string{"a.ts": "import { type Request, type Response } from 'express'\nexport function h () {\n  return ({ query }: Request, res: Response) => {\n    const to: string = query.to as string\n    res.redirect(to)\n  }\n}\n"}, []string{"sast:js/open-redirect"}},
+		{"destructured with a response sibling", map[string]string{"a.js": "app.get('/', ({ query, body }, res) => { res.redirect(query.next); });\n"}, []string{"sast:js/open-redirect"}},
+		{"renamed destructuring", map[string]string{"a.js": "app.get('/', ({ query: q }, res) => { res.redirect(q.next); });\n"}, []string{"sast:js/open-redirect"}},
+		{"destructuring something that is not a handler", map[string]string{"a.js": "function search({ query }, options) { return db.query('SELECT ' + query); }\n"}, nil},
+		{"libxmljs noent", map[string]string{"a.js": "const libxml = require('libxmljs');\nfunction f(d) { return libxml.parseXml(d, { noent: true }); }\n"}, []string{"sast:js/xxe"}},
+		{"libxmljs default", map[string]string{"a.js": "const libxml = require('libxmljs');\nfunction f(d) { return libxml.parseXml(d); }\n"}, nil},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := slices.Compact(analyze(t, tt.files))
+			if !slices.Equal(got, tt.want) {
+				t.Fatalf("got %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

@@ -112,13 +112,15 @@ func taint(fset *token.FileSet, root string, pkgs []*pkg, mods []*module, rel fu
 		}
 	}
 	sh := &shared{
-		sums:    map[string]*summary{},
-		methods: map[string][]impl{},
-		globals: map[types.Object]taintSet{},
-		regexps: map[types.Object]string{},
+		declTypes: map[types.Object]ast.Expr{},
+		sums:      map[string]*summary{},
+		methods:   map[string][]impl{},
+		globals:   map[types.Object]taintSet{},
+		regexps:   map[types.Object]string{},
 	}
 	for _, p := range pkgs {
 		collectRegexps(p.files, p.info, sh.regexps)
+		collectDeclTypes(p, sh.declTypes)
 	}
 	for _, f := range fns {
 		if f.decl.Recv == nil {
@@ -210,6 +212,10 @@ func load(fset *token.FileSet, root string) ([]*pkg, []*module, []finding.Findin
 			}
 			if !lowValue && !skippedFile(name) && !strings.HasSuffix(name, "_test.go") {
 				incomplete = append(incomplete, scanSecrets(root, full, relPath(root, full), name)...)
+			}
+			if !lowValue && isTemplate(name) {
+				incomplete = append(incomplete, scanTemplate(root, full, relPath(root, full))...)
+				continue
 			}
 			if kind := iacKind(relPath(root, full), name); kind != "" && !lowValue {
 				incomplete = append(incomplete, scanIaC(root, full, relPath(root, full), kind)...)
@@ -451,4 +457,41 @@ func dedupeSecrets(in []finding.Finding) []finding.Finding {
 		out = append(out, f)
 	}
 	return out
+}
+
+// collectDeclTypes records the written type of every parameter, result and declared
+// variable.
+func collectDeclTypes(p *pkg, into map[types.Object]ast.Expr) {
+	add := func(fl *ast.FieldList) {
+		if fl == nil {
+			return
+		}
+		for _, f := range fl.List {
+			for _, n := range f.Names {
+				if o := p.info.Defs[n]; o != nil {
+					into[o] = f.Type
+				}
+			}
+		}
+	}
+	for _, f := range p.files {
+		ast.Inspect(f, func(n ast.Node) bool {
+			switch n := n.(type) {
+			case *ast.FuncType:
+				add(n.Params)
+				add(n.Results)
+			case *ast.FuncDecl:
+				add(n.Recv)
+			case *ast.ValueSpec:
+				if n.Type != nil {
+					for _, name := range n.Names {
+						if o := p.info.Defs[name]; o != nil {
+							into[o] = n.Type
+						}
+					}
+				}
+			}
+			return true
+		})
+	}
 }

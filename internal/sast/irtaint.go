@@ -37,6 +37,9 @@ type langSpec struct {
 	self map[string]bool
 	// shells are executables that parse their argument as a command line.
 	shells map[string]bool
+	// nameSinks are variables that collect output the framework later writes to the
+	// page, such as $html in PHP code that is included into a template.
+	nameSinks map[string]kind
 	// assignSinks are members that are dangerous to assign to: el.innerHTML = x.
 	assignSinks map[string]kind
 	// mutators are methods that add their arguments to the receiver: sb.append(x),
@@ -360,7 +363,13 @@ func (m *module) fieldType(class, name string) (string, bool) {
 func (r *irRun) resolve(fn *expr, st istate) (qname string, recv *expr, field string) {
 	switch fn.kind {
 	case exprName:
-		return r.qualified(fn, st), nil, ""
+		if q := r.qualified(fn, st); q != "" {
+			return q, nil, ""
+		}
+		if r.spec.name == "rb" {
+			return "?." + fn.name, nil, fn.name
+		}
+		return "", nil, ""
 	case exprMember:
 		if q := r.qualified(fn, st); q != "" {
 			return q, nil, fn.name
@@ -411,7 +420,15 @@ func (r *irRun) eval(e *expr, st istate) taintSet {
 		r.walkFn(e.fn, st, nil)
 	case exprNot:
 		r.eval(e.x, st)
-	case exprAnd, exprOr, exprIn:
+	case exprAnd, exprOr:
+		// `a || b` and `a ?? b` evaluate to one of their operands, so they carry the
+		// taint of both: const q = req.query.q || "" is still request data.
+		out := r.eval(e.x, st)
+		for _, a := range e.args {
+			out = merge(out, r.eval(a, st))
+		}
+		return out
+	case exprIn:
 		r.eval(e.x, st)
 		for _, a := range e.args {
 			r.eval(a, st)
@@ -424,15 +441,24 @@ func (r *irRun) eval(e *expr, st istate) taintSet {
 // own table is more specific than the generic prefix of the module it was imported from
 // (flask.request.form is a string, flask.request.json an object).
 func (r *irRun) rootSource(e *expr) (string, bool) {
-	first := e
-	for first.kind == exprMember && first.x != nil && first.x.kind == exprMember {
-		first = first.x
+	// Collect the chain a.b.c from the base variable outward.
+	var chain []string
+	x := e
+	for x != nil && x.kind == exprMember {
+		chain = append(chain, x.name)
+		x = x.x
 	}
-	if first.kind == exprMember && first.x != nil && first.x.kind == exprName && !r.shadow[first.x.name] {
-		d, ok := r.spec.sourceRoots[first.x.name][first.name]
-		return d, ok
+	if x == nil || x.kind != exprName || r.shadow[x.name] || len(chain) == 0 {
+		return "", false
 	}
-	return "", false
+	slices.Reverse(chain)
+	base := x.name
+	// self.request.GET in a class-based view is the same request object.
+	if r.spec.self[base] && chain[0] == "request" && len(chain) > 1 {
+		base, chain = "request", chain[1:]
+	}
+	d, ok := r.spec.sourceRoots[base][chain[0]]
+	return d, ok
 }
 
 func (r *irRun) evalMember(e *expr, st istate) taintSet {
@@ -504,6 +530,14 @@ func (r *irRun) evalCall(e *expr, st istate) taintSet {
 	}
 	r.checkMisuse(e, qname, field)
 	r.checkExtras(e, qname, field, fn, st)
+	if fn.kind == exprIndex && len(fn.args) > 0 && r.spec.name != "php" {
+		// handlers[req.query.action](): the request picks which function runs.
+		for _, at := range r.eval(fn.args[0], st) {
+			if hit := at.kinds & kCode; hit != 0 {
+				r.reachSink(e.pos, "dynamic call", hit, at, nil)
+			}
+		}
+	}
 	if fn.kind == exprMember && r.spec.mutators[fn.name] {
 		var added taintSet
 		for _, t := range args {
@@ -576,11 +610,13 @@ func (r *irRun) lookupSink(qname string, recv *expr, field string) (sink, string
 	if s, ok := r.spec.sinks[qname]; ok && !strings.HasPrefix(qname, "?.") {
 		return s, qname, true
 	}
-	if recv == nil || field == "" {
+	// A Ruby call with no receiver is a call on self (select(...) inside a scope).
+	implicitSelf := recv == nil && r.spec.name == "rb" && field != ""
+	if (recv == nil && !implicitSelf) || field == "" {
 		return sink{}, "", false
 	}
 	s, ok := r.spec.sinks["?."+field]
-	if !ok {
+	if !ok || (implicitSelf && (len(s.recv) > 0 || s.recvUpper)) {
 		return sink{}, "", false
 	}
 	if len(s.recv) > 0 || s.recvUpper {
@@ -909,6 +945,15 @@ func (r *irRun) stmt(s *stmt, st istate) {
 			r.checkAssignMisuse(l, s.rhs)
 			if l.kind == exprName && !s.binds {
 				r.shadow[l.name] = true
+			}
+			if l.kind == exprName {
+				if k, ok := r.spec.nameSinks[l.name]; ok {
+					for _, at := range t {
+						if hit := at.kinds & k; hit != 0 {
+							r.reachSink(l.pos, "$"+l.name, hit, at, nil)
+						}
+					}
+				}
 			}
 			if l.kind == exprMember {
 				if k, ok := r.spec.assignSinks[l.name]; ok {

@@ -59,3 +59,16 @@ func TestNoSQLPrototypeAndZipSlip(t *testing.T) {
 		})
 	}
 }
+
+func TestGoUnresolvedPackageStillMatchesSinks(t *testing.T) {
+	// go.mongodb.org/mongo-driver is not available, so Collection's methods cannot be
+	// resolved by type. The call is still named from the type as it was written.
+	got := analyze(t, map[string]string{"main.go": "package main\nimport (\n\t\"encoding/json\"\n\t\"net/http\"\n\t\"go.mongodb.org/mongo-driver/bson\"\n\t\"go.mongodb.org/mongo-driver/mongo\"\n)\nfunc h(c *mongo.Collection, r *http.Request) {\n\tvar f bson.M\n\tjson.NewDecoder(r.Body).Decode(&f)\n\tc.FindOne(r.Context(), f)\n}\n"})
+	if !slices.Equal(got, []string{"sast:go/nosql-injection"}) {
+		t.Fatalf("got %v", got)
+	}
+	got = analyze(t, map[string]string{"main.go": "package main\nimport (\n\t\"net/http\"\n\t\"go.mongodb.org/mongo-driver/bson\"\n\t\"go.mongodb.org/mongo-driver/mongo\"\n)\nfunc h(c *mongo.Collection, r *http.Request) {\n\tc.FindOne(r.Context(), bson.M{\"name\": r.FormValue(\"n\")})\n}\n"})
+	if len(got) != 0 {
+		t.Fatalf("a form value is always a string: got %v", got)
+	}
+}

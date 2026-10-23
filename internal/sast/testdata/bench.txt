@@ -1471,8 +1471,8 @@ function build() {
   return db.query("SELECT * FROM t ORDER BY " + params.sort);
 }
 
-=== js/gap-promise-chain
-// gap: sast:js/sql-injection
+=== js/sqli-promise-chain
+// want: sast:js/sql-injection
 app.get('/u', (req, res) => {
   Promise.resolve(req.query.id).then(id => db.query("SELECT " + id));
 });
@@ -1663,8 +1663,8 @@ def users(cur):
 def build(cur, name):
     cur.execute("SELECT * FROM users WHERE name = '" + name + "'")
 
-=== py/gap-getattr-dispatch
-# gap: sast:py/code-injection
+=== py/unsafe-reflection-getattr
+# want: sast:py/code-injection
 from flask import request
 import handlers
 
@@ -2567,3 +2567,96 @@ func Clear(path string) {
 		os.Remove(path)
 	}
 }
+
+=== js/sqli-or-default
+// want: sast:js/sql-injection
+app.get('/search', (req, res) => {
+  const q = req.query.q || '';
+  db.query("SELECT * FROM products WHERE name LIKE '%" + q + "%'");
+  res.end();
+});
+
+=== ts/sqli-sequelize-template-literal
+// want: sast:js/sql-injection
+import { type Request, type Response, type NextFunction } from 'express'
+export function search () {
+  return (req: Request, res: Response, next: NextFunction) => {
+    let criteria: any = req.query.q === 'undefined' ? '' : req.query.q ?? ''
+    criteria = (criteria.length <= 200) ? criteria : criteria.substring(0, 200)
+    models.sequelize.query(`SELECT * FROM Products WHERE name LIKE '%${criteria}%'`)
+  }
+}
+
+=== ts/redirect-destructured-request
+// want: sast:js/open-redirect
+import { type Request, type Response, type NextFunction } from 'express'
+export function redirect () {
+  return ({ query }: Request, res: Response, next: NextFunction) => {
+    res.redirect(query.to as string)
+  }
+}
+
+=== js/nosql-where-constructor-function
+// want: sast:js/nosql-injection
+--- dao.js
+function AllocationsDAO(db) {
+  this.byThreshold = (id, threshold, cb) => {
+    db.collection('allocations').find({ $where: `this.userId == ${id} && this.stocks > '${threshold}'` }).toArray(cb);
+  };
+}
+module.exports = AllocationsDAO;
+--- route.js
+const AllocationsDAO = require('./dao');
+function Handler(db) {
+  const dao = new AllocationsDAO(db);
+  this.show = (req, res) => { dao.byThreshold(1, req.query.threshold, () => {}); };
+}
+
+=== php/xss-html-buffer
+// want: sast:php/xss
+<?php
+$html = '';
+if (isset($_GET['name'])) {
+    $html .= '<pre>Hello ' . $_GET['name'] . '</pre>';
+}
+
+=== php/safe-html-buffer-escaped
+// want: none
+<?php
+$html = '';
+if (isset($_GET['name'])) {
+    $html .= '<pre>Hello ' . htmlspecialchars($_GET['name']) . '</pre>';
+}
+
+=== rb/sqli-rails-scope
+# want: sast:rb/sql-injection
+--- model.rb
+class Analytics < ApplicationRecord
+  scope :hits_by_ip, ->(ip, col = "*") { select("#{col}").where(ip_address: ip) }
+end
+--- ctl.rb
+class AdminController < ApplicationController
+  def analytics
+    @a = Analytics.hits_by_ip(params[:ip], params[:fields])
+  end
+end
+
+=== py/xxe-sax-external-ges
+# want: sast:py/xxe
+from xml.sax import make_parser
+from xml.sax.handler import feature_external_ges
+
+def parse(data):
+    p = make_parser()
+    p.setFeature(feature_external_ges, True)
+    return p
+
+=== html/template-safe-filter
+# want: sast:template/unescaped-output
+--- templates/comment.html
+<div class="comment">{{ comment.body|safe }}</div>
+
+=== html/template-default-escaping
+# want: none
+--- templates/comment.html
+<div class="comment">{{ comment.body }}</div>

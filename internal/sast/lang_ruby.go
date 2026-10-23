@@ -115,6 +115,12 @@ func (r *rubyLower) body(n *node) []*stmt {
 	switch r.kind(n) {
 	case "body_statement", "then", "else", "do_block", "begin", "block_body":
 		return r.stmts(r.named(n))
+	case "block":
+		// A lambda's body is a block that wraps the statements.
+		if b := r.field(n, "body"); b != nil {
+			return r.body(b)
+		}
+		return r.stmts(r.named(n))
 	}
 	return r.stmt(n)
 }
@@ -235,11 +241,50 @@ func (r *rubyLower) classDef(n *node) {
 			r.method(c)
 		case "class", "module":
 			r.classDef(c)
+		case "call":
+			if r.scopeDef(c) {
+				continue
+			}
+			r.mod.top = append(r.mod.top, r.stmt(c)...)
 		default:
 			// Class-body statements such as skip_before_action run once, at load time.
 			r.mod.top = append(r.mod.top, r.stmt(c)...)
 		}
 	}
+}
+
+// scopeDef registers a Rails scope as a class method: scope :name, ->(args) { body }.
+func (r *rubyLower) scopeDef(n *node) bool {
+	if r.text(r.field(n, "method")) != "scope" {
+		return false
+	}
+	args := r.named(r.field(n, "arguments"))
+	if len(args) < 2 || r.kind(args[0]) != "simple_symbol" {
+		return false
+	}
+	var lambda *expr
+	switch r.kind(args[1]) {
+	case "lambda":
+		lambda = r.blockExpr(args[1])
+	case "call":
+		if r.text(r.field(args[1], "method")) == "lambda" || r.text(r.field(args[1], "method")) == "proc" {
+			if b := r.field(args[1], "block"); b != nil {
+				lambda = r.blockExpr(b)
+			}
+		}
+	}
+	if lambda == nil || lambda.fn == nil {
+		return false
+	}
+	f := lambda.fn
+	f.name, f.class, f.pos = strings.TrimPrefix(r.text(args[0]), ":"), r.class, r.pos(n)
+	if len(f.body) > 0 {
+		if last := f.body[len(f.body)-1]; last.kind == stmtExpr {
+			last.kind = stmtReturn
+		}
+	}
+	r.mod.funcs = append(r.mod.funcs, f)
+	return true
 }
 
 func (r *rubyLower) method(n *node) {

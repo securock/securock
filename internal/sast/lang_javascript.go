@@ -532,7 +532,72 @@ func (j *jsLower) function(n *node, name string) *funcIR {
 	if b := j.field(n, "body"); b != nil && j.kind(b) != "statement_block" {
 		f.body = []*stmt{{kind: stmtReturn, pos: j.pos(b), rhs: j.expr(b)}}
 	}
+	f.body = append(j.requestDestructuring(j.field(n, "parameters")), f.body...)
 	return f
+}
+
+var requestMembers = map[string]bool{"query": true, "body": true, "params": true, "headers": true, "cookies": true}
+
+// requestDestructuring handles an Express handler written ({ query, body }, res) => ...:
+// each destructured name is read from the request object, so it is request data.
+func (j *jsLower) requestDestructuring(params *node) []*stmt {
+	if params == nil {
+		return nil
+	}
+	ps := j.named(params)
+	if len(ps) == 0 {
+		return nil
+	}
+	var pat *node
+	handler := false
+	switch j.kind(ps[0]) {
+	case "object_pattern":
+		pat = ps[0]
+	case "required_parameter":
+		pat = j.field(ps[0], "pattern")
+		if t := j.field(ps[0], "type"); t != nil && strings.Contains(j.text(t), "Request") {
+			handler = true
+		}
+	}
+	if pat == nil || j.kind(pat) != "object_pattern" {
+		return nil
+	}
+	for _, p := range ps[1:] {
+		name := j.text(p)
+		if pt := j.field(p, "pattern"); pt != nil {
+			name = j.text(pt)
+		}
+		switch strings.TrimPrefix(strings.TrimSpace(name), "_") {
+		case "res", "response", "reply", "next":
+			handler = true
+		}
+	}
+	if !handler {
+		return nil
+	}
+	var out []*stmt
+	for _, c := range j.named(pat) {
+		prop, local := "", ""
+		switch j.kind(c) {
+		case "shorthand_property_identifier_pattern":
+			prop = j.text(c)
+			local = prop
+		case "pair_pattern":
+			prop = strings.Trim(j.text(j.field(c, "key")), `"'`)
+			local = j.text(j.field(c, "value"))
+		}
+		if !requestMembers[prop] || local == "" {
+			continue
+		}
+		req := j.mk(exprName, c)
+		req.name = "req"
+		src := j.mk(exprMember, c)
+		src.x, src.name = req, prop
+		name := j.mk(exprName, c)
+		name.name = local
+		out = append(out, &stmt{kind: stmtAssign, pos: j.pos(c), lhs: []*expr{name}, rhs: src, binds: true})
+	}
+	return out
 }
 
 func (j *jsLower) classDecl(n *node) {
@@ -717,6 +782,15 @@ func (j *jsLower) expr(n *node) *expr {
 			call.kw = []string{""}
 			return call
 		}
+		if key := strings.Trim(j.text(j.field(n, "key")), `"'`); key == "autoescape" || key == "noent" {
+			call := j.mk(exprCall, n)
+			fn := j.mk(exprName, n)
+			fn.name = key
+			call.x = fn
+			call.args = []*expr{j.expr(j.field(n, "value"))}
+			call.kw = []string{""}
+			return call
+		}
 		// { rejectUnauthorized: false } is a call to a misuse check; any other pair is
 		// just its value.
 		if j.text(j.field(n, "key")) == "rejectUnauthorized" {
@@ -793,7 +867,7 @@ func (j *jsLower) call(n *node, k exprKind, fn *node) *expr {
 	// ids.map(id => ...): the callback's first parameter is an element of the receiver.
 	if k == exprCall && e.x.kind == exprMember {
 		switch e.x.name {
-		case "map", "forEach", "filter", "flatMap", "some", "every", "find", "findIndex":
+		case "map", "forEach", "filter", "flatMap", "some", "every", "find", "findIndex", "then", "catch", "finally":
 			for _, a := range e.args {
 				if a.kind == exprLambda {
 					bindCallback(a, e.x.x)
