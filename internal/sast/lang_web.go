@@ -48,6 +48,8 @@ func init() {
 	for _, k := range []string{"algorithms", "secretOrKey", "nodeIntegration", "contextIsolation", "webSecurity", "allowRunningInsecureContent"} {
 		js.builtins[k] = true
 	}
+	js.misuse["sessionSecret"] = []misuse{{rule: ruleHardKey, detail: "the session secret is a string literal", literal: map[int]bool{0: true}}}
+	js.builtins["sessionSecret"] = true
 	// Headless browsers fetch and render whatever they are given: puppeteer and playwright
 	// pages, wkhtmltopdf and PhantomJS.
 	pages := []string{"page", "tab", "frame", "mainFrame", "newPage"}

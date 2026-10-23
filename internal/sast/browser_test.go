@@ -84,6 +84,8 @@ func TestJSObjectOptionChecks(t *testing.T) {
 		{"pinned algorithms", "const jwt = require('jsonwebtoken');\nfunction f(t, k) { return jwt.verify(t, k, { algorithms: ['RS256'] }); }", nil},
 		{"passport secretOrKey literal", "const { Strategy } = require('passport-jwt');\nnew Strategy({ secretOrKey: 'HARDCODED-SECRET' }, () => {});", []string{"sast:js/hardcoded-signing-key"}},
 		{"passport secretOrKey from env", "const { Strategy } = require('passport-jwt');\nnew Strategy({ secretOrKey: process.env.JWT_SECRET }, () => {});", nil},
+		{"session secret literal", "const session = require('express-session');\napp.use(session({ secret: 'keyboard cat', resave: false, saveUninitialized: true }));", []string{"sast:js/hardcoded-signing-key"}},
+		{"session secret from env", "const session = require('express-session');\napp.use(session({ secret: process.env.SESSION_SECRET, resave: false, saveUninitialized: true }));", nil},
 		{"electron nodeIntegration", "new BrowserWindow({ webPreferences: { nodeIntegration: true } });", []string{"sast:js/electron-insecure-window"}},
 		{"electron contextIsolation off", "new BrowserWindow({ webPreferences: { contextIsolation: false } });", []string{"sast:js/electron-insecure-window"}},
 		{"electron secure defaults", "new BrowserWindow({ webPreferences: { nodeIntegration: false, contextIsolation: true, webSecurity: true } });", nil},

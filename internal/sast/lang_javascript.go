@@ -769,19 +769,35 @@ func (j *jsLower) expr(n *node) *expr {
 	case "object":
 		// { origin: true, credentials: true } hands credentials to any website.
 		e := j.mk(exprOther, n)
-		var origin, creds *node
+		var origin, creds, secret *node
+		sessionOpts := false
 		for _, c := range j.named(n) {
 			if x := j.expr(c); x != nil {
 				e.args = append(e.args, x)
 			}
 			if j.kind(c) == "pair" {
 				switch strings.Trim(j.text(j.field(c, "key")), `"'`) {
+				case "secret":
+					secret = j.field(c, "value")
+				case "resave", "saveUninitialized":
+					sessionOpts = true
 				case "origin":
 					origin = j.field(c, "value")
 				case "credentials":
 					creds = j.field(c, "value")
 				}
 			}
+		}
+		// express-session options: { secret: "...", resave: false } signs the session
+		// cookie with a key anyone who reads the source knows.
+		if secret != nil && sessionOpts {
+			call := j.mk(exprCall, n)
+			fn := j.mk(exprName, n)
+			fn.name = "sessionSecret"
+			call.x = fn
+			call.args = []*expr{j.expr(secret)}
+			call.kw = []string{""}
+			e.args = append(e.args, call)
 		}
 		// {role: "system", content: x} and {system: x}: request data in an LLM's instructions.
 		var role, content *node
