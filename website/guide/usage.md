@@ -311,6 +311,12 @@ check that keeps the path inside the destination ends it: `filepath.IsLocal`, re
 `tarfile.extractall` and `shutil.unpack_archive` without `filter=` are reported as
 `zip-slip`.
 
+`sast:config/*` reports unsafe Spring Boot settings in `application*.properties` and
+`application*.yml`: every actuator endpoint exposed over HTTP, the H2 console enabled,
+stack traces or exception messages returned to clients, TLS or CSRF switched off, and
+debug or DevTools left on. Java's `getProperty("key", "default")` also reads these
+files, so an algorithm named in a properties file is checked.
+
 `sast:template/unescaped-output` (low) reports a template that prints a value without
 HTML escaping: the `safe` filter in Jinja2, Django and Nunjucks, the `raw` filter in
 Twig, `autoescape off`, EJS `<%-`, Handlebars triple braces, Mustache `&` tags, Blade `!!`

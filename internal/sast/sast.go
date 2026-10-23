@@ -215,6 +215,9 @@ func load(fset *token.FileSet, root string) ([]*pkg, []*module, map[string]strin
 			if strings.HasSuffix(strings.ToLower(name), ".properties") {
 				readProperties(full, props)
 			}
+			if isSpringConfig(name) && !lowValue {
+				incomplete = append(incomplete, scanSpringConfig(full, relPath(root, full))...)
+			}
 			if !lowValue && !skippedFile(name) && !strings.HasSuffix(name, "_test.go") {
 				incomplete = append(incomplete, scanSecrets(root, full, relPath(root, full), name)...)
 			}

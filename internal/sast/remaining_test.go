@@ -318,3 +318,24 @@ func TestAlgorithmFromPropertiesAndConstants(t *testing.T) {
 		t.Fatalf("got %v", got)
 	}
 }
+
+func TestSpringConfig(t *testing.T) {
+	tests := []struct {
+		name  string
+		files map[string]string
+		want  []string
+	}{
+		{"properties", map[string]string{"application.properties": "management.endpoints.web.exposure.include=*\nspring.h2.console.enabled=true\nserver.port=8080\n"}, []string{"sast:config/spring-actuator-exposed", "sast:config/spring-h2-console"}},
+		{"yaml", map[string]string{"application.yml": "management:\n  endpoints:\n    web:\n      exposure:\n        include: \"*\"\nserver:\n  error:\n    include-stacktrace: always\n"}, []string{"sast:config/spring-actuator-exposed", "sast:config/spring-error-detail"}},
+		{"safe settings", map[string]string{"application.yml": "management:\n  endpoints:\n    web:\n      exposure:\n        include: health,info\nspring:\n  h2:\n    console:\n      enabled: false\n"}, nil},
+		{"other yaml is not spring config", map[string]string{"settings.yml": "spring:\n  h2:\n    console:\n      enabled: true\n"}, nil},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := analyze(t, tt.files)
+			if !slices.Equal(got, tt.want) {
+				t.Fatalf("got %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
