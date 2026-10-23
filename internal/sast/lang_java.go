@@ -268,6 +268,9 @@ func (j *javaLower) method(m *node, class string) {
 			f.params = append(f.params, pr)
 		}
 	}
+	if j.field(m, "body") == nil {
+		return // an interface or abstract method has nothing to analyze
+	}
 	f.body = j.block(j.field(m, "body"))
 	j.mod.funcs = append(j.mod.funcs, f)
 }

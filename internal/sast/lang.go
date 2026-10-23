@@ -27,6 +27,7 @@ var extensions = map[string][2]string{
 	".java": {"java", "java"},
 	".php":  {"php", "php"},
 	".rb":   {"ruby", "rb"},
+	".cs":   {"c_sharp", "cs"},
 }
 
 // skippedFile reports files that are not first-party source: minified bundles,
@@ -36,7 +37,7 @@ func skippedFile(name string) bool {
 	switch {
 	case strings.HasSuffix(low, ".min.js"), strings.HasSuffix(low, ".d.ts"), strings.HasSuffix(low, ".bundle.js"):
 		return true
-	case strings.Contains(low, ".test."), strings.Contains(low, ".spec."), strings.HasPrefix(low, "test_"), strings.HasSuffix(low, "_test.py"), strings.HasSuffix(low, "_spec.rb"), strings.HasSuffix(low, "test.java"), strings.HasSuffix(low, "tests.java"), strings.HasSuffix(low, "test.php"):
+	case strings.Contains(low, ".test."), strings.Contains(low, ".spec."), strings.HasPrefix(low, "test_"), strings.HasSuffix(low, "_test.py"), strings.HasSuffix(low, "_spec.rb"), strings.HasSuffix(low, "test.java"), strings.HasSuffix(low, "tests.cs"), strings.HasSuffix(low, "test.cs"), strings.HasSuffix(low, "tests.java"), strings.HasSuffix(low, "test.php"):
 		return true
 	}
 	return false
@@ -46,7 +47,7 @@ func skippedFile(name string) bool {
 var skippedDirs = map[string]bool{
 	"dist": true, "build": true, "out": true, "coverage": true, "target": true,
 	"__pycache__": true, "venv": true, "site-packages": true, "bower_components": true,
-	"libs": true, "third_party": true, "thirdparty": true, "__tests__": true, "tests": true, "test": true, "spec": true, "e2e": true,
+	"libs": true, "obj": true, "bin": true, "third_party": true, "thirdparty": true, "__tests__": true, "tests": true, "test": true, "spec": true, "e2e": true,
 }
 
 type lowering struct {

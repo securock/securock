@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"go/token"
 	"path"
+	"regexp"
 	"slices"
 	"sort"
 	"strings"
@@ -27,6 +28,9 @@ type langSpec struct {
 	// sourceMembers are attribute names that are untrusted on any receiver:
 	// ZipInfo.filename.
 	sourceMembers map[string]string
+	// sourceVarMembers are members that are request data when read from a variable with
+	// a telling name: txtUser.Text in ASP.NET WebForms.
+	sourceVarMembers map[string]*regexp.Regexp
 	// sourceMethods are method names that read request data from any receiver:
 	// getParameter, get_argument.
 	sourceMethods map[string]string
@@ -526,6 +530,9 @@ func (r *irRun) rootSource(e *expr) (string, bool) {
 }
 
 func (r *irRun) evalMember(e *expr, st istate) taintSet {
+	if re, ok := r.spec.sourceVarMembers[e.name]; ok && e.x != nil && e.x.kind == exprName && re.MatchString(e.x.name) && !r.shadow[e.x.name] {
+		return r.source(e.pos, "web form field")
+	}
 	if name, f, ok := r.pathOf(e); ok && st.marked(name, f) {
 		return st.read(name, f)
 	}
@@ -751,6 +758,9 @@ func (r *irRun) callSource(fn *expr) (string, bool) {
 // then one whose directory the current file imports from, and a name that is still
 // ambiguous after that is not guessed at.
 func (r *irRun) narrow(keys []string) []string {
+	// The same method is reachable through its class and each of its supertypes.
+	slices.Sort(keys)
+	keys = slices.Compact(keys)
 	if len(keys) <= 1 {
 		return keys
 	}
