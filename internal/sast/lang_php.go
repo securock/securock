@@ -101,6 +101,7 @@ type phpLower struct {
 func lowerPHP(l *lowering) *module {
 	p := &phpLower{lowering: l}
 	l.mod.top = p.stmts(l.named(l.root))
+	p.constants(l.root)
 	return l.mod
 }
 
@@ -572,4 +573,35 @@ func phpDelim(pat string) string {
 		return ""
 	}
 	return pat[:1]
+}
+
+// constants records define('KEY', '...') and const KEY = '...' as assignments in the
+// module's top-level code, where string constants are looked up.
+func (p *phpLower) constants(n *node) {
+	add := func(at *node, name string, val *node) {
+		if val == nil || p.kind(val) != "string" {
+			return
+		}
+		id := p.mk(exprName, at)
+		id.name = name
+		p.mod.top = append(p.mod.top, &stmt{kind: stmtAssign, pos: p.pos(at), lhs: []*expr{id}, rhs: p.expr(val)})
+	}
+	switch p.kind(n) {
+	case "const_element":
+		if cs := p.named(n); len(cs) == 2 {
+			add(n, p.text(cs[0]), cs[1])
+		}
+	case "function_call_expression":
+		if p.text(p.field(n, "function")) == "define" {
+			if args := p.named(p.field(n, "arguments")); len(args) == 2 {
+				k, v := p.named(args[0]), p.named(args[1])
+				if len(k) == 1 && len(v) == 1 && p.kind(k[0]) == "string" {
+					add(n, strings.Trim(p.text(k[0]), `'"`), v[0])
+				}
+			}
+		}
+	}
+	for _, c := range p.named(n) {
+		p.constants(c)
+	}
 }

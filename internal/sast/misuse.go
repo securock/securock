@@ -145,6 +145,8 @@ func unwrapBytes(e *expr) *expr {
 		switch {
 		case e.x.kind == exprMember && e.x.x != nil && (e.x.name == "getBytes" || e.x.name == "toCharArray" || e.x.name == "encode"):
 			e = e.x.x
+		case e.x.kind == exprMember && e.x.name == "GetBytes" && len(e.args) > 0:
+			e = e.args[0] // Encoding.UTF8.GetBytes("k")
 		case e.x.kind == exprMember && e.x.name == "from" && e.x.x != nil && e.x.x.kind == exprName && e.x.x.name == "Buffer" && len(e.args) > 0:
 			e = e.args[0]
 		default:

@@ -4,7 +4,7 @@ package sast
 // sources, weak URL allowlists, directory listings, mass assignment and LLM prompts.
 
 func init() {
-	for _, sp := range []*langSpec{jsSpec, pySpec, javaSpec, phpSpec, rubySpec} {
+	for _, sp := range []*langSpec{jsSpec, pySpec, javaSpec, phpSpec, rubySpec, csSpec} {
 		ensureSets(sp)
 		if sp.misuse == nil {
 			sp.misuse = map[string][]misuse{}
@@ -80,6 +80,13 @@ func init() {
 	for _, n := range []string{"Crypto.Cipher.AES.new", "Cryptodome.Cipher.AES.new", "cryptography.fernet.Fernet"} {
 		pySpec.misuse[n] = hardKey(0)
 	}
+
+	for _, n := range []string{"HMACSHA1", "HMACSHA256", "HMACSHA384", "HMACSHA512", "HMACMD5"} {
+		csSpec.misuse["System.Security.Cryptography."+n] = append(csSpec.misuse["System.Security.Cryptography."+n], hardKey(0)...)
+	}
+	phpSpec.misuse["openssl_encrypt"] = append(phpSpec.misuse["openssl_encrypt"], hardKey(2)...)
+	phpSpec.misuse["openssl_decrypt"] = append(phpSpec.misuse["openssl_decrypt"], hardKey(2)...)
+	phpSpec.misuse["hash_hmac"] = append(phpSpec.misuse["hash_hmac"], hardKey(2)...)
 
 	// ---- Ruby
 	rb := rubySpec

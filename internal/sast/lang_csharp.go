@@ -347,6 +347,20 @@ func (c *csLower) fieldDecl(class string, m *node) {
 		c.mod.fields[class] = map[string]string{}
 	}
 	c.mod.fields[class][name] = ty
+	// const string K = "..." and static readonly string K = "...": a constant other code reads.
+	if d := c.firstOfKind(c.firstOfKind(m, "variable_declaration"), "variable_declarator"); d != nil {
+		mods := ""
+		for _, ch := range c.named(m) {
+			if c.kind(ch) == "modifier" {
+				mods += " " + c.text(ch)
+			}
+		}
+		if v := c.firstOfKind(d, "string_literal"); v != nil && (strings.Contains(mods, "const") || strings.Contains(mods, "readonly")) {
+			id := c.mk(exprName, d)
+			id.name = name
+			c.mod.top = append(c.mod.top, &stmt{kind: stmtAssign, pos: c.pos(d), lhs: []*expr{id}, rhs: c.expr(v)})
+		}
+	}
 }
 
 func (c *csLower) firstOfKind(n *node, kind string) *node {
