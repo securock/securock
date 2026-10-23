@@ -30,11 +30,13 @@ const (
 	kProto
 	kLog
 	kCORS
-	kRand  // a predictable random value reaching a cookie, token or key
-	kTrust // request data stored where the application trusts it
+	kRand   // a predictable random value reaching a cookie, token or key
+	kTrust  // request data stored where the application trusts it
+	kMass   // a request object handed whole to a model: User.create(req.body)
+	kPrompt // request data placed in an LLM system prompt
 
-	kLast = kTrust
-	kAll  = kSQL | kCmd | kPath | kSSRF | kXSS | kRedirect | kCode | kDeser | kXPath | kLDAP | kRegex | kNoSQL | kNoSQLStr | kProto | kLog | kCORS | kTrust
+	kLast = kPrompt
+	kAll  = kSQL | kCmd | kPath | kSSRF | kXSS | kRedirect | kCode | kDeser | kXPath | kLDAP | kRegex | kNoSQL | kNoSQLStr | kProto | kLog | kCORS | kTrust | kMass | kPrompt
 	// kRand is not in kAll: request data is not random, and a sanitizer for request data
 	// does not make a predictable number unpredictable.
 )
@@ -68,9 +70,9 @@ func kindsFor(desc string) kind {
 	}
 	if desc == "request URL" || desc == "request path" {
 		// The URL of the request itself is not a destination an attacker chose.
-		return kAll &^ (kNoSQL | kProto | kSSRF)
+		return kAll &^ (kNoSQL | kProto | kSSRF | kMass)
 	}
-	return kAll &^ (kNoSQL | kProto)
+	return kAll &^ (kNoSQL | kProto | kMass)
 }
 
 type rule struct {
@@ -99,6 +101,8 @@ var taintRules = map[kind]rule{
 	kCORS:     {"sast:go/cors-misconfiguration", "CWE-942", "Untrusted origin is allowed by CORS", "Compare the Origin header against an allowlist and echo it back only when it matches.", finding.SeverityMedium},
 	kRand:     {"sast:go/insecure-random", "CWE-338", "Predictable random value used for a secret", "Use the operating system's cryptographic generator (crypto/rand, secrets, SecureRandom, random_bytes).", finding.SeverityMedium},
 	kTrust:    {"sast:go/trust-boundary", "CWE-501", "Request data stored in a trusted place", "Validate request data before storing it in the session or another trusted store.", finding.SeverityLow},
+	kMass:     {"sast:go/mass-assignment", "CWE-915", "Request object saved to a model without choosing fields", "Pick the attributes you accept (permit, pick, an explicit DTO) instead of passing the whole request object to the model.", finding.SeverityMedium},
+	kPrompt:   {"sast:go/prompt-injection", "CWE-1427", "Request data placed in an LLM system prompt", "Keep instructions fixed; pass user text only as user content, and treat the model's output as untrusted.", finding.SeverityMedium},
 	kDeser:    {"sast:go/insecure-deserialization", "CWE-502", "Insecure deserialization", "Do not deserialize untrusted data with a format that can instantiate arbitrary types; use JSON or a schema-validated format.", finding.SeverityHigh},
 }
 
@@ -132,6 +136,11 @@ type sink struct {
 	// recvUpper also admits receivers rooted at a capitalized name (a model class:
 	// User.findOne), in addition to those listed in recv.
 	recvUpper bool
+	// direct limits the sink to an argument that is the object itself (req.body), not a
+	// literal that picks fields out of it.
+	direct bool
+	// kw also checks keyword arguments with these names (system="..." in Python).
+	kw []string
 	// strArg skips arguments that are hashes or arrays: Ruby's where(name: x) is
 	// parameterized, where("name = '#{x}'") is not.
 	strArg bool

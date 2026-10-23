@@ -486,6 +486,9 @@ func (r *rubyLower) call(n *node) *expr {
 	if recv != nil && method == "start_with?" && len(e.args) == 1 {
 		in := r.mk(exprIn, n)
 		in.x, in.args = e.args[0], []*expr{e.x.x}
+		if as := r.named(r.field(n, "arguments")); len(as) == 1 {
+			return withWeakAllow(in, r.weakAllow(r.pos(n), r.text(recv), r.text(as[0])))
+		}
 		return in
 	}
 	if recv != nil && (method == "include?" || method == "member?" || method == "key?" || method == "has_key?") && len(e.args) == 1 {

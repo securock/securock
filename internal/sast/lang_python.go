@@ -566,6 +566,32 @@ func (p *pyLower) expr(n *node) *expr {
 		if len(cs) > 0 {
 			return p.expr(cs[len(cs)-1])
 		}
+	case "dictionary":
+		// {"role": "system", "content": x}: request data in an LLM's instructions.
+		var role, content *node
+		d := p.mk(exprOther, n)
+		for _, c := range p.named(n) {
+			if p.kind(c) != "pair" {
+				continue
+			}
+			d.args = append(d.args, p.expr(c))
+			switch strings.Trim(p.text(p.field(c, "key")), `"'`) {
+			case "role":
+				role = p.field(c, "value")
+			case "content":
+				content = p.field(c, "value")
+			}
+		}
+		if role != nil && content != nil && strings.Trim(p.text(role), `"'`) == "system" {
+			call := p.mk(exprCall, n)
+			fn := p.mk(exprName, n)
+			fn.name = "llmPrompt"
+			call.x = fn
+			call.args = []*expr{p.expr(content)}
+			call.kw = []string{""}
+			d.args = append(d.args, call)
+		}
+		return d
 	case "named_expression":
 		return p.expr(p.field(n, "value"))
 	}
@@ -632,6 +658,9 @@ func (p *pyLower) call(n *node) *expr {
 	if e.x.kind == exprMember && e.x.name == "startswith" && len(e.args) == 1 {
 		in := p.mk(exprIn, n)
 		in.x, in.args = e.args[0], []*expr{e.x.x}
+		if as := p.named(p.field(n, "arguments")); len(as) == 1 {
+			return withWeakAllow(in, p.weakAllow(p.pos(n), p.text(p.field(fn, "object")), p.text(as[0])))
+		}
 		return in
 	}
 	if e.x.kind == exprMember {

@@ -2660,3 +2660,55 @@ def parse(data):
 # want: none
 --- templates/comment.html
 <div class="comment">{{ comment.body }}</div>
+
+=== ts/xss-angular-query-into-bypass
+// want: sast:js/xss
+export class SearchComponent {
+  constructor (private route: ActivatedRoute, private sanitizer: DomSanitizer) {}
+  ngOnInit () {
+    const q: string = this.route.snapshot.queryParams.q
+    this.html = this.sanitizer.bypassSecurityTrustHtml(`<code>${q}</code>`)
+  }
+}
+
+=== ts/safe-angular-sanitized
+// want: none
+export class SearchComponent {
+  ngOnInit () {
+    const q: string = this.route.snapshot.queryParams.q
+    this.html = this.sanitizer.sanitize(SecurityContext.HTML, q)
+  }
+}
+
+=== ts/weak-redirect-allowlist
+// want: sast:js/weak-allowlist
+export const isRedirectAllowed = (url: string) => {
+  let allowed = false
+  for (const allowedUrl of redirectAllowlist) {
+    allowed = allowed || url.includes(allowedUrl)
+  }
+  return allowed
+}
+
+=== ts/safe-exact-allowlist
+// want: none
+export const isRedirectAllowed = (url: string) => redirectAllowlist.has(url)
+
+=== ts/directory-listing
+// want: sast:js/directory-listing
+import serveIndex from 'serve-index'
+app.use('/ftp', serveIndex('ftp', { icons: true }))
+
+=== ts/mass-assignment
+// want: sast:js/mass-assignment
+app.post('/api/users', (req, res) => { UserModel.create(req.body) })
+
+=== ts/safe-picked-fields
+// want: none
+app.post('/api/users', (req, res) => { UserModel.create({ email: req.body.email }) })
+
+=== ts/prompt-injection-system
+// want: sast:js/prompt-injection
+app.post('/chat', async (req, res) => {
+  const r = await generateText({ system: `You are ${req.body.persona}`, prompt: 'hello' })
+})

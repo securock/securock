@@ -264,7 +264,10 @@ and Ruby (`rb`). Rule ids are `sast:LANGUAGE/RULE`:
 | `xxe`                          | 611  | high     | Python, Java, PHP, Ruby |
 | `debug-enabled`                | 489  | medium   | Python, PHP, Ruby       |
 | `insecure-cookie`              | 614  | medium   | Python, Java            |
-| `mass-assignment`              | 915  | medium   | Ruby                    |
+| `mass-assignment`              | 915  | medium   | JS, Ruby                |
+| `weak-allowlist`               | 601  | medium   | JS, Python, Java, Ruby  |
+| `directory-listing`            | 548  | medium   | JS                      |
+| `prompt-injection`             | 1427 | medium   | JS, Python              |
 | `csrf-disabled`                | 352  | medium   | Ruby                    |
 | `variable-extraction`          | 621  | high     | PHP                     |
 | `insecure-temp-file`           | 377  | low      | Python                  |
@@ -346,7 +349,7 @@ limits, network policies or IAM least privilege beyond wildcards, is not
 checked.
 
 Sources are HTTP request data and command-line arguments: `net/http`, gin,
-echo, fiber, chi and mux in Go; Express, Koa, Next.js, NestJS and the browser
+echo, fiber, chi and mux in Go; Express, Koa, Next.js, NestJS, Angular routes and the browser
 URL in JavaScript; Flask, Django, FastAPI and Tornado in Python; servlets,
 Spring and JAX-RS in Java; the PHP superglobals and Laravel requests; Rails
 and Sinatra `params`. Taint is tracked per field, through closures, interface
@@ -396,7 +399,10 @@ constructs real code rarely has: a switch on a constant string, a list whose fir
 element is removed before the second is read, a hash algorithm chosen from a properties
 file. The remaining false positives are mostly those, and the remaining misses are mostly
 configuration-driven (the algorithm or file name comes from a properties file, which is
-not read). Languages other than Java and Python have no labeled suite here, only the
+not read). Juice Shop also ships each security challenge in several flawed and one correct variant
+(`data/static/codefixes`), which makes a labeled set for JavaScript and TypeScript: the
+vulnerable variants of the injection, XSS and redirect challenges are found, and the
+parameterized SQL variants are not reported. Other languages have no labeled suite here, only the
 cases in `internal/sast/testdata/bench.txt` and runs over intentionally vulnerable
 applications (NodeGoat, Juice Shop, DVWA, railsgoat, WebGoat, pygoat), which were read
 by hand. Treat the results as a measured starting point, not a guarantee.

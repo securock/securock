@@ -217,3 +217,36 @@ func TestFlowFixesFoundByTheOWASPBenchmark(t *testing.T) {
 		})
 	}
 }
+
+func TestJuiceShopFixVariants(t *testing.T) {
+	tests := []struct {
+		name  string
+		files map[string]string
+		want  []string
+	}{
+		{"angular route query into bypassSecurityTrustHtml", map[string]string{"c.ts": "export class C {\n  constructor(private route: ActivatedRoute, private sanitizer: DomSanitizer) {}\n  ngOnInit () {\n    let q: string = this.route.snapshot.queryParams.q\n    this.html = this.sanitizer.bypassSecurityTrustHtml(`<code>${q}</code>`)\n  }\n}\n"}, []string{"sast:js/xss"}},
+		{"angular subscribe callback", map[string]string{"c.ts": "export class C {\n  ngOnInit () {\n    this.route.queryParams.subscribe((p: any) => { this.h = this.sanitizer.bypassSecurityTrustHtml(p.q) })\n  }\n}\n"}, []string{"sast:js/xss"}},
+		{"angular sanitized content", map[string]string{"c.ts": "export class C {\n  ngOnInit () {\n    let q: string = this.route.snapshot.queryParams.q\n    this.h = this.sanitizer.sanitize(SecurityContext.HTML, q)\n  }\n}\n"}, nil},
+		{"redirect allowlist by substring", map[string]string{"a.ts": "export const isRedirectAllowed = (url: string) => {\n  let allowed = false\n  for (const allowedUrl of redirectAllowlist) {\n    allowed = allowed || url.includes(allowedUrl)\n  }\n  return allowed\n}\n"}, []string{"sast:js/weak-allowlist"}},
+		{"redirect allowlist by exact membership", map[string]string{"a.ts": "export const isRedirectAllowed = (url: string) => redirectAllowlist.has(url)\n"}, nil},
+		{"java allowlist by prefix", map[string]string{"A.java": "public class A {\n  boolean ok(String url, java.util.List<String> allowedUrls) {\n    for (String allowedUrl : allowedUrls) { if (url.startsWith(allowedUrl)) return true; }\n    return false;\n  }\n}\n"}, []string{"sast:java/weak-allowlist"}},
+		{"python allowlist by prefix", map[string]string{"a.py": "def ok(url, allowed_urls):\n    for allowed_url in allowed_urls:\n        if url.startswith(allowed_url):\n            return True\n    return False\n"}, []string{"sast:py/weak-allowlist"}},
+		{"serve-index", map[string]string{"s.ts": "import serveIndex from 'serve-index'\napp.use('/ftp', serveIndex('ftp', { icons: true }))\n"}, []string{"sast:js/directory-listing"}},
+		{"mass assignment of the request body", map[string]string{"a.ts": "app.post('/users', (req, res) => { UserModel.create(req.body) })\n"}, []string{"sast:js/mass-assignment"}},
+		{"mass assignment with chosen fields", map[string]string{"a.ts": "app.post('/users', (req, res) => { UserModel.create({ email: req.body.email, password: req.body.password }) })\n"}, nil},
+		{"rails mass assignment", map[string]string{"a.rb": "class C < ApplicationController\n  def create\n    User.create(params[:user])\n  end\n  def ok\n    User.create(params.require(:user).permit(:name))\n  end\nend\n"}, []string{"sast:rb/mass-assignment"}},
+		{"llm system prompt from the request", map[string]string{"a.ts": "app.post('/chat', async (req, res) => {\n  const r = await generateText({ system: `You are ${req.body.persona}`, prompt: 'hi' })\n})\n"}, []string{"sast:js/prompt-injection"}},
+		{"llm user message from the request", map[string]string{"a.ts": "app.post('/chat', async (req, res) => {\n  const r = await generateText({ system: 'You are helpful', prompt: req.body.text })\n})\n"}, nil},
+		{"llm system message object", map[string]string{"a.ts": "app.post('/chat', async (req, res) => {\n  const m = [{ role: 'system', content: 'Rules: ' + req.body.rules }]\n})\n"}, []string{"sast:js/prompt-injection"}},
+		{"python llm system role", map[string]string{"a.py": "from flask import request\ndef f():\n    return [{\"role\": \"system\", \"content\": \"Be \" + request.args['tone']}]\n"}, []string{"sast:py/prompt-injection"}},
+		{"python llm system keyword", map[string]string{"a.py": "from flask import request\ndef f(client):\n    return client.messages.create(system='Be ' + request.json['tone'], messages=[])\n"}, []string{"sast:py/prompt-injection"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := slices.Compact(analyze(t, tt.files))
+			if !slices.Equal(got, tt.want) {
+				t.Fatalf("got %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

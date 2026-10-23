@@ -540,6 +540,16 @@ var requestMembers = map[string]bool{"query": true, "body": true, "params": true
 
 // requestDestructuring handles an Express handler written ({ query, body }, res) => ...:
 // each destructured name is read from the request object, so it is request data.
+func (j *jsLower) llmPrompt(at *node, value *node) *expr {
+	call := j.mk(exprCall, at)
+	fn := j.mk(exprName, at)
+	fn.name = "llmPrompt"
+	call.x = fn
+	call.args = []*expr{j.expr(value)}
+	call.kw = []string{""}
+	return call
+}
+
 func (j *jsLower) requestDestructuring(params *node) []*stmt {
 	if params == nil {
 		return nil
@@ -766,6 +776,24 @@ func (j *jsLower) expr(n *node) *expr {
 				}
 			}
 		}
+		// {role: "system", content: x} and {system: x}: request data in an LLM's instructions.
+		var role, content *node
+		for _, c := range j.named(n) {
+			if j.kind(c) != "pair" {
+				continue
+			}
+			switch strings.Trim(j.text(j.field(c, "key")), `"'`) {
+			case "role":
+				role = j.field(c, "value")
+			case "content":
+				content = j.field(c, "value")
+			case "system", "systemPrompt", "system_prompt", "instructions":
+				e.args = append(e.args, j.llmPrompt(c, j.field(c, "value")))
+			}
+		}
+		if role != nil && content != nil && strings.Trim(j.text(role), `"'`) == "system" {
+			e.args = append(e.args, j.llmPrompt(n, content))
+		}
 		if origin != nil && creds != nil {
 			call := j.mk(exprCall, n)
 			fn := j.mk(exprName, n)
@@ -842,13 +870,13 @@ func (j *jsLower) call(n *node, k exprKind, fn *node) *expr {
 			if as := j.named(j.field(n, "arguments")); len(as) == 1 {
 				e := j.mk(exprIn, n)
 				e.x, e.args = j.expr(as[0]), []*expr{j.expr(j.field(fn, "object"))}
-				return e
+				return withWeakAllow(e, j.weakAllow(j.pos(n), j.text(j.field(fn, "object")), j.text(as[0])))
 			}
 		} else if m == "includes" || m == "has" {
 			if as := j.named(j.field(n, "arguments")); len(as) == 1 {
 				e := j.mk(exprIn, n)
 				e.x, e.args = j.expr(j.field(fn, "object")), []*expr{j.expr(as[0])}
-				return e
+				return withWeakAllow(e, j.weakAllow(j.pos(n), j.text(j.field(fn, "object")), j.text(as[0])))
 			}
 		}
 	}
@@ -871,7 +899,7 @@ func (j *jsLower) call(n *node, k exprKind, fn *node) *expr {
 	// ids.map(id => ...): the callback's first parameter is an element of the receiver.
 	if k == exprCall && e.x.kind == exprMember {
 		switch e.x.name {
-		case "map", "forEach", "filter", "flatMap", "some", "every", "find", "findIndex", "then", "catch", "finally":
+		case "map", "forEach", "filter", "flatMap", "some", "every", "find", "findIndex", "then", "catch", "finally", "subscribe", "pipe":
 			for _, a := range e.args {
 				if a.kind == exprLambda {
 					bindCallback(a, e.x.x)

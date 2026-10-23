@@ -507,8 +507,15 @@ func (r *irRun) rootSource(e *expr) (string, bool) {
 	if r.spec.self[base] && chain[0] == "request" && len(chain) > 1 {
 		base, chain = "request", chain[1:]
 	}
-	d, ok := r.spec.sourceRoots[base][chain[0]]
-	return d, ok
+	if d, ok := r.spec.sourceRoots[base][chain[0]]; ok {
+		return d, true
+	}
+	// this.route.snapshot...: a field of the class that holds the request-like object.
+	if r.spec.self[x.name] && len(chain) > 1 {
+		d, ok := r.spec.sourceRoots[chain[0]][chain[1]]
+		return d, ok
+	}
+	return "", false
 }
 
 func (r *irRun) evalMember(e *expr, st istate) taintSet {
@@ -966,6 +973,13 @@ func (r *irRun) checkSink(c *expr, name string, s sink, args []taintSet, recv ta
 			}
 		}
 	}
+	kwIdx := map[int]bool{}
+	for i, k := range c.kw {
+		if k != "" && slices.Contains(s.kw, k) {
+			idx = append(idx, i)
+			kwIdx[i] = true
+		}
+	}
 	for _, i := range idx {
 		if i == -1 {
 			for _, at := range recv {
@@ -975,10 +989,13 @@ func (r *irRun) checkSink(c *expr, name string, s sink, args []taintSet, recv ta
 			}
 			continue
 		}
-		if i >= len(args) || (i < len(c.kw) && c.kw[i] != "" && s.kwTrue == "") {
+		if i >= len(args) || (i < len(c.kw) && c.kw[i] != "" && s.kwTrue == "" && !kwIdx[i]) {
 			continue
 		}
 		if s.strArg && c.args[i].kind == exprOther {
+			continue
+		}
+		if s.direct && c.args[i].kind != exprName && c.args[i].kind != exprMember && c.args[i].kind != exprIndex {
 			continue
 		}
 		for _, at := range args[i] {

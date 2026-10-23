@@ -560,12 +560,12 @@ func (j *javaLower) invoke(n *node) *expr {
 	if obj != nil && name == "startsWith" && len(args) == 1 {
 		e := j.mk(exprIn, n)
 		e.x, e.args = j.expr(args[0]), []*expr{j.expr(obj)}
-		return e
+		return withWeakAllow(e, j.weakAllow(j.pos(n), j.text(obj), j.text(args[0])))
 	}
 	if obj != nil && name == "contains" && len(args) == 1 {
 		e := j.mk(exprIn, n)
 		e.x, e.args = j.expr(obj), []*expr{j.expr(args[0])}
-		return e
+		return withWeakAllow(e, j.weakAllow(j.pos(n), j.text(obj), j.text(args[0])))
 	}
 	if obj != nil && name == "matches" && len(args) == 1 && j.kind(args[0]) == "string_literal" {
 		if lit := j.expr(args[0]); lit.kind == exprStr && strictLiteral(lit.str, "", true) {
