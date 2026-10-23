@@ -215,3 +215,27 @@ func TestJavaStringConstants(t *testing.T) {
 		})
 	}
 }
+
+func TestHardcodedEncryptionKey(t *testing.T) {
+	tests := []struct {
+		name string
+		file string
+		src  string
+		want []string
+	}{
+		{"java literal", "A.java", "import javax.crypto.spec.SecretKeySpec;\nclass A { private static final String K = \"0123456789abcdef\";\n Object f() { return new SecretKeySpec(K.getBytes(), \"AES\"); } }", []string{"sast:java/hardcoded-key"}},
+		{"java key from a parameter", "A.java", "import javax.crypto.spec.SecretKeySpec;\nclass A { Object f(byte[] k) { return new SecretKeySpec(k, \"AES\"); } }", nil},
+		{"node createCipheriv", "a.js", "const crypto = require('crypto');\nfunction f(iv) { return crypto.createCipheriv('aes-256-cbc', '0123456789abcdef0123456789abcdef', iv); }", []string{"sast:js/hardcoded-key"}},
+		{"node key from env", "a.js", "const crypto = require('crypto');\nfunction f(iv) { return crypto.createCipheriv('aes-256-cbc', process.env.KEY, iv); }", nil},
+		{"python AES", "a.py", "from Crypto.Cipher import AES\n\ndef f():\n    return AES.new(b'0123456789abcdef', AES.MODE_GCM)\n", []string{"sast:py/hardcoded-key"}},
+		{"python key from env", "a.py", "import os\nfrom Crypto.Cipher import AES\n\ndef f():\n    return AES.new(os.environ['K'].encode(), AES.MODE_GCM)\n", nil},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := analyze(t, map[string]string{tt.file: tt.src})
+			if !slices.Equal(got, tt.want) {
+				t.Fatalf("got %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

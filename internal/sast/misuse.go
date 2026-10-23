@@ -89,6 +89,8 @@ var (
 		"Require authentication by default and open up only the specific public paths.", finding.SeverityHigh}
 	ruleElectron = rule{"sast:go/electron-insecure-window", "CWE-1021", "Electron window weakens the renderer sandbox",
 		"Keep nodeIntegration off, contextIsolation and webSecurity on, and expose only what the page needs through a preload script.", finding.SeverityHigh}
+	ruleHardCryptoKey = rule{"sast:go/hardcoded-key", "CWE-321", "Encryption key is written in the source",
+		"Load the key from a key store or the environment and rotate the exposed one; anyone who can read the code can decrypt the data.", finding.SeverityMedium}
 	ruleHardKey = rule{"sast:go/hardcoded-signing-key", "CWE-321", "Token signing key is written in the source",
 		"Load the key from a secret store or the environment, rotate the exposed one, and use a key of at least 256 random bits.", finding.SeverityHigh}
 	ruleExtract = rule{"sast:go/variable-extraction", "CWE-621", "Request data is imported into the variable scope",

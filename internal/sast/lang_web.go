@@ -70,6 +70,17 @@ func init() {
 	// jjwt: signWith(SignatureAlgorithm.HS256, "secret") — the older two-argument form.
 	javaSpec.misuse["?.signWith"] = append(javaSpec.misuse["?.signWith"], misuse{rule: ruleHardKey, detail: "the signing key is a string literal", literal: map[int]bool{1: true}})
 
+	// Encryption keys written in the source.
+	hardKey := func(idx int) []misuse {
+		return []misuse{{rule: ruleHardCryptoKey, detail: "the encryption key is a string literal", literal: map[int]bool{idx: true}}}
+	}
+	javaSpec.misuse["javax.crypto.spec.SecretKeySpec"] = hardKey(0)
+	js.misuse["crypto.createCipheriv"] = append(js.misuse["crypto.createCipheriv"], hardKey(1)...)
+	js.misuse["crypto.createDecipheriv"] = append(js.misuse["crypto.createDecipheriv"], hardKey(1)...)
+	for _, n := range []string{"Crypto.Cipher.AES.new", "Cryptodome.Cipher.AES.new", "cryptography.fernet.Fernet"} {
+		pySpec.misuse[n] = hardKey(0)
+	}
+
 	// ---- Ruby
 	rb := rubySpec
 	for _, m := range []string{"create", "create!", "update", "update!", "update_attributes", "new", "assign_attributes", "update_all"} {
