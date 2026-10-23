@@ -189,6 +189,7 @@ Cargo under [`examples/`](examples/).
 | `--output`              | Write the report to a file instead of stdout (also on exit `1`)                                |
 | `--min-release-age`     | `audit`. Report npm and PyPI releases newer than this, such as `7d`                            |
 | `--fail-on`             | `audit`, `sast` and `doctor`. Exit `1` at or above this severity (default `high`)                      |
+| `--assume-params`       | `sast`. Treat string parameters of Go functions nothing calls directly as untrusted (registry handlers)  |
 | `--exceptions`          | Accepted-findings file (default `.securock/exceptions.yaml`)                                   |
 | `--reachability`        | Record package scope and dependencies; mark vulnerabilities reachable, unreachable, or unknown |
 | `--no-fail`             | Always exit `0`                                                                                |

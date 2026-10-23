@@ -11,6 +11,7 @@ import (
 
 func newSASTCommand(opts *options) *cobra.Command {
 	var failOn string
+	var assumeParams bool
 	cmd := &cobra.Command{
 		Use:   "sast [path]",
 		Short: "Find vulnerabilities in your own source code",
@@ -33,7 +34,7 @@ unsafe settings (sast:iac/*), and text files are scanned for committed credentia
 				return opErr(err)
 			}
 			path := projectPath(args)
-			found, err := sast.Analyze(path)
+			found, err := sast.AnalyzeWith(path, sast.Options{AssumeParams: assumeParams})
 			if err != nil {
 				return opErr(err)
 			}
@@ -55,5 +56,6 @@ unsafe settings (sast:iac/*), and text files are scanned for committed credentia
 		},
 	}
 	cmd.Flags().StringVar(&failOn, "fail-on", "high", "exit 1 when a finding is at or above this severity: critical, high, medium, low, or info")
+	cmd.Flags().BoolVar(&assumeParams, "assume-params", false, "treat string parameters of Go functions that nothing calls directly as untrusted (handlers reached through a registry); finds more, with more false positives")
 	return cmd
 }

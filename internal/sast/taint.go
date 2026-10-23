@@ -214,6 +214,10 @@ type funcCtx struct {
 	ret     taintSet
 	sinks   []paramSink
 	litDeep int
+	// entry marks a function whose callers are out of sight; pnames names its parameters.
+	entry  bool
+	pnames map[int]string
+	pos    token.Pos
 }
 
 // recvParam is the parameter index that stands for a method's receiver in summaries.
@@ -234,6 +238,8 @@ type shared struct {
 	methods   map[string][]impl // method name -> concrete methods, for interface calls
 	globals   map[types.Object]taintSet
 	regexps   map[types.Object]string
+	// orphans are the functions nothing calls directly (Options.AssumeParams).
+	orphans map[string]bool
 }
 
 type analyzer struct {
@@ -715,7 +721,14 @@ func (a *analyzer) reachSink(pos token.Pos, name string, hit kind, at atom, inne
 	trace := appendFlow(at.flow, inner)
 	if at.param >= 0 {
 		a.ctx.sinks = append(a.ctx.sinks, paramSink{param: at.param, kind: hit, name: name, pos: pos, flow: trace})
-		return
+		if pn, ok := a.ctx.pnames[at.param]; ok && a.ctx.entry {
+			src := a.source(a.ctx.pos, "parameter "+pn+" of "+a.ctx.label)[0]
+			src.flow = appendFlow(src.flow, at.flow)
+			at = src
+			trace = appendFlow(at.flow, inner)
+		} else {
+			return
+		}
 	}
 	for k := kind(1); k <= kLast; k <<= 1 {
 		if hit&k == 0 {
@@ -1107,6 +1120,7 @@ func (a *analyzer) assignStmt(s *ast.AssignStmt, st state) {
 func (a *analyzer) analyzeFunc(fd *ast.FuncDecl, name string) *summary {
 	a.ctx = &funcCtx{name: name, label: declName(fd)}
 	st := state{}
+	a.ctx.entry, a.ctx.pos = a.orphans[name], fd.Pos()
 	a.ctx.oks = map[types.Object]ast.Expr{}
 	a.ctx.cleaned = map[types.Object]bool{}
 	if fd.Recv != nil && len(fd.Recv.List) > 0 && len(fd.Recv.List[0].Names) > 0 {
@@ -1119,6 +1133,10 @@ func (a *analyzer) analyzeFunc(fd *ast.FuncDecl, name string) *summary {
 		for _, n := range f.Names {
 			if o, ok := a.info.Defs[n].(*types.Var); ok && n.Name != "_" && !inert(o.Type()) {
 				st[vkey{o, ""}] = taintSet{{key: fmt.Sprintf("p%d", i), param: i, kinds: kAll}}
+				if a.ctx.pnames == nil {
+					a.ctx.pnames = map[int]string{}
+				}
+				a.ctx.pnames[i] = n.Name
 			}
 			i++
 		}
@@ -1202,4 +1220,44 @@ func (a *analyzer) safely(fd *ast.FuncDecl, name string) (sum *summary, ok bool)
 		}
 	}()
 	return a.analyzeFunc(fd, name), true
+}
+
+// orphanFuncs returns the functions (by summary key) that no call expression in the
+// project names, except main, init and tests.
+func orphanFuncs(pkgs []*pkg, all []string) map[string]bool {
+	called := map[string]bool{}
+	for _, p := range pkgs {
+		for _, f := range p.files {
+			ast.Inspect(f, func(n ast.Node) bool {
+				c, ok := n.(*ast.CallExpr)
+				if !ok {
+					return true
+				}
+				var id *ast.Ident
+				switch fun := unparen(c.Fun).(type) {
+				case *ast.Ident:
+					id = fun
+				case *ast.SelectorExpr:
+					id = fun.Sel
+				}
+				if id != nil {
+					if fo, ok := p.info.Uses[id].(*types.Func); ok {
+						called[normalize(fo.FullName())] = true
+					}
+				}
+				return true
+			})
+		}
+	}
+	out := map[string]bool{}
+	for _, name := range all {
+		if called[name] || strings.HasSuffix(name, ".main") || strings.HasSuffix(name, ".init") {
+			continue
+		}
+		if i := strings.LastIndex(name, "."); i >= 0 && (strings.HasPrefix(name[i+1:], "Test") || strings.HasPrefix(name[i+1:], "Benchmark")) {
+			continue
+		}
+		out[name] = true
+	}
+	return out
 }

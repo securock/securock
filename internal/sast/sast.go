@@ -47,6 +47,20 @@ type pkg struct {
 
 // Analyze scans the source under root and returns findings sorted by severity.
 func Analyze(root string) ([]finding.Finding, error) {
+	return AnalyzeWith(root, Options{})
+}
+
+// Options tunes the analysis.
+type Options struct {
+	// AssumeParams treats the string parameters of Go functions that nothing calls
+	// directly as untrusted. Such functions are reached through a registry, a callback
+	// table or reflection, so their callers are out of sight; the option trades
+	// precision for recall.
+	AssumeParams bool
+}
+
+// AnalyzeWith is Analyze with options.
+func AnalyzeWith(root string, opts Options) ([]finding.Finding, error) {
 	abs, err := filepath.Abs(root)
 	if err != nil {
 		return nil, err
@@ -82,7 +96,7 @@ func Analyze(root string) ([]finding.Finding, error) {
 		}
 		return filepath.ToSlash(r)
 	}
-	out = append(out, taint(fset, abs, pkgs, mods, props, rel)...)
+	out = append(out, taint(fset, abs, pkgs, mods, props, rel, opts)...)
 	for _, p := range pkgs {
 		out = append(out, astRules(fset, p, rel)...)
 	}
@@ -91,7 +105,7 @@ func Analyze(root string) ([]finding.Finding, error) {
 
 // taint runs the interprocedural analysis to a fixed point over function summaries.
 // Findings are taken from the final round only, once every summary is complete.
-func taint(fset *token.FileSet, root string, pkgs []*pkg, mods []*module, props map[string]string, rel func(token.Pos) string) []finding.Finding {
+func taint(fset *token.FileSet, root string, pkgs []*pkg, mods []*module, props map[string]string, rel func(token.Pos) string, opts Options) []finding.Finding {
 	type fn struct {
 		decl *ast.FuncDecl
 		name string
@@ -111,12 +125,22 @@ func taint(fset *token.FileSet, root string, pkgs []*pkg, mods []*module, props 
 			}
 		}
 	}
+	fns2names := func(fs []fn) []string {
+		var out []string
+		for _, f := range fs {
+			out = append(out, f.name)
+		}
+		return out
+	}
 	sh := &shared{
 		declTypes: map[types.Object]ast.Expr{},
 		sums:      map[string]*summary{},
 		methods:   map[string][]impl{},
 		globals:   map[types.Object]taintSet{},
 		regexps:   map[types.Object]string{},
+	}
+	if opts.AssumeParams {
+		sh.orphans = orphanFuncs(pkgs, fns2names(fns))
 	}
 	for _, p := range pkgs {
 		collectRegexps(p.files, p.info, sh.regexps)

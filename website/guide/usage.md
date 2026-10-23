@@ -398,6 +398,12 @@ define it. Calls into third-party libraries the rules do not name are assumed
 to pass their arguments through to the result. `sast` uses the same `accept`,
 `--exceptions`, and `--fail-on` flow as `audit`.
 
+Go handlers that are registered in a table or callback map and never called directly have
+no visible source, so `sast` does not follow their parameters by default. Pass
+`--assume-params` to treat the string parameters of such functions as untrusted. It finds
+those handlers (for example go-test-bench's), at the cost of more false positives on
+library code whose callers validate their input.
+
 ### How accurate is sast
 
 Accuracy is measured against the OWASP Benchmark, a labeled suite of small web handlers
