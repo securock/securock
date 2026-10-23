@@ -137,7 +137,7 @@ func parseFile(fset *token.FileSet, abs, rel string, src []byte) (m *module, had
 	}
 	lang := entry.Language()
 	if info[1] == "kt" {
-		src = blankExtensionAnnotations(blankClassRefs(src))
+		src = blankTypeArguments(blankVisibility(blankExtensionAnnotations(blankClassRefs(src))))
 	}
 	tree, err := gotreesitter.NewParser(lang).Parse(src)
 	if err != nil || tree == nil {
@@ -202,6 +202,39 @@ func blankExtensionAnnotations(src []byte) []byte {
 			if out[i] != '\n' {
 				out[i] = ' '
 			}
+		}
+		return out
+	})
+}
+
+var reVisibility = regexp.MustCompile(`(?m)^([ \t]*)(public|private|internal|protected)([ \t]+(?:(?:suspend|inline|operator|infix|tailrec|override|open|final|abstract|external|expect|actual)[ \t]+)+fun[ \t]+(?:<[^>\n]*>[ \t]+)?[\w.<>?, ]+\.\w+[ \t]*[(<])`)
+
+// blankVisibility blanks a visibility modifier that comes before other modifiers on an
+// extension function ("internal suspend fun HttpClient.get()"): the Kotlin grammar
+// reads the modifiers as identifiers of an infix expression and loses the function.
+// Visibility does not matter to the analysis, and the positions stay.
+func blankVisibility(src []byte) []byte {
+	return reVisibility.ReplaceAllFunc(src, func(m []byte) []byte {
+		sub := reVisibility.FindSubmatch(m)
+		out := append([]byte(nil), m...)
+		for i := len(sub[1]); i < len(sub[1])+len(sub[2]); i++ {
+			out[i] = ' '
+		}
+		return out
+	})
+}
+
+var reTypeArgs = regexp.MustCompile(`(\w)(<[A-Za-z_][\w.?, <>*]*>)\(`)
+
+// blankTypeArguments blanks the explicit type arguments of a call (jsonSchema<Map<K, V>>(),
+// call.receive<User>()): the Kotlin grammar mistakes them for comparisons when the
+// arguments continue on the next line. Types do not carry taint, and positions stay.
+func blankTypeArguments(src []byte) []byte {
+	return reTypeArgs.ReplaceAllFunc(src, func(m []byte) []byte {
+		sub := reTypeArgs.FindSubmatch(m)
+		out := append([]byte(nil), m...)
+		for i := len(sub[1]); i < len(sub[1])+len(sub[2]); i++ {
+			out[i] = ' '
 		}
 		return out
 	})

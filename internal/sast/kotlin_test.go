@@ -25,6 +25,8 @@ func TestKotlin(t *testing.T) {
 		{"channel receive is not request data", "suspend fun h(ch: kotlinx.coroutines.channels.Channel<String>) {\n val b = ch.receive()\n Runtime.getRuntime().exec(b)\n}", nil},
 		{"class literal in an annotation before an extension function", "}\n@OptIn(Foo::class)\nfun Route.r(conn: Connection) {\n get(\"/a\") {\n  conn.createStatement().executeQuery(\"SELECT \" + call.parameters[\"id\"])\n }\n}\nclass D {", []string{"sast:kt/sql-injection"}},
 		{"annotated extension function after an annotated class", "}\n@Serializable\ndata class U(val a: String)\n\n@Suppress(\"UNUSED\")\nfun Route.r(conn: Connection) {\n get(\"/a\") {\n  conn.createStatement().executeQuery(\"SELECT \" + call.parameters[\"id\"])\n }\n}\nclass D {", []string{"sast:kt/sql-injection"}},
+		{"visibility before suspend on an extension function", "}\ninternal suspend fun Route.r(conn: Connection) {\n get(\"/a\") {\n  conn.createStatement().executeQuery(\"SELECT \" + call.parameters[\"id\"])\n }\n}\nclass D {", []string{"sast:kt/sql-injection"}},
+		{"generic call with arguments on following lines", "fun r(conn: Connection, call: ApplicationCall) {\n val id = call.parameters[\"id\"]\n take<Row>(a,\n  b, c)\n conn.createStatement().executeQuery(\"SELECT \" + id)\n}", []string{"sast:kt/sql-injection"}},
 		{"ktor constant", "fun routes(r: io.ktor.server.routing.Route, conn: Connection) {\n r.get(\"/a\") {\n  conn.createStatement().executeQuery(\"SELECT 1\")\n }\n}", nil},
 		{"taint through a helper", "private fun q(s: String) = conn.createStatement().executeQuery(s)\n@GetMapping(\"/a\")\nfun g(@RequestParam n: String) {\n q(\"SELECT \" + n)\n}", []string{"sast:kt/sql-injection"}},
 	}
