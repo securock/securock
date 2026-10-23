@@ -3,6 +3,7 @@ package scanner_test
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -377,7 +378,13 @@ func (r rendezvousOSV) Query(ctx context.Context, deps []ecosystem.Dependency) (
 	select {
 	case <-r.started:
 	case <-ctx.Done():
-		return nil, ctx.Err()
+		// Once collection has started, this fake models an independent OSV
+		// result, even if the sibling's failure has already canceled the context.
+		select {
+		case <-r.started:
+		default:
+			return nil, ctx.Err()
+		}
 	case <-time.After(5 * time.Second):
 		return nil, errors.New("evidence collection did not start while OSV was queried")
 	}
@@ -421,5 +428,81 @@ func TestScanReportsOSVErrorOverEvidenceError(t *testing.T) {
 	})
 	if !errors.Is(err, osvErr) {
 		t.Fatalf("err = %v, want %v", err, osvErr)
+	}
+}
+
+type canceledOSV struct{}
+
+func (canceledOSV) Query(ctx context.Context, _ []ecosystem.Dependency) (map[string][]lockfile.Vulnerability, error) {
+	select {
+	case <-ctx.Done():
+		return nil, fmt.Errorf("OSV query: %w", ctx.Err())
+	case <-time.After(5 * time.Second):
+		return nil, errors.New("OSV query was not canceled")
+	}
+}
+
+type canceledEvidence struct{ started chan<- struct{} }
+
+func (c canceledEvidence) Collect(ctx context.Context, _ []ecosystem.Dependency) (map[string]evidence.Record, error) {
+	close(c.started)
+	select {
+	case <-ctx.Done():
+		return nil, fmt.Errorf("evidence collection: %w", ctx.Err())
+	case <-time.After(5 * time.Second):
+		return nil, errors.New("evidence collection was not canceled")
+	}
+}
+
+func TestScanReportsEvidenceErrorOverCanceledOSV(t *testing.T) {
+	evErr := fmt.Errorf("evidence collection: %w", errors.New("evidence down"))
+	_, err := scanner.Scan(context.Background(), scanner.Options{
+		Path:     "../ecosystem/npm/testdata",
+		Policy:   policy.Default(),
+		Client:   canceledOSV{},
+		Evidence: signalEvidence{started: make(chan struct{}), err: evErr},
+	})
+	if !errors.Is(err, evErr) {
+		t.Fatalf("err = %v, want %v", err, evErr)
+	}
+}
+
+func TestScanCancelsEvidenceOnOSVError(t *testing.T) {
+	started := make(chan struct{})
+	osvErr := errors.New("osv down")
+	_, err := scanner.Scan(context.Background(), scanner.Options{
+		Path:     "../ecosystem/npm/testdata",
+		Policy:   policy.Default(),
+		Client:   rendezvousOSV{started: started, err: osvErr},
+		Evidence: canceledEvidence{started: started},
+	})
+	if !errors.Is(err, osvErr) {
+		t.Fatalf("err = %v, want %v", err, osvErr)
+	}
+}
+
+func TestScanPreservesParentCancellation(t *testing.T) {
+	for _, deadline := range []bool{false, true} {
+		t.Run(fmt.Sprintf("deadline=%t", deadline), func(t *testing.T) {
+			var ctx context.Context
+			if deadline {
+				var cancel context.CancelFunc
+				ctx, cancel = context.WithDeadline(context.Background(), time.Unix(0, 0))
+				defer cancel()
+			} else {
+				var cancel context.CancelCauseFunc
+				ctx, cancel = context.WithCancelCause(context.Background())
+				cancel(errors.New("caller stopped the scan"))
+			}
+			_, err := scanner.Scan(ctx, scanner.Options{
+				Path:     "../ecosystem/npm/testdata",
+				Policy:   policy.Default(),
+				Client:   canceledOSV{},
+				Evidence: signalEvidence{started: make(chan struct{}), err: errors.New("evidence down")},
+			})
+			if !errors.Is(err, ctx.Err()) {
+				t.Fatalf("err = %v, want %v", err, ctx.Err())
+			}
+		})
 	}
 }

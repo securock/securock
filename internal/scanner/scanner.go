@@ -3,6 +3,7 @@ package scanner
 import (
 	"cmp"
 	"context"
+	"errors"
 	"slices"
 	"sync"
 
@@ -97,10 +98,10 @@ func Scan(ctx context.Context, opts Options) (*Result, error) {
 		}
 
 		// Evidence collection does not depend on the OSV results, so the two run
-		// together. Either failure cancels the other; the OSV error wins when both fail
-		// so the reported error does not depend on timing.
-		ctx, cancel := context.WithCancel(ctx)
-		defer cancel()
+		// together. Either failure cancels the other. An independent OSV error wins
+		// when both fail, but cancellation must not hide the evidence failure that caused it.
+		ctx, cancel := context.WithCancelCause(ctx)
+		defer cancel(nil)
 		var (
 			wg    sync.WaitGroup
 			evErr error
@@ -110,17 +111,20 @@ func Scan(ctx context.Context, opts Options) (*Result, error) {
 			defer wg.Done()
 			ev, evErr = collector.Collect(ctx, query)
 			if evErr != nil {
-				cancel()
+				cancel(evErr)
 			}
 		}()
 		vulns, err = client.Query(ctx, query)
 		if err == nil {
 			details = advisoryDetails(ctx, client, vulns)
 		} else {
-			cancel()
+			cancel(err)
 		}
 		wg.Wait()
 		if err != nil {
+			if errors.Is(err, context.Canceled) && evErr != nil && errors.Is(context.Cause(ctx), evErr) {
+				return nil, evErr
+			}
 			return nil, err
 		}
 		if evErr != nil {
