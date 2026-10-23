@@ -24,6 +24,11 @@ var weakCrypto = map[string]string{
 	"crypto/rc4.NewCipher":          "RC4 has known biases and is prohibited by RFC 7465",
 }
 
+// goModeArg maps a call to the index of its file-mode argument.
+var goModeArg = map[string]int{
+	"os.Chmod": 1, "os.Mkdir": 1, "os.MkdirAll": 1, "os.WriteFile": 2, "os.OpenFile": 2, "io/ioutil.WriteFile": 2,
+}
+
 var secretName = regexp.MustCompile(`(?i)(password|passwd|pwd|secret|api_?key|access_?key|auth_?token|private_?key|client_?secret|token)`)
 
 // notSecret names that contain a secret-looking word but describe something else.
@@ -81,11 +86,25 @@ func astRules(fset *token.FileSet, p *pkg, rel func(token.Pos) string) []finding
 							}
 						}
 					}
+					if idx, ok := goModeArg[name]; ok && idx < len(n.Args) {
+						if tv := p.info.Types[n.Args[idx]]; tv.Value != nil && tv.Value.Kind() == constant.Int {
+							if v, exact := constant.Int64Val(tv.Value); exact && v&0o002 != 0 {
+								r.add(n.Pos(), ruleWorldWritable, fmt.Sprintf("%s is called with mode %#o, writable by everyone", shortName(name), v))
+							}
+						}
+					}
 					if why, ok := weakCrypto[name]; ok {
 						r.add(n.Pos(), ruleWeakCrypto, why+" ("+shortName(name)+")")
 					}
 				case *ast.KeyValueExpr:
 					if k, ok := n.Key.(*ast.Ident); ok {
+						if k.Name == "MinVersion" {
+							if tv := p.info.Types[n.Value]; tv.Value != nil && tv.Value.Kind() == constant.Int {
+								if v, exact := constant.Int64Val(tv.Value); exact && v > 0 && v < 0x0303 {
+									r.add(n.Pos(), ruleTLS, "MinVersion allows TLS older than 1.2, which has known attacks")
+								}
+							}
+						}
 						if k.Name == "InsecureSkipVerify" && isTrue(p.info, n.Value) {
 							r.add(n.Pos(), ruleTLS, skipVerifyDetail)
 						}

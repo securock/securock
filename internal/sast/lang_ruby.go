@@ -96,7 +96,7 @@ type rubyLower struct {
 
 func lowerRuby(l *lowering) *module {
 	r := &rubyLower{lowering: l}
-	l.mod.top = r.stmts(l.named(l.root))
+	l.mod.top = append(l.mod.top, r.stmts(l.named(l.root))...)
 	return l.mod
 }
 
@@ -203,6 +203,15 @@ func (r *rubyLower) targets(n *node) []*expr {
 		if cs := r.named(n); len(cs) > 0 {
 			return r.targets(cs[0])
 		}
+	case "call":
+		// obj.attr = value is a call to the setter in the syntax tree and an assignment to
+		// a member here.
+		if recv := r.field(n, "receiver"); recv != nil && r.field(n, "arguments") == nil {
+			m := r.mk(exprMember, n)
+			m.x = r.expr(recv)
+			m.name = r.text(r.field(n, "method"))
+			return []*expr{m}
+		}
 	}
 	return []*expr{r.expr(n)}
 }
@@ -226,6 +235,9 @@ func (r *rubyLower) classDef(n *node) {
 			r.method(c)
 		case "class", "module":
 			r.classDef(c)
+		default:
+			// Class-body statements such as skip_before_action run once, at load time.
+			r.mod.top = append(r.mod.top, r.stmt(c)...)
 		}
 	}
 }

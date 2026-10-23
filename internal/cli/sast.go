@@ -24,7 +24,8 @@ across assignments, fields, closures, function calls and files. Analysis is offl
 file that cannot be parsed is reported as sast:analysis-incomplete rather than skipped
 silently. React's dangerouslySetInnerHTML is a sink in JSX and TSX. Dockerfiles,
 Kubernetes and Compose manifests, Terraform, and GitHub Actions workflows are checked for
-unsafe settings (sast:iac/*).`,
+unsafe settings (sast:iac/*), and text files are scanned for committed credentials
+(sast:secrets/*).`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			threshold, err := finding.ParseSeverity(failOn)

@@ -615,6 +615,19 @@ func (j *jsLower) expr(n *node) *expr {
 		}
 	case "ternary_expression":
 		return j.other(n, j.expr(j.field(n, "consequence")), j.expr(j.field(n, "alternative")))
+	case "pair":
+		// { rejectUnauthorized: false } is a call to a misuse check; any other pair is
+		// just its value.
+		if j.text(j.field(n, "key")) == "rejectUnauthorized" {
+			call := j.mk(exprCall, n)
+			fn := j.mk(exprName, n)
+			fn.name = "rejectUnauthorized"
+			call.x = fn
+			call.args = []*expr{j.expr(j.field(n, "value"))}
+			call.kw = []string{""}
+			return call
+		}
+		return j.other(n, j.expr(j.field(n, "value")))
 	case "jsx_attribute":
 		// <div dangerouslySetInnerHTML={{__html: x}}>: React's escape hatch, a call to a sink.
 		cs := j.named(n)

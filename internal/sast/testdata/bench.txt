@@ -1883,8 +1883,8 @@ $id = $_GET['id'];
 if (!preg_match('/^[0-9]+$/', $id)) { die('bad id'); }
 $res = mysqli_query($conn, "SELECT * FROM users WHERE id = " . $id);
 
-=== php/gap-extract
-// gap: sast:php/sql-injection
+=== php/extract-superglobal
+// want: sast:php/variable-extraction
 <?php
 extract($_GET);
 $res = mysqli_query($conn, "SELECT * FROM users WHERE id = " . $id);
@@ -2172,3 +2172,124 @@ jobs:
         env:
           TITLE: ${{ github.event.issue.title }}
         run: 'echo "New issue: $TITLE"'
+
+=== py/tls-verify-false
+# want: sast:py/tls-verification-disabled
+import requests
+
+def fetch(url):
+    return requests.get(url, verify=False, timeout=5).text
+
+=== py/safe-tls-default
+# want: none
+import requests
+
+def fetch(url):
+    return requests.get(url, timeout=5).text
+
+=== py/weak-hash-md5
+# want: sast:py/weak-crypto
+import hashlib
+
+def digest(data):
+    return hashlib.md5(data).hexdigest()
+
+=== py/safe-md5-not-for-security
+# want: none
+import hashlib
+
+def etag(data):
+    return hashlib.md5(data, usedforsecurity=False).hexdigest()
+
+=== py/flask-debug
+# want: sast:py/debug-enabled
+from flask import Flask
+app = Flask(__name__)
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", debug=True)
+
+=== js/weak-hash
+// want: sast:js/weak-crypto
+const crypto = require('crypto');
+exports.hashPassword = (pw) => crypto.createHash('sha1').update(pw).digest('hex');
+
+=== js/safe-hash
+// want: none
+const crypto = require('crypto');
+exports.fingerprint = (data) => crypto.createHash('sha256').update(data).digest('hex');
+
+=== js/tls-disabled
+// want: sast:js/tls-verification-disabled
+const https = require('https');
+module.exports = new https.Agent({ rejectUnauthorized: false });
+
+=== js/jquery-html-from-url
+// want: sast:js/xss
+const name = new URLSearchParams(window.location.search).get('name');
+$('#greeting').html('Hello ' + name);
+
+=== java/weak-digest
+// want: sast:java/weak-crypto
+import java.security.MessageDigest;
+public class H {
+  byte[] hash(byte[] b) throws Exception { return MessageDigest.getInstance("MD5").digest(b); }
+}
+
+=== java/safe-digest
+// want: none
+import java.security.MessageDigest;
+public class H {
+  byte[] hash(byte[] b) throws Exception { return MessageDigest.getInstance("SHA-256").digest(b); }
+}
+
+=== java/ldap-injection
+// want: sast:java/ldap-injection
+import javax.servlet.http.*;
+import javax.naming.directory.*;
+public class L extends HttpServlet {
+  protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws Exception {
+    DirContext ctx = null;
+    ctx.search("ou=people,dc=x", "(uid=" + req.getParameter("u") + ")", null);
+  }
+}
+
+=== php/tls-off
+# want: sast:php/tls-verification-disabled
+<?php
+$c = curl_init($url);
+curl_setopt($c, CURLOPT_SSL_VERIFYPEER, false);
+curl_exec($c);
+
+=== rb/md5-digest
+# want: sast:rb/weak-crypto
+require 'digest'
+class Tokens
+  def self.sign(x)
+    Digest::MD5.hexdigest(x)
+  end
+end
+
+=== rb/csrf-skipped
+# want: sast:rb/csrf-disabled
+class WebhooksController < ApplicationController
+  skip_before_action :verify_authenticity_token
+  def create; head :ok; end
+end
+
+=== sh/aws-key
+# want: sast:secrets/aws-access-key
+#!/bin/sh
+export AWS_ACCESS_KEY_ID=AKIAIOSFODNN7ABCDEFG
+aws s3 ls
+
+=== env/keyed-secret
+# want: sast:secrets/hardcoded-credential
+PORT=8080
+API_SECRET=q8Zr4Lm2Vt9Xk7Pw3Nc
+
+=== env/safe-references
+# want: none
+PORT=8080
+API_SECRET=${API_SECRET}
+DB_PASSWORD=changeme-in-prod

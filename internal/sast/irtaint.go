@@ -42,6 +42,9 @@ type langSpec struct {
 	// simpleTypes maps a class name usable without an import (java.lang, or a wildcard
 	// import) to its qualified name.
 	simpleTypes map[string]string
+	// misuse and assignMisuse list unsafe calls and assignments that need no tainted data.
+	misuse       map[string][]misuse
+	assignMisuse map[string]assignMisuse
 	// builtins are global functions that may be named without an import.
 	builtins map[string]bool
 }
@@ -427,6 +430,7 @@ func (r *irRun) evalCall(e *expr, st istate) taintSet {
 	if s, name, ok := r.lookupSink(qname, recvExpr, field); ok {
 		r.checkSink(e, name, s, args, recvT)
 	}
+	r.checkMisuse(e, qname, field)
 	if fn.kind == exprMember && r.spec.mutators[fn.name] {
 		var added taintSet
 		for _, t := range args {
@@ -769,6 +773,7 @@ func (r *irRun) stmt(s *stmt, st istate) {
 				v = merge(r.eval(l, st), t)
 			}
 			r.assign(l, v, st)
+			r.checkAssignMisuse(l, s.rhs)
 			if l.kind == exprName {
 				r.shadow[l.name] = true
 			}

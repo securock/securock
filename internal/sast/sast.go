@@ -86,7 +86,7 @@ func Analyze(root string) ([]finding.Finding, error) {
 	for _, p := range pkgs {
 		out = append(out, astRules(fset, p, rel)...)
 	}
-	return finding.New("sast", out).Findings, nil
+	return finding.New("sast", dedupeSecrets(out)).Findings, nil
 }
 
 // taint runs the interprocedural analysis to a fixed point over function summaries.
@@ -208,6 +208,9 @@ func load(fset *token.FileSet, root string) ([]*pkg, []*module, []finding.Findin
 					return err
 				}
 				continue
+			}
+			if !lowValue && !skippedFile(name) && !strings.HasSuffix(name, "_test.go") {
+				incomplete = append(incomplete, scanSecrets(root, full, relPath(root, full), name)...)
 			}
 			if kind := iacKind(relPath(root, full), name); kind != "" && !lowValue {
 				incomplete = append(incomplete, scanIaC(root, full, relPath(root, full), kind)...)
@@ -430,4 +433,23 @@ func relPath(root, full string) string {
 		return full
 	}
 	return filepath.ToSlash(r)
+}
+
+// dedupeSecrets drops a pattern-matched credential when a typed Go or IaC rule already
+// reported the same line, so one literal is one finding.
+func dedupeSecrets(in []finding.Finding) []finding.Finding {
+	typed := map[string]bool{}
+	for _, f := range in {
+		if (f.ID == "sast:go/hardcoded-secret" || f.ID == "sast:iac/hardcoded-secret") && f.Location != nil {
+			typed[fmt.Sprintf("%s:%d", f.Location.File, f.Location.Line)] = true
+		}
+	}
+	out := in[:0:0]
+	for _, f := range in {
+		if strings.HasPrefix(f.ID, "sast:secrets/") && f.Location != nil && typed[fmt.Sprintf("%s:%d", f.Location.File, f.Location.Line)] {
+			continue
+		}
+		out = append(out, f)
+	}
+	return out
 }

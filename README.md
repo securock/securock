@@ -66,8 +66,9 @@ Those changes are easy to miss in a language lockfile diff.
   command, code, path, request, response, and deserialization sinks, and prints
   the path it took. Go, JavaScript/TypeScript, Python, Java, PHP, and Ruby,
   fully offline. It also checks Dockerfiles, Kubernetes and Compose manifests,
-  Terraform, and GitHub Actions workflows for unsafe settings. A file it
-  cannot parse is reported rather than skipped
+  Terraform, and GitHub Actions workflows for unsafe settings, and scans every
+  text file for committed credentials. A file it cannot parse is reported
+  rather than skipped
 
 **Exports**
 

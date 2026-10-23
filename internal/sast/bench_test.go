@@ -22,7 +22,7 @@ type benchCase struct {
 var directive = regexp.MustCompile(`(?m)^(?://|#) (want|gap|fp-gap): (.+)$`)
 
 // benchExt is the file name a case is written to; a case may add files with "--- name".
-var benchExt = map[string]string{"go": "main.go", "js": "main.js", "ts": "main.ts", "py": "main.py", "java": "Main.java", "php": "main.php", "rb": "main.rb", "jsx": "main.jsx", "tsx": "main.tsx", "docker": "Dockerfile", "k8s": "manifest.yaml", "tf": "main.tf", "actions": ".github/workflows/ci.yml"}
+var benchExt = map[string]string{"go": "main.go", "js": "main.js", "ts": "main.ts", "py": "main.py", "java": "Main.java", "php": "main.php", "rb": "main.rb", "jsx": "main.jsx", "tsx": "main.tsx", "docker": "Dockerfile", "k8s": "manifest.yaml", "tf": "main.tf", "actions": ".github/workflows/ci.yml", "env": ".env", "sh": "deploy.sh"}
 
 func loadBench(t *testing.T) []benchCase {
 	t.Helper()

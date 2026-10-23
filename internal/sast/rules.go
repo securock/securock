@@ -22,9 +22,12 @@ const (
 	kRedirect
 	kCode
 	kDeser
+	kXPath
+	kLDAP
+	kRegex
 
-	kLast = kDeser
-	kAll  = kSQL | kCmd | kPath | kSSRF | kXSS | kRedirect | kCode | kDeser
+	kLast = kRegex
+	kAll  = kSQL | kCmd | kPath | kSSRF | kXSS | kRedirect | kCode | kDeser | kXPath | kLDAP | kRegex
 )
 
 type rule struct {
@@ -43,6 +46,9 @@ var taintRules = map[kind]rule{
 	kXSS:      {"sast:go/xss", "CWE-79", "Cross-site scripting", "Escape the value for its output context (HTML-encode it, or use a template engine that escapes by default) before writing it to the response.", finding.SeverityMedium},
 	kRedirect: {"sast:go/open-redirect", "CWE-601", "Open redirect", "Only redirect to relative paths or to destinations on an allowlist.", finding.SeverityMedium},
 	kCode:     {"sast:go/code-injection", "CWE-94", "Code injection", "Never evaluate untrusted input as code; parse it as data instead.", finding.SeverityCritical},
+	kXPath:    {"sast:go/xpath-injection", "CWE-643", "XPath injection", "Use a parameterized XPath API, or validate the value against a strict allowlist before building the expression.", finding.SeverityHigh},
+	kLDAP:     {"sast:go/ldap-injection", "CWE-90", "LDAP injection", "Escape the value for use in an LDAP filter, or build the filter with a library that does.", finding.SeverityHigh},
+	kRegex:    {"sast:go/regex-injection", "CWE-1333", "Regular expression built from untrusted input", "Escape the value with the language's regex-quoting function, or match it as a literal string.", finding.SeverityMedium},
 	kDeser:    {"sast:go/insecure-deserialization", "CWE-502", "Insecure deserialization", "Do not deserialize untrusted data with a format that can instantiate arbitrary types; use JSON or a schema-validated format.", finding.SeverityHigh},
 }
 
