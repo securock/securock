@@ -123,6 +123,13 @@ func astRules(fset *token.FileSet, p *pkg, rel func(token.Pos) string) []finding
 							}
 						}
 					}
+					if name == "crypto/rsa.GenerateKey" && len(n.Args) == 2 {
+						if tv := p.info.Types[n.Args[1]]; tv.Value != nil && tv.Value.Kind() == constant.Int {
+							if v, exact := constant.Int64Val(tv.Value); exact && v < 2048 {
+								r.add(n.Pos(), ruleWeakCrypto, fmt.Sprintf("an RSA key of %d bits can be factored; use at least 2048", v))
+							}
+						}
+					}
 					if why, ok := weakCrypto[name]; ok {
 						r.add(n.Pos(), ruleWeakCrypto, why+" ("+shortName(name)+")")
 					}
@@ -155,12 +162,8 @@ func astRules(fset *token.FileSet, p *pkg, rel func(token.Pos) string) []finding
 					}
 				case *ast.KeyValueExpr:
 					if k, ok := n.Key.(*ast.Ident); ok {
-						if k.Name == "MinVersion" {
-							if tv := p.info.Types[n.Value]; tv.Value != nil && tv.Value.Kind() == constant.Int {
-								if v, exact := constant.Int64Val(tv.Value); exact && v > 0 && v < 0x0303 {
-									r.add(n.Pos(), ruleTLS, "MinVersion allows TLS older than 1.2, which has known attacks")
-								}
-							}
+						if (k.Name == "MinVersion" || k.Name == "MaxVersion") && oldTLS(p.info, n.Value) {
+							r.add(n.Pos(), ruleTLS, tlsVersionDetail(k.Name))
 						}
 						if k.Name == "InsecureSkipVerify" && isTrue(p.info, n.Value) {
 							r.add(n.Pos(), ruleTLS, skipVerifyDetail)
@@ -200,6 +203,9 @@ func astRules(fset *token.FileSet, p *pkg, rel func(token.Pos) string) []finding
 						if name == "InsecureSkipVerify" && isTrue(p.info, n.Rhs[i]) {
 							r.add(n.Pos(), ruleTLS, skipVerifyDetail)
 						}
+						if _, isSel := l.(*ast.SelectorExpr); isSel && (name == "MinVersion" || name == "MaxVersion") && oldTLS(p.info, n.Rhs[i]) {
+							r.add(n.Pos(), ruleTLS, tlsVersionDetail(name))
+						}
 						if name != "" {
 							r.checkSecret(name, n.Rhs[i], n.Pos(), p.info)
 						}
@@ -210,6 +216,23 @@ func astRules(fset *token.FileSet, p *pkg, rel func(token.Pos) string) []finding
 		}
 	}
 	return r.out
+}
+
+// oldTLS reports a constant TLS version older than 1.2.
+func oldTLS(info *types.Info, e ast.Expr) bool {
+	tv := info.Types[e]
+	if tv.Value == nil || tv.Value.Kind() != constant.Int {
+		return false
+	}
+	v, exact := constant.Int64Val(tv.Value)
+	return exact && v > 0 && v < 0x0303
+}
+
+func tlsVersionDetail(field string) string {
+	if field == "MaxVersion" {
+		return "MaxVersion caps the connection at a TLS version older than 1.2, which has known attacks"
+	}
+	return "MinVersion allows TLS older than 1.2, which has known attacks"
 }
 
 func isTrue(info *types.Info, e ast.Expr) bool {

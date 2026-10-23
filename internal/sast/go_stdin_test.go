@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-func TestGoStandardInputAndExecVariants(t *testing.T) {
+func TestGoStandardInputExecAndCryptoVariants(t *testing.T) {
 	tests := []struct {
 		name string
 		src  string
@@ -50,6 +50,21 @@ import ("os"; "syscall")
 func main() {
 	syscall.ForkExec(os.Args[1], nil, nil)
 }`, []string{"sast:go/command-injection"}},
+		{"rsa key too small", `package main
+import ("crypto/rand"; "crypto/rsa")
+func main() { rsa.GenerateKey(rand.Reader, 1<<10) }`, []string{"sast:go/weak-crypto"}},
+		{"rsa 2048 is fine", `package main
+import ("crypto/rand"; "crypto/rsa")
+func main() { rsa.GenerateKey(rand.Reader, 2048) }`, nil},
+		{"tls MinVersion assigned low", `package main
+import "crypto/tls"
+func main() { cfg := &tls.Config{}; cfg.MinVersion = tls.VersionTLS10; _ = cfg }`, []string{"sast:go/tls-verification-disabled"}},
+		{"tls MaxVersion low", `package main
+import "crypto/tls"
+func main() { _ = &tls.Config{MaxVersion: tls.VersionTLS11} }`, []string{"sast:go/tls-verification-disabled"}},
+		{"tls 1.2 is fine", `package main
+import "crypto/tls"
+func main() { cfg := &tls.Config{MinVersion: tls.VersionTLS12}; cfg.MaxVersion = tls.VersionTLS13 }`, nil},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
