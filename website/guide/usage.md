@@ -362,7 +362,7 @@ Sources are HTTP request data and command-line arguments: `net/http`, gin,
 echo, fiber, chi and mux in Go; Express, Koa, Next.js, NestJS, Angular routes and the browser
 URL in JavaScript; Flask, Django, FastAPI and Tornado in Python; servlets,
 Spring and JAX-RS in Java; ASP.NET Core controller actions (`[FromQuery]`, `[FromBody]`, `Request.Query`)
-and WebForms input controls (`txtName.Text`) in C#; the PHP superglobals and Laravel requests; Rails
+and WebForms input controls (`txtName.Text`) in C#, with ASP.NET Core settings checked too (CORS with credentials for any origin, cookie `SecurePolicy`/`SameSite`, JWT audience/issuer validation off, certificate callbacks that always return true); the PHP superglobals and Laravel requests; Rails
 and Sinatra `params`. Taint is tracked per field, through closures, interface
 and inheritance calls, and across functions and files. A sanitizer clears only
 the classes it neutralizes: HTML escaping stops `xss` but not SQL injection,

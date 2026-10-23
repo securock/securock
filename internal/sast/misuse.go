@@ -277,6 +277,17 @@ func (r *irRun) checkAssignMisuse(lhs, rhs *expr) {
 			return
 		}
 	}
+	// A callback that always answers true: ServerCertificateValidationCallback += (a, b, c, d) => true.
+	if rhs.kind == exprLambda && rhs.fn != nil && matchesAny("lambda:true", am.vals) {
+		if n := len(rhs.fn.body); n > 0 {
+			if last := rhs.fn.body[n-1]; last.kind == stmtReturn && last.rhs != nil && last.rhs.kind == exprNum && strings.EqualFold(last.rhs.str, "true") {
+				ru := am.rule
+				ru.id = strings.Replace(ru.id, "go/", r.spec.name+"/", 1)
+				r.reportMisuse(lhs.pos, ru, am.detail)
+			}
+		}
+		return
+	}
 	have, ok := constText(rhs)
 	if !ok || !matchesAny(have, am.vals) {
 		return

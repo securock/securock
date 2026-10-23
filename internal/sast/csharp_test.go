@@ -42,3 +42,29 @@ func TestCSharp(t *testing.T) {
 		})
 	}
 }
+
+func TestCSharpConfiguration(t *testing.T) {
+	tests := []struct {
+		name string
+		body string
+		want []string
+	}{
+		{"any origin with credentials", "void F(CorsPolicyBuilder b) { b.AllowAnyOrigin().AllowCredentials(); }", []string{"sast:cs/cors-misconfiguration"}},
+		{"credentials then any origin", "void F(CorsPolicyBuilder b) { b.AllowCredentials().AllowAnyOrigin(); }", []string{"sast:cs/cors-misconfiguration"}},
+		{"listed origins with credentials", "void F(CorsPolicyBuilder b) { b.WithOrigins(\"https://a\").AllowCredentials(); }", nil},
+		{"cookie over http", "void F(CookieAuthenticationOptions o) { o.Cookie.SecurePolicy = CookieSecurePolicy.None; }", []string{"sast:cs/insecure-cookie"}},
+		{"cookie always secure", "void F(CookieAuthenticationOptions o) { o.Cookie.SecurePolicy = CookieSecurePolicy.Always; }", nil},
+		{"audience not validated", "void F(TokenValidationParameters p) { p.ValidateAudience = false; p.ValidateIssuer = true; }", []string{"sast:cs/jwt-unverified"}},
+		{"certificate callback that accepts everything", "void F() { ServicePointManager.ServerCertificateValidationCallback += (s, c, ch, e) => true; }", []string{"sast:cs/tls-verification-disabled"}},
+		{"certificate callback that checks", "void F() { ServicePointManager.ServerCertificateValidationCallback += (s, c, ch, e) => e == System.Net.Security.SslPolicyErrors.None; }", nil},
+		{"dangerous accept-any validator", "void F(HttpClientHandler h) { h.ServerCertificateCustomValidationCallback = HttpClientHandler.DangerousAcceptAnyServerCertificateValidator; }", []string{"sast:cs/tls-verification-disabled"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := analyze(t, map[string]string{"C.cs": "using System;\npublic class C {\n" + tt.body + "\n}\n"})
+			if !slices.Equal(got, tt.want) {
+				t.Fatalf("got %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

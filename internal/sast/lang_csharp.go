@@ -169,6 +169,19 @@ func init() {
 	csSpec.assignMisuse["ValidateLifetime"] = assignMisuse{rule: ruleJWT, detail: "token lifetime is not validated", vals: []string{"=false"}}
 	csSpec.assignMisuse["RequireSignedTokens"] = assignMisuse{rule: ruleJWT, detail: "unsigned tokens are accepted", vals: []string{"=false"}}
 	csSpec.builtins["Redirect"] = true
+	// ASP.NET Core configuration.
+	csSpec.misuse["?.AllowCredentials"] = []misuse{
+		{rule: ruleCORS, detail: "AllowAnyOrigin().AllowCredentials() lets any website send credentialed requests", recvCall: "AllowAnyOrigin"},
+		{rule: ruleCORS, detail: "SetIsOriginAllowed(_ => true) accepts every origin together with credentials", recvCall: "SetIsOriginAllowed"},
+	}
+	csSpec.misuse["?.AllowAnyOrigin"] = []misuse{{rule: ruleCORS, detail: "AllowAnyOrigin after AllowCredentials accepts every origin with credentials", recvCall: "AllowCredentials"}}
+	csSpec.assignMisuse["SecurePolicy"] = assignMisuse{rule: ruleCookie, detail: "the cookie may be sent over plain HTTP", vals: []string{"none"}}
+	csSpec.assignMisuse["SameSite"] = assignMisuse{rule: ruleCookie, detail: "SameSite=None sends the cookie on cross-site requests", vals: []string{"none"}}
+	csSpec.assignMisuse["ValidateAudience"] = assignMisuse{rule: ruleJWT, detail: "the token audience is not validated", vals: []string{"=false"}}
+	csSpec.assignMisuse["ValidateIssuer"] = assignMisuse{rule: ruleJWT, detail: "the token issuer is not validated", vals: []string{"=false"}}
+	for _, cb := range []string{"ServerCertificateValidationCallback", "ServerCertificateCustomValidationCallback", "RemoteCertificateValidationCallback"} {
+		csSpec.assignMisuse[cb] = assignMisuse{rule: ruleTLS, detail: "the certificate check always succeeds", vals: []string{"lambda:true", "dangerousacceptany"}}
+	}
 	csSpec.misuse["weakAllowlist"] = []misuse{bare(ruleWeakAllowlist, "the URL is accepted when it merely contains or starts with an allowed one")}
 	csSpec.builtins["weakAllowlist"] = true
 	addBuiltins()
