@@ -227,6 +227,10 @@ func TestHardcodedEncryptionKey(t *testing.T) {
 		{"java key from a parameter", "A.java", "import javax.crypto.spec.SecretKeySpec;\nclass A { Object f(byte[] k) { return new SecretKeySpec(k, \"AES\"); } }", nil},
 		{"node createCipheriv", "a.js", "const crypto = require('crypto');\nfunction f(iv) { return crypto.createCipheriv('aes-256-cbc', '0123456789abcdef0123456789abcdef', iv); }", []string{"sast:js/hardcoded-key"}},
 		{"node key from env", "a.js", "const crypto = require('crypto');\nfunction f(iv) { return crypto.createCipheriv('aes-256-cbc', process.env.KEY, iv); }", nil},
+		{"ruby constant and cipher key", "a.rb", "require 'openssl'\nKEY = '0123456789abcdef0123456789abcdef'\nclass E\n  def go\n    cipher = OpenSSL::Cipher.new('aes-256-cbc')\n    cipher.key = KEY\n  end\nend\n", []string{"sast:rb/hardcoded-key"}},
+		{"ruby cipher key from env", "a.rb", "require 'openssl'\nclass E\n  def go\n    cipher = OpenSSL::Cipher.new('aes-256-cbc')\n    cipher.key = ENV['KEY']\n  end\nend\n", nil},
+		{"ruby jwt literal secret", "a.rb", "require 'jwt'\nclass E\n  def go(u)\n    JWT.encode({ id: u }, 'hardcoded-jwt-secret', 'HS256')\n  end\nend\n", []string{"sast:rb/hardcoded-signing-key"}},
+		{"c# aes key literal", "A.cs", "using System.Security.Cryptography;\nusing System.Text;\nclass A { public void F() { var aes = Aes.Create(); aes.Key = Encoding.UTF8.GetBytes(\"0123456789abcdef\"); } }", []string{"sast:cs/hardcoded-key"}},
 		{"python AES", "a.py", "from Crypto.Cipher import AES\n\ndef f():\n    return AES.new(b'0123456789abcdef', AES.MODE_GCM)\n", []string{"sast:py/hardcoded-key"}},
 		{"python key from env", "a.py", "import os\nfrom Crypto.Cipher import AES\n\ndef f():\n    return AES.new(os.environ['K'].encode(), AES.MODE_GCM)\n", nil},
 	}

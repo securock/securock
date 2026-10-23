@@ -56,6 +56,11 @@ type assignMisuse struct {
 	file string
 	// skip excludes paths containing any of these: development.rb is meant to show errors.
 	skip []string
+	// literal makes the assignment unsafe when the value is a string literal (or a
+	// constant that resolves to one), whatever vals says; recvRe limits it to receivers
+	// with a matching name: cipher.key = "...".
+	literal bool
+	recvRe  *regexp.Regexp
 }
 
 var (
@@ -350,6 +355,18 @@ func (r *irRun) checkAssignMisuse(lhs, rhs *expr) {
 				r.reportMisuse(lhs.pos, ru, am.detail)
 			}
 		}
+		return
+	}
+	if am.literal {
+		if am.recvRe != nil && (lhs.kind != exprMember || !am.recvRe.MatchString(rootName(lhs.x))) {
+			return
+		}
+		if !literalArg(rhs, r.argText) {
+			return
+		}
+		ru := am.rule
+		ru.id = strings.Replace(ru.id, "go/", r.spec.name+"/", 1)
+		r.reportMisuse(lhs.pos, ru, am.detail)
 		return
 	}
 	have, ok := constText(rhs)

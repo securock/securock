@@ -1,5 +1,7 @@
 package sast
 
+import "regexp"
+
 // Checks added after running the analyzer over Juice Shop's code-fix variants: Angular
 // sources, weak URL allowlists, directory listings, mass assignment and LLM prompts.
 
@@ -84,6 +86,13 @@ func init() {
 	for _, n := range []string{"HMACSHA1", "HMACSHA256", "HMACSHA384", "HMACSHA512", "HMACMD5"} {
 		csSpec.misuse["System.Security.Cryptography."+n] = append(csSpec.misuse["System.Security.Cryptography."+n], hardKey(0)...)
 	}
+	rubySpec.misuse["JWT.encode"] = append(rubySpec.misuse["JWT.encode"], misuse{rule: ruleHardKey, detail: "the signing key is a string literal", literal: map[int]bool{1: true}})
+	for _, m := range []string{"hexdigest", "digest", "base64digest"} {
+		rubySpec.misuse["OpenSSL.HMAC."+m] = append(rubySpec.misuse["OpenSSL.HMAC."+m], hardKey(1)...)
+	}
+	cipherRecv := regexp.MustCompile(`(?i)(cipher|aes|rijndael|crypt|encryptor|decryptor)`)
+	rubySpec.assignMisuse["key"] = assignMisuse{rule: ruleHardCryptoKey, detail: "the encryption key is a string literal", literal: true, recvRe: cipherRecv}
+	csSpec.assignMisuse["Key"] = assignMisuse{rule: ruleHardCryptoKey, detail: "the encryption key is a string literal", literal: true, recvRe: cipherRecv}
 	phpSpec.misuse["openssl_encrypt"] = append(phpSpec.misuse["openssl_encrypt"], hardKey(2)...)
 	phpSpec.misuse["openssl_decrypt"] = append(phpSpec.misuse["openssl_decrypt"], hardKey(2)...)
 	phpSpec.misuse["hash_hmac"] = append(phpSpec.misuse["hash_hmac"], hardKey(2)...)
