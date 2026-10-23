@@ -3,6 +3,7 @@ package sast_test
 import (
 	"os"
 	"path/filepath"
+	"reflect"
 	"slices"
 	"strings"
 	"testing"
@@ -340,5 +341,32 @@ func h(db *sql.DB, r *http.Request) {
 }`})
 	if !slices.Equal(got, []string{"sast:go/sql-injection"}) {
 		t.Fatalf("got %v", got)
+	}
+}
+
+func TestOutputIsDeterministicAcrossLanguages(t *testing.T) {
+	files := map[string]string{
+		"a.js":   "app.get('/', (req, res) => { db.query('x' + req.query.a); exec('ls ' + req.query.b); res.send(req.query.c); });\n",
+		"b.py":   "from flask import request\nimport os\ndef f(cur):\n    cur.execute('x' + request.args['a'])\n    os.system('ls ' + request.args['b'])\n",
+		"C.java": "import javax.servlet.http.*;\npublic class C extends HttpServlet {\n  void f(HttpServletRequest r, java.sql.Statement s) throws Exception { s.executeQuery(\"x\" + r.getParameter(\"a\")); Runtime.getRuntime().exec(r.getParameter(\"b\")); }\n}\n",
+		"d.php":  "<?php\nmysqli_query($c, 'x' . $_GET['a']);\nsystem($_GET['b']);\necho $_GET['c'];\n",
+		"e.rb":   "class E < ApplicationController\n  def x\n    User.find_by_sql(\"x #{params[:a]}\")\n    system(\"ls #{params[:b]}\")\n  end\nend\n",
+		"f.tf":   "resource \"aws_db_instance\" \"d\" {\n  publicly_accessible = true\n  storage_encrypted   = false\n}\n",
+	}
+	dir := t.TempDir()
+	for name, src := range files {
+		if err := os.WriteFile(filepath.Join(dir, name), []byte(src), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	first, err := sast.Analyze(dir)
+	if err != nil || len(first) < 10 {
+		t.Fatalf("expected findings in every language, got %d, %v", len(first), err)
+	}
+	for range 5 {
+		got, err := sast.Analyze(dir)
+		if err != nil || !reflect.DeepEqual(got, first) {
+			t.Fatal("two runs over the same files differ in content or order")
+		}
 	}
 }
