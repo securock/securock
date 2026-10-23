@@ -23,6 +23,7 @@ func TestKotlin(t *testing.T) {
 		{"ktor header", "suspend fun h(call: io.ktor.server.application.ApplicationCall) {\n val h = call.request.headers[\"X-Cmd\"]\n Runtime.getRuntime().exec(h)\n}", []string{"sast:kt/command-injection"}},
 		{"ktor receive", "suspend fun h(call: io.ktor.server.application.ApplicationCall) {\n val b = call.receive<String>()\n Runtime.getRuntime().exec(b)\n}", []string{"sast:kt/command-injection"}},
 		{"channel receive is not request data", "suspend fun h(ch: kotlinx.coroutines.channels.Channel<String>) {\n val b = ch.receive()\n Runtime.getRuntime().exec(b)\n}", nil},
+		{"class literal in an annotation before an extension function", "}\n@OptIn(Foo::class)\nfun Route.r(conn: Connection) {\n get(\"/a\") {\n  conn.createStatement().executeQuery(\"SELECT \" + call.parameters[\"id\"])\n }\n}\nclass D {", []string{"sast:kt/sql-injection"}},
 		{"ktor constant", "fun routes(r: io.ktor.server.routing.Route, conn: Connection) {\n r.get(\"/a\") {\n  conn.createStatement().executeQuery(\"SELECT 1\")\n }\n}", nil},
 		{"taint through a helper", "private fun q(s: String) = conn.createStatement().executeQuery(s)\n@GetMapping(\"/a\")\nfun g(@RequestParam n: String) {\n q(\"SELECT \" + n)\n}", []string{"sast:kt/sql-injection"}},
 	}

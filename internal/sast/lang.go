@@ -1,8 +1,10 @@
 package sast
 
 import (
+	"bytes"
 	"go/token"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"github.com/odvcencio/gotreesitter"
@@ -134,6 +136,9 @@ func parseFile(fset *token.FileSet, abs, rel string, src []byte) (m *module, had
 		return nil, true, nil
 	}
 	lang := entry.Language()
+	if info[1] == "kt" {
+		src = blankClassRefs(src)
+	}
 	tree, err := gotreesitter.NewParser(lang).Parse(src)
 	if err != nil || tree == nil {
 		return nil, true, err
@@ -171,4 +176,13 @@ func bindCallback(lambda *expr, over *expr) {
 	}
 	name := &expr{kind: exprName, pos: lambda.pos, name: f.params[0].name}
 	f.body = append([]*stmt{{kind: stmtAssign, pos: lambda.pos, lhs: []*expr{name}, rhs: over, binds: true}}, f.body...)
+}
+
+var reClassRef = regexp.MustCompile(`::class(\.java|\.kotlin)?`)
+
+// blankClassRefs overwrites Kotlin class literals (Foo::class) with spaces of the same
+// length: the Kotlin grammar rejects `@OptIn(Foo::class)` before an extension function,
+// and a class literal carries no data, so positions stay and nothing is lost.
+func blankClassRefs(src []byte) []byte {
+	return reClassRef.ReplaceAllFunc(src, func(m []byte) []byte { return bytes.Repeat([]byte{' '}, len(m)) })
 }
