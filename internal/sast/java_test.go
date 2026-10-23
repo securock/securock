@@ -185,3 +185,30 @@ public class A {
 		})
 	}
 }
+
+func TestJavaStringConstants(t *testing.T) {
+	tests := []struct {
+		name  string
+		files map[string]string
+		want  []string
+	}{
+		{"static final signing key", map[string]string{
+			"A.java": "import io.jsonwebtoken.Jwts;\nimport io.jsonwebtoken.SignatureAlgorithm;\nclass A {\n private static final String KEY = \"shhh-secret\";\n String f(String u) { return Jwts.builder().setSubject(u).signWith(SignatureAlgorithm.HS256, KEY).compact(); }\n}",
+		}, []string{"sast:java/hardcoded-signing-key"}},
+		{"constant from another class", map[string]string{
+			"Keys.java": "class Keys { public static final String JWT = \"shhh-secret\"; }",
+			"A.java":    "import io.jsonwebtoken.Jwts;\nimport io.jsonwebtoken.SignatureAlgorithm;\nclass A {\n String f(String u) { return Jwts.builder().setSubject(u).signWith(SignatureAlgorithm.HS256, Keys.JWT).compact(); }\n}",
+		}, []string{"sast:java/hardcoded-signing-key"}},
+		{"key read from configuration", map[string]string{
+			"A.java": "import io.jsonwebtoken.Jwts;\nimport io.jsonwebtoken.SignatureAlgorithm;\nclass A {\n private static final String KEY = System.getenv(\"KEY\");\n String f(String u) { return Jwts.builder().setSubject(u).signWith(SignatureAlgorithm.HS256, KEY).compact(); }\n}",
+		}, nil},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := analyze(t, tt.files)
+			if !slices.Equal(got, tt.want) {
+				t.Fatalf("got %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

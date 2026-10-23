@@ -177,6 +177,12 @@ func newProject(mods []*module) *project {
 	for _, m := range mods {
 		p.mods[m.path] = m
 		p.globalCSRF = p.globalCSRF || m.globalCSRF
+		// A class with only constants has no methods but can still be named: Keys.JWT.
+		for class := range m.fields {
+			if p.classes[class] == "" {
+				p.classes[class] = m.path
+			}
+		}
 		for _, f := range m.funcs {
 			if f.class == "" {
 				continue
@@ -1478,6 +1484,15 @@ func (r *irRun) strOf(e *expr) (string, bool) {
 		}
 		return b.String(), true
 	case exprMember:
+		// Constants.KEY where Constants is one of the project's classes.
+		if e.x != nil && e.x.kind == exprName && r.proj != nil {
+			if path := r.proj.classes[e.x.name]; path != "" {
+				if m := r.proj.mods[path]; m != nil {
+					v, ok := topStrs(m)[e.name]
+					return v, ok
+				}
+			}
+		}
 		// cfg.SECRET where cfg is a project module.
 		if e.x != nil && e.x.kind == exprName && r.mod != nil {
 			if ref, ok := r.mod.locals[e.x.name]; ok && ref.name == "" {

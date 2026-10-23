@@ -193,6 +193,12 @@ func (j *javaLower) classDecl(n *node) {
 						j.mod.fields[name] = map[string]string{}
 					}
 					j.mod.fields[name][j.text(j.field(d, "name"))] = ty
+					// static final String KEY = "...": a constant other code can read.
+					if v := j.field(d, "value"); v != nil && j.kind(v) == "string_literal" && strings.Contains(j.fieldModifiers(m), "final") {
+						id := j.mk(exprName, d)
+						id.name = j.text(j.field(d, "name"))
+						j.mod.top = append(j.mod.top, &stmt{kind: stmtAssign, pos: j.pos(d), lhs: []*expr{id}, rhs: j.expr(v)})
+					}
 				}
 			}
 		case "method_declaration", "constructor_declaration":
@@ -625,4 +631,14 @@ func (j *javaLower) invoke(n *node) *expr {
 		return e
 	}
 	return e
+}
+
+// fieldModifiers is the text of a declaration's modifiers ("private static final").
+func (j *javaLower) fieldModifiers(m *node) string {
+	for _, c := range j.named(m) {
+		if j.kind(c) == "modifiers" {
+			return j.text(c)
+		}
+	}
+	return ""
 }

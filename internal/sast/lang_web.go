@@ -67,6 +67,9 @@ func init() {
 	js.sinks["llmPrompt"] = sink{kind: kPrompt, args: []int{0}}
 	js.builtins["llmPrompt"] = true
 
+	// jjwt: signWith(SignatureAlgorithm.HS256, "secret") — the older two-argument form.
+	javaSpec.misuse["?.signWith"] = append(javaSpec.misuse["?.signWith"], misuse{rule: ruleHardKey, detail: "the signing key is a string literal", literal: map[int]bool{1: true}})
+
 	// ---- Ruby
 	rb := rubySpec
 	for _, m := range []string{"create", "create!", "update", "update!", "update_attributes", "new", "assign_attributes", "update_all"} {
