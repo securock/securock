@@ -43,6 +43,19 @@ func (r *irRun) checkExtras(c *expr, qname, field string, fn *expr, st istate) {
 		}
 	}
 
+	if r.spec.cookieCtors[qname] {
+		r.cookies = append(r.cookies, c.pos)
+	}
+	if len(c.args) == 1 {
+		if v, ok := constText(c.args[0]); ok && v == "true" {
+			switch field {
+			case "setSecure":
+				r.cookieSecure = true
+			case "setHttpOnly":
+				r.cookieHTTPOnly = true
+			}
+		}
+	}
 	if r.spec.xxeFactories[qname] {
 		r.xxeFactories = append(r.xxeFactories, c.pos)
 	}

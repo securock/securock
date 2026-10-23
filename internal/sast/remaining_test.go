@@ -205,8 +205,8 @@ func TestFlowFixesFoundByTheOWASPBenchmark(t *testing.T) {
 		{"python Path.read_text", map[string]string{"a.py": "from pathlib import Path\nfrom flask import request\ndef f():\n    return Path('/srv/' + request.args['f']).read_text()\n"}, []string{"sast:py/path-traversal"}},
 		{"lxml XPath constructor", map[string]string{"a.py": "import lxml.etree\nfrom flask import request\ndef f():\n    return lxml.etree.XPath(\"//u[@n='\" + request.args['n'] + \"']\")\n"}, []string{"sast:py/xpath-injection"}},
 		{"java session attribute is a trust boundary", map[string]string{"A.java": "import javax.servlet.http.*;\npublic class A extends HttpServlet {\n  public void doPost(HttpServletRequest request, HttpServletResponse response) throws Exception {\n    request.getSession().setAttribute(\"k\", request.getParameter(\"v\"));\n  }\n}\n"}, []string{"sast:java/trust-boundary"}},
-		{"java weak random in a cookie", map[string]string{"A.java": "import javax.servlet.http.*;\npublic class A extends HttpServlet {\n  public void doPost(HttpServletRequest request, HttpServletResponse response) throws Exception {\n    float r = new java.util.Random().nextFloat();\n    response.addCookie(new javax.servlet.http.Cookie(\"id\", Float.toString(r)));\n  }\n}\n"}, []string{"sast:java/insecure-random"}},
-		{"java secure random in a cookie", map[string]string{"A.java": "import javax.servlet.http.*;\npublic class A extends HttpServlet {\n  public void doPost(HttpServletRequest request, HttpServletResponse response) throws Exception {\n    float r = new java.security.SecureRandom().nextFloat();\n    response.addCookie(new javax.servlet.http.Cookie(\"id\", Float.toString(r)));\n  }\n}\n"}, nil},
+		{"java weak random in a cookie", map[string]string{"A.java": "import javax.servlet.http.*;\npublic class A extends HttpServlet {\n  public void doPost(HttpServletRequest request, HttpServletResponse response) throws Exception {\n    float r = new java.util.Random().nextFloat();\n    response.addCookie(new javax.servlet.http.Cookie(\"id\", Float.toString(r)));\n  }\n}\n"}, []string{"sast:java/insecure-cookie", "sast:java/insecure-random"}},
+		{"java secure random in a cookie", map[string]string{"A.java": "import javax.servlet.http.*;\npublic class A extends HttpServlet {\n  public void doPost(HttpServletRequest request, HttpServletResponse response) throws Exception {\n    float r = new java.security.SecureRandom().nextFloat();\n    response.addCookie(new javax.servlet.http.Cookie(\"id\", Float.toString(r)));\n  }\n}\n"}, []string{"sast:java/insecure-cookie"}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -286,5 +286,25 @@ func TestGoCookieLiterals(t *testing.T) {
 	got := analyze(t, map[string]string{"main.go": "package main\nimport \"net/http\"\nfunc a() *http.Cookie { return &http.Cookie{Name: \"s\", Value: \"v\"} }\nfunc b() *http.Cookie { return &http.Cookie{Name: \"s\", Secure: true, HttpOnly: true} }\nfunc c() *http.Cookie { return &http.Cookie{Name: \"s\", MaxAge: -1} }\n"})
 	if !slices.Equal(got, []string{"sast:go/insecure-cookie"}) {
 		t.Fatalf("got %v", got)
+	}
+}
+
+func TestJavaCookieFlags(t *testing.T) {
+	tests := []struct {
+		name string
+		src  string
+		want []string
+	}{
+		{"no flags", "import javax.servlet.http.*;\npublic class A {\n  void f(HttpServletResponse r) { Cookie c = new Cookie(\"a\", \"b\"); r.addCookie(c); }\n}\n", []string{"sast:java/insecure-cookie"}},
+		{"only secure", "import javax.servlet.http.*;\npublic class A {\n  void f(HttpServletResponse r) { Cookie c = new Cookie(\"a\", \"b\"); c.setSecure(true); r.addCookie(c); }\n}\n", []string{"sast:java/insecure-cookie"}},
+		{"both flags", "import javax.servlet.http.*;\npublic class A {\n  void f(HttpServletResponse r) { Cookie c = new Cookie(\"a\", \"b\"); c.setSecure(true); c.setHttpOnly(true); r.addCookie(c); }\n}\n", nil},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := analyze(t, map[string]string{"A.java": tt.src})
+			if !slices.Equal(got, tt.want) {
+				t.Fatalf("got %v, want %v", got, tt.want)
+			}
+		})
 	}
 }

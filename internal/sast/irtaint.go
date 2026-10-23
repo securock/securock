@@ -60,6 +60,8 @@ type langSpec struct {
 	fsCheck, fsUse map[string]bool
 	// xxeFactories create an XML parser that resolves external entities unless hardened.
 	xxeFactories map[string]bool
+	// cookieCtors create a cookie whose flags are set by later calls (Java's new Cookie).
+	cookieCtors map[string]bool
 	// pkgRoots are the first segments of fully qualified names written inline, as in
 	// java.io.File or org.apache.commons.io.FileUtils.
 	pkgRoots map[string]bool
@@ -245,14 +247,16 @@ type irRun struct {
 	// mistaken for the request parameters.
 	shadow map[string]bool
 	// per-function state for the checks that look at order and context
-	lhsName      string
-	loopAcc      istate // states at break/continue in the innermost loop
-	fn           *funcIR
-	strVars      map[string]bool  // variables that hold a string built in this function
-	consts       map[string]int64 // integer variables with a known value on this path
-	checked      map[string]bool
-	xxeFactories []token.Pos
-	xxeHardened  bool
+	lhsName                      string
+	loopAcc                      istate // states at break/continue in the innermost loop
+	fn                           *funcIR
+	strVars                      map[string]bool  // variables that hold a string built in this function
+	consts                       map[string]int64 // integer variables with a known value on this path
+	checked                      map[string]bool
+	xxeFactories                 []token.Pos
+	xxeHardened                  bool
+	cookies                      []token.Pos
+	cookieSecure, cookieHTTPOnly bool
 }
 
 // commonMethods are names that the standard library defines on many types, so a project
@@ -1313,6 +1317,7 @@ func (r *irRun) analyze(f *funcIR) *summary {
 	r.checked = map[string]bool{}
 	r.consts = map[string]int64{}
 	r.xxeFactories, r.xxeHardened, r.lhsName = nil, false, ""
+	r.cookies, r.cookieSecure, r.cookieHTTPOnly = nil, false, false
 	st := istate{}
 	if f.class != "" {
 		st[ikey{recvName, ""}] = taintSet{{key: "pr", param: recvParam, kinds: kAll}}
@@ -1331,6 +1336,11 @@ func (r *irRun) analyze(f *funcIR) *summary {
 		st[ikey{p.name, ""}] = t
 	}
 	r.block(f.body, st)
+	if len(r.cookies) > 0 && !(r.cookieSecure && r.cookieHTTPOnly) {
+		for _, pos := range r.cookies {
+			r.reportMisuse(pos, ruleFor2(r.spec.name, ruleCookie), "the cookie is created without Secure and HttpOnly being set to true")
+		}
+	}
 	if !r.xxeHardened {
 		for _, pos := range r.xxeFactories {
 			r.reportMisuse(pos, ruleFor2(r.spec.name, ruleXXE), "the XML parser factory is used without disabling DTDs or external entities")

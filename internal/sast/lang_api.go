@@ -83,6 +83,7 @@ func init() {
 	for _, m := range []string{"md5", "md5Hex", "getMd5Digest", "sha1", "sha1Hex", "getSha1Digest", "shaHex", "sha"} {
 		jv.misuse["org.apache.commons.codec.digest.DigestUtils."+m] = []misuse{bare(ruleWeakCrypto, "MD5 and SHA-1 are broken for collision resistance")}
 	}
+	jv.cookieCtors = map[string]bool{"javax.servlet.http.Cookie": true, "jakarta.servlet.http.Cookie": true}
 	jv.simpleTypes["NullCipher"] = "javax.crypto.NullCipher"
 	jv.simpleTypes["SSLContext"] = "javax.net.ssl.SSLContext"
 
