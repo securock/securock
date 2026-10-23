@@ -33,7 +33,8 @@ func csSimpleTypes() map[string]string {
 	add("System.Xml", "XmlDocument", "XmlReaderSettings")
 	add("System.Security.Cryptography", "MD5", "SHA1", "DES", "TripleDES", "RC2", "MD5CryptoServiceProvider", "SHA1CryptoServiceProvider", "SHA1Managed", "DESCryptoServiceProvider", "HMACSHA1", "HMACSHA256", "HMACSHA384", "HMACSHA512", "HMACMD5")
 	add("System.Text.RegularExpressions", "Regex")
-	add("System", "Random", "Activator", "Type", "Convert", "Uri")
+	add("System", "Random", "Activator", "Type", "Convert", "Uri", "Guid")
+	add("Microsoft.AspNetCore.Html", "HtmlString")
 	add("System.Web", "HttpUtility")
 	add("System.DirectoryServices", "DirectorySearcher")
 	return m
