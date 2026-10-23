@@ -413,7 +413,7 @@ the false-positive rate; a tool that guesses scores 0.
 
 | Suite                       | True positives | False positives | Score |
 | --------------------------- | -------------- | --------------- | ----- |
-| BenchmarkJava 1.2 (2,740)   | 86%            | 15%             | +0.72 |
+| BenchmarkJava 1.2 (2,740)   | 91%            | 15%             | +0.77 |
 | BenchmarkPython 0.1 (1,230) | 80%            | 22%             | +0.59 |
 
 The suites are not vendored. To reproduce, check one out and run
@@ -428,7 +428,7 @@ file with `getProperty("key", "default")` are resolved from the project's own pr
 files. Juice Shop also ships each security challenge in several flawed and one correct variant
 (`data/static/codefixes`), which makes a labeled set for JavaScript and TypeScript: the
 vulnerable variants of the injection, XSS and redirect challenges are found, and the
-parameterized SQL variants are not reported. Other languages have no labeled suite here, only the
+parameterized SQL variants are not reported. Two other public sets were used as spot checks: njsscan's Node.js true-negative samples (1 of 65 files reported, and that one is a log-injection note) and gosec's Go samples, where the SQL injection, TLS and RSA key size cases are covered. Other languages have no labeled suite here, only the
 cases in `internal/sast/testdata/bench.txt` and runs over intentionally vulnerable
 applications (NodeGoat, Juice Shop, DVWA, railsgoat, WebGoat, pygoat), which were read
 by hand. Treat the results as a measured starting point, not a guarantee.
