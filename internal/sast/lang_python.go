@@ -160,7 +160,7 @@ func (p *pyLower) stmt(n *node) []*stmt {
 		}
 		return []*stmt{s}
 	case "break_statement", "continue_statement":
-		return []*stmt{{kind: stmtJump, pos: p.pos(n), loop: true}}
+		return []*stmt{{kind: stmtJump, pos: p.pos(n), loop: true, next: k == "continue_statement"}}
 	case "if_statement":
 		return []*stmt{p.ifStmt(n)}
 	case "for_statement":
@@ -168,7 +168,7 @@ func (p *pyLower) stmt(n *node) []*stmt {
 		s.lhs = p.targets(p.field(n, "left"))
 		return []*stmt{s}
 	case "while_statement":
-		return []*stmt{{kind: stmtBranch, pos: p.pos(n), arms: [][]*stmt{p.block(p.field(n, "body"))}}}
+		return []*stmt{{kind: stmtLoop, pos: p.pos(n), then: p.block(p.field(n, "body")), cond: p.expr(p.field(n, "condition"))}}
 	case "try_statement":
 		s := &stmt{kind: stmtBranch, pos: p.pos(n)}
 		for _, c := range p.named(n) {
@@ -588,12 +588,17 @@ func (p *pyLower) expr(n *node) *expr {
 	case "dictionary":
 		// {"role": "system", "content": x}: request data in an LLM's instructions.
 		var role, content *node
-		d := p.mk(exprOther, n)
+		d := p.mk(exprObject, n)
 		for _, c := range p.named(n) {
 			if p.kind(c) != "pair" {
+				d.args = append(d.args, p.expr(c))
 				continue
 			}
-			d.args = append(d.args, p.expr(c))
+			v := p.expr(p.field(c, "value"))
+			if key := p.expr(p.field(c, "key")); key != nil && (key.kind == exprStr || key.kind == exprNum) {
+				v = &expr{kind: exprField, pos: p.pos(c), name: key.str, x: v}
+			}
+			d.args = append(d.args, v)
 			switch strings.Trim(p.text(p.field(c, "key")), `"'`) {
 			case "role":
 				role = p.field(c, "value")
@@ -677,6 +682,7 @@ func (p *pyLower) call(n *node) *expr {
 	if e.x.kind == exprMember && e.x.name == "startswith" && len(e.args) == 1 {
 		in := p.mk(exprIn, n)
 		in.x, in.args = e.args[0], []*expr{e.x.x}
+		in.str = "prefix"
 		if as := p.named(p.field(n, "arguments")); len(as) == 1 {
 			return withWeakAllow(in, p.weakAllow(p.pos(n), p.text(p.field(fn, "object")), p.text(as[0])))
 		}

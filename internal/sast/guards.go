@@ -19,44 +19,51 @@ import (
 // proves nothing.
 
 // validWhenTrue returns the values that are known good if cond is true.
-func (a *analyzer) validWhenTrue(cond ast.Expr) []ast.Expr {
+type validatedGo struct {
+	value ast.Expr
+	kinds kind
+}
+
+func (a *analyzer) validWhenTrue(cond ast.Expr, st state) []validatedGo {
 	switch c := unparen(cond).(type) {
 	case *ast.BinaryExpr:
 		if c.Op == token.LAND {
-			return append(a.validWhenTrue(c.X), a.validWhenTrue(c.Y)...)
+			return append(a.validWhenTrue(c.X, st), a.validWhenTrue(c.Y, st)...)
 		}
 	case *ast.IndexExpr:
 		// m[x] on a map[string]bool is true only for keys that were put in it.
-		if m, ok := typeUnder(a.info.TypeOf(c.X)).(*types.Map); ok && isBool(m.Elem()) {
-			return []ast.Expr{c.Index}
+		if m, ok := typeUnder(a.info.TypeOf(c.X)).(*types.Map); ok && isBool(m.Elem()) && len(a.eval(c.X, st)) == 0 {
+			return []validatedGo{{c.Index, kAll}}
 		}
 	case *ast.Ident:
 		if x, ok := a.ctx.oks[a.info.Uses[c]]; ok {
-			return []ast.Expr{x}
+			if ix, ok := x.(*ast.IndexExpr); ok && len(a.eval(ix.X, st)) == 0 {
+				return []validatedGo{{ix.Index, kAll}}
+			}
 		}
 	case *ast.CallExpr:
-		return a.validatorCall(c)
+		return a.validatorCall(c, st)
 	}
 	return nil
 }
 
 // validWhenFalse returns the values that are known good if cond is false.
-func (a *analyzer) validWhenFalse(cond ast.Expr) []ast.Expr {
+func (a *analyzer) validWhenFalse(cond ast.Expr, st state) []validatedGo {
 	switch c := unparen(cond).(type) {
 	case *ast.CallExpr:
 		// if strings.Contains(name, "..") { reject }
 		if name, _ := a.calleeName(c.Fun); name == "strings.Contains" && len(c.Args) == 2 {
 			if tv := a.info.Types[c.Args[1]]; tv.Value != nil && tv.Value.Kind() == constant.String && constant.StringVal(tv.Value) == ".." {
-				return []ast.Expr{c.Args[0]}
+				return []validatedGo{{c.Args[0], kPath}}
 			}
 		}
 	case *ast.UnaryExpr:
 		if c.Op == token.NOT {
-			return a.validWhenTrue(c.X)
+			return a.validWhenTrue(c.X, st)
 		}
 	case *ast.BinaryExpr:
 		if c.Op == token.LOR {
-			return append(a.validWhenFalse(c.X), a.validWhenFalse(c.Y)...)
+			return append(a.validWhenFalse(c.X, st), a.validWhenFalse(c.Y, st)...)
 		}
 	}
 	return nil
@@ -75,28 +82,32 @@ func isBool(t types.Type) bool {
 	return ok && b.Info()&types.IsBoolean != 0
 }
 
-func (a *analyzer) validatorCall(c *ast.CallExpr) []ast.Expr {
+func (a *analyzer) validatorCall(c *ast.CallExpr, st state) []validatedGo {
 	name, recv := a.calleeName(c.Fun)
 	switch name {
 	case "slices.Contains":
-		if len(c.Args) == 2 {
-			return []ast.Expr{c.Args[1]}
+		if len(c.Args) == 2 && len(a.eval(c.Args[0], st)) == 0 {
+			return []validatedGo{{c.Args[1], kAll}}
 		}
 	case "path/filepath.IsLocal":
 		if len(c.Args) == 1 {
-			return []ast.Expr{c.Args[0]}
+			return []validatedGo{{c.Args[0], kPath}}
 		}
 	case "strings.HasPrefix":
 		// A prefix check is only a containment check once the path has been cleaned:
 		// "/srv/" + name passes it for "../etc/passwd", filepath.Join("/srv", name) does not.
-		if len(c.Args) == 2 {
-			if obj, _, _, ok := a.pathOf(c.Args[0]); ok && a.ctx.cleaned[obj] {
-				return []ast.Expr{c.Args[0]}
+		if len(c.Args) == 2 && a.pathBoundary(c.Args[1]) {
+			if obj, field, _, ok := a.pathOf(c.Args[0]); ok && a.ctx.cleaned[vkey{obj, field}] {
+				return []validatedGo{{c.Args[0], kPath}}
 			}
 		}
 	case "(*regexp.Regexp).MatchString", "(*regexp.Regexp).Match":
 		if len(c.Args) == 1 && recv != nil && a.strictPattern(recv) {
-			return []ast.Expr{c.Args[0]}
+			k := kAll
+			if obj, _, _, ok := a.pathOf(recv); ok && strings.Contains(a.regexps[obj], ".") {
+				k &^= kPath
+			}
+			return []validatedGo{{c.Args[0], k}}
 		}
 	}
 	return nil
@@ -156,33 +167,58 @@ func safeLiteral(c byte) bool {
 }
 
 // markValid clears taint from the validated values.
-func (a *analyzer) markValid(vals []ast.Expr, st state) {
+func (a *analyzer) markValid(vals []validatedGo, st state) {
 	for _, v := range vals {
-		if obj, field, _, ok := a.pathOf(v); ok {
-			st.write(obj, field, nil, false)
-			st.mark(obj, field)
+		if obj, field, _, ok := a.pathOf(v.value); ok && !widenedField(field) {
+			st.mark(obj, field, v.kinds)
 		}
 	}
 }
 
+func (a *analyzer) pathBoundary(e ast.Expr) bool {
+	if tv := a.info.Types[e]; tv.Value != nil && tv.Value.Kind() == constant.String {
+		return strings.HasSuffix(constant.StringVal(tv.Value), "/")
+	}
+	if b, ok := unparen(e).(*ast.BinaryExpr); ok && b.Op == token.ADD {
+		return a.pathBoundary(b.Y)
+	}
+	if c, ok := unparen(e).(*ast.CallExpr); ok && len(c.Args) == 1 {
+		if id, ok := c.Fun.(*ast.Ident); ok && id.Name == "string" {
+			if sel, ok := c.Args[0].(*ast.SelectorExpr); ok && sel.Sel.Name == "PathSeparator" {
+				if id, ok := sel.X.(*ast.Ident); ok {
+					if p, ok := a.info.Uses[id].(*types.PkgName); ok {
+						return p.Imported().Path() == "os"
+					}
+				}
+			}
+		}
+	}
+	return false
+}
+
 // terminates reports whether control cannot continue past the end of the list.
 func terminates(list []ast.Stmt) bool {
-	if len(list) == 0 {
-		return false
-	}
-	switch s := list[len(list)-1].(type) {
-	case *ast.ReturnStmt:
-		return true
-	case *ast.BranchStmt:
-		return s.Tok != token.FALLTHROUGH
-	case *ast.ExprStmt:
-		if c, ok := s.X.(*ast.CallExpr); ok {
-			if id, ok := c.Fun.(*ast.Ident); ok && id.Name == "panic" {
+	for _, stmt := range list {
+		switch s := stmt.(type) {
+		case *ast.ReturnStmt:
+			return true
+		case *ast.BranchStmt:
+			return s.Tok != token.FALLTHROUGH
+		case *ast.ExprStmt:
+			if c, ok := s.X.(*ast.CallExpr); ok {
+				if id, ok := c.Fun.(*ast.Ident); ok && id.Name == "panic" {
+					return true
+				}
+			}
+		case *ast.BlockStmt:
+			if terminates(s.List) {
+				return true
+			}
+		case *ast.IfStmt:
+			if terminates(s.Body.List) && s.Else != nil && terminates([]ast.Stmt{s.Else}) {
 				return true
 			}
 		}
-	case *ast.BlockStmt:
-		return terminates(s.List)
 	}
 	return false
 }
@@ -201,7 +237,7 @@ func (a *analyzer) noteOK(s *ast.AssignStmt) {
 	}
 	if id, ok := s.Lhs[1].(*ast.Ident); ok && id.Name != "_" {
 		if o := a.info.ObjectOf(id); o != nil {
-			a.ctx.oks[o] = ix.Index
+			a.ctx.oks[o] = ix
 		}
 	}
 }

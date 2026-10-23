@@ -162,7 +162,7 @@ func (p *phpLower) stmt(n *node) []*stmt {
 	case "throw_expression", "exit_statement":
 		return []*stmt{{kind: stmtJump, pos: p.pos(n)}}
 	case "break_statement", "continue_statement":
-		return []*stmt{{kind: stmtJump, pos: p.pos(n), loop: true}}
+		return []*stmt{{kind: stmtJump, pos: p.pos(n), loop: true, next: k == "continue_statement"}}
 	case "if_statement":
 		s := &stmt{kind: stmtIf, pos: p.pos(n), cond: p.expr(p.field(n, "condition")), then: p.block(p.field(n, "body"))}
 		for _, c := range p.named(n) {
@@ -191,7 +191,7 @@ func (p *phpLower) stmt(n *node) []*stmt {
 		}
 		return []*stmt{s}
 	case "for_statement", "while_statement", "do_statement":
-		return []*stmt{{kind: stmtBranch, pos: p.pos(n), arms: [][]*stmt{p.block(p.field(n, "body"))}}}
+		return []*stmt{{kind: stmtLoop, pos: p.pos(n), then: p.block(p.field(n, "body")), cond: p.expr(p.field(n, "condition"))}}
 	case "switch_statement":
 		s := &stmt{kind: stmtBranch, pos: p.pos(n)}
 		if b := p.field(n, "body"); b != nil {
@@ -513,6 +513,7 @@ func (p *phpLower) callShape(n *node, e *expr) *expr {
 		if len(e.args) == 2 {
 			in := p.mk(exprIn, n)
 			in.x, in.args = e.args[1], []*expr{e.args[0]}
+			in.str = "prefix"
 			return in
 		}
 	case "in_array":

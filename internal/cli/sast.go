@@ -20,8 +20,10 @@ func newSASTCommand(opts *options) *cobra.Command {
 deserialization) and, in Go, for insecure API use (weak crypto, disabled TLS
 verification, hard-coded credentials).
 
-Languages: Go, JavaScript and TypeScript, Python, Java, C#, PHP, and Ruby. Data is followed
-across assignments, fields, closures, function calls and files. Analysis is offline. A
+Languages: Go, JavaScript and TypeScript, Python, Java, Kotlin, C#, PHP, and Ruby. Data is followed
+across assignments, fields, setters, direct local reference aliases, closures, function
+calls and files. Deep calls and loop-carried data are followed to convergence within
+bounded analysis budgets. Analysis is offline. A
 file that cannot be parsed is reported as sast:analysis-incomplete rather than skipped
 silently. React's dangerouslySetInnerHTML is a sink in JSX and TSX. Dockerfiles,
 Kubernetes and Compose manifests, Terraform, and GitHub Actions workflows are checked for

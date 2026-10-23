@@ -66,10 +66,13 @@ Those changes are easy to miss in a language lockfile diff.
   command, code, path, NoSQL, request, response, and deserialization sinks
   (including zip slip and prototype pollution), and prints
   the path it took. Go, JavaScript/TypeScript, Python, Java, Kotlin, C#, PHP, and Ruby,
-  fully offline. It also checks Dockerfiles, Kubernetes and Compose manifests,
+  fully offline. It follows deep call chains and loop-carried data to convergence,
+  distinguishes receiver fields, and tracks setters, constructors and direct local
+  reference aliases. Validation clears only the vulnerability classes it prevents;
+  an exhausted analysis budget is reported as incomplete. It also checks Dockerfiles, Kubernetes and Compose manifests,
   Terraform, and GitHub Actions workflows for unsafe settings, and scans every
   text file for committed credentials. A file it cannot parse is reported
-  rather than skipped. Accuracy is measured only for Java (91% detected, 15% false
+  rather than skipped. Published accuracy measurements cover Java (91% detected, 15% false
   positives on OWASP BenchmarkJava) and Python (80% and 22%); the other languages are
   experimental. See [how accurate is sast](https://securock.dev/guide/usage#how-accurate-is-sast)
 

@@ -94,13 +94,9 @@ func (s istate) union(o istate) {
 	}
 }
 
-func (s istate) mark(name, field string) {
-	s[ikey{name, markerPrefix + field}] = taintSet{{key: "valid"}}
-}
-
-func (s istate) marked(name, field string) bool {
-	_, ok := s[ikey{name, markerPrefix + field}]
-	return ok
+func (s istate) mark(name, field string, kinds kind) {
+	k := ikey{name, markerPrefix + field}
+	s[k] = merge(s[k], taintSet{{key: "valid", kinds: kinds}})
 }
 
 func (s istate) replace(a, b istate) {
@@ -110,8 +106,8 @@ func (s istate) replace(a, b istate) {
 	// A value is validated after the branches only if it was validated in both.
 	for k := range a {
 		if isMarker(k.field) {
-			if _, both := b[k]; both {
-				s[k] = a[k]
+			if v, both := b[k]; both {
+				s[k] = a[k].keep(markerKinds(v))
 			}
 		}
 	}
@@ -120,11 +116,11 @@ func (s istate) replace(a, b istate) {
 func (s istate) read(name, field string) taintSet {
 	var out taintSet
 	for k, v := range s {
-		if k.name == name && related(k.field, field) {
-			out = merge(out, v)
+		if k.name == name && !isMetadata(k.field) && related(k.field, field) {
+			out = merge(out, readField(v, k.field, field))
 		}
 	}
-	return out
+	return out.clear(s.validated(name, field))
 }
 
 func (s istate) has(name string) bool {
@@ -137,23 +133,38 @@ func (s istate) has(name string) bool {
 }
 
 func (s istate) write(name, field string, t taintSet, weak bool) {
+	if field != "" {
+		for _, peer := range s.aliases(name) {
+			if peer != name {
+				s.writeLocal(peer, field, t, true)
+			}
+		}
+	}
+	s.writeLocal(name, field, t, weak)
+}
+
+func (s istate) writeLocal(name, field string, t taintSet, weak bool) {
+	s.invalidate(name, field)
+	weak = weak || widenedField(field)
 	if !weak {
 		for k := range s {
-			if k.name == name && (k.field == field || strings.HasPrefix(k.field, field+".")) {
+			if k.name == name && !isMetadata(k.field) && (k.field == field || strings.HasPrefix(k.field, field+".")) {
 				delete(s, k)
 			}
 		}
 	}
-	if len(t) > 0 {
-		k := ikey{name, field}
-		s[k] = merge(s[k], t)
+	for _, at := range t {
+		k := ikey{name, fieldJoin(field, at.path)}
+		at.path = ""
+		s[k] = merge(s[k], taintSet{at})
 	}
 }
 
 // project is the set of lowered files an analysis can resolve imports between.
 type project struct {
-	mods    map[string]*module // by path
-	classes map[string]string  // class name -> path of the module defining it
+	mods      map[string]*module // by path
+	classes   map[string]string  // class name -> path of the module defining it
+	functions map[string]*funcIR // by summary key
 	// methods maps "Class.method" to the key of its summary.
 	methods map[string][]string
 	// byName maps a bare method name to every class method with it, for calls on a value
@@ -173,7 +184,7 @@ func funcKey(m *module, f *funcIR) string {
 }
 
 func newProject(mods []*module) *project {
-	p := &project{mods: map[string]*module{}, classes: map[string]string{}, methods: map[string][]string{}, byName: map[string][]string{}}
+	p := &project{mods: map[string]*module{}, classes: map[string]string{}, functions: map[string]*funcIR{}, methods: map[string][]string{}, byName: map[string][]string{}}
 	for _, m := range mods {
 		p.mods[m.path] = m
 		p.globalCSRF = p.globalCSRF || m.globalCSRF
@@ -184,6 +195,9 @@ func newProject(mods []*module) *project {
 			}
 		}
 		for _, f := range m.funcs {
+			if key := funcKey(m, f); p.functions[key] == nil {
+				p.functions[key] = f
+			}
 			if f.class == "" {
 				continue
 			}
@@ -260,10 +274,14 @@ type irRun struct {
 	types map[string]string
 	// shadow marks names assigned in the function, so a local called "params" is not
 	// mistaken for the request parameters.
-	shadow map[string]bool
+	shadow     map[string]bool
+	localNames map[string]bool
+	cleanPaths map[string]bool
+	boundaries map[string]bool
 	// per-function state for the checks that look at order and context
 	lhsName                      string
 	loopAcc                      istate // states at break/continue in the innermost loop
+	continueAcc                  istate
 	fn                           *funcIR
 	strVars                      map[string]bool   // variables that hold a string built in this function
 	consts                       map[string]int64  // integer variables with a known value on this path
@@ -307,10 +325,23 @@ func (r *irRun) pathOf(e *expr) (name, field string, ok bool) {
 		if r.spec.self[e.name] {
 			return recvName, "", true
 		}
+		if (r.spec.name == "java" || r.spec.name == "cs") && r.class != "" && !r.localNames[e.name] && !r.mod.staticFields[r.class+"."+e.name] {
+			if _, ok := r.mod.fields[r.class][e.name]; ok {
+				return recvName, fieldPart(e.name), true
+			}
+		}
 		return e.name, "", true
 	case exprMember:
 		if n, f, ok := r.pathOf(e.x); ok {
-			return n, f + "." + e.name, true
+			return n, fieldJoin(f, fieldPart(e.name)), true
+		}
+	case exprIndex:
+		if len(e.args) == 1 {
+			if part := constIndex(e.args[0]); part != "" {
+				if n, f, ok := r.pathOf(e.x); ok {
+					return n, fieldJoin(f, part), true
+				}
+			}
 		}
 	}
 	return "", "", false
@@ -339,11 +370,9 @@ func (r *irRun) qualified(e *expr, st istate) string {
 		if r.spec.pkgRoots[e.name] && !st.has(e.name) && r.types[e.name] == "" {
 			return e.name
 		}
-		for _, f := range r.mod.funcs {
-			if f.class == "" && f.name == e.name {
-				return "" // the project's own function shadows a library of the same name
-			}
-		}
+		if r.proj.functions[r.mod.path+"#"+e.name] != nil {
+			return ""
+		} // a project function shadows a library
 		if q, ok := r.spec.simpleTypes[e.name]; ok {
 			return q
 		}
@@ -387,6 +416,9 @@ func (r *irRun) typeOf(e *expr, st istate) string {
 			return e.x.name
 		}
 	case exprCall:
+		if r.spec.name == "rb" && e.x.kind == exprMember && e.x.name == "new" && e.x.x.kind == exprName && r.proj.classes[e.x.x.name] != "" {
+			return e.x.x.name
+		}
 		if q, _, _ := r.resolve(e.x, st); q != "" {
 			if t, ok := r.spec.returns[q]; ok {
 				return t
@@ -432,9 +464,14 @@ func (r *irRun) resolve(fn *expr, st istate) (qname string, recv *expr, field st
 	return "", nil, ""
 }
 
-func (r *irRun) eval(e *expr, st istate) taintSet {
+func (r *irRun) eval(e *expr, st istate) (result taintSet) {
 	if e == nil {
 		return nil
+	}
+	if e.kind == exprName || e.kind == exprIndex {
+		if name, field, ok := r.pathOf(e); ok {
+			defer func() { result = result.clear(st.validated(name, field)) }()
+		}
 	}
 	switch e.kind {
 	case exprStr, exprNum:
@@ -457,15 +494,27 @@ func (r *irRun) eval(e *expr, st istate) taintSet {
 				return r.source(e.pos, desc)
 			}
 		}
+		if name, f, ok := r.pathOf(e); ok {
+			// The base may itself be a source, whose taint is not stored in state.
+			return merge(st.read(name, f), r.eval(e.x, st).selectField(constIndex(e.args[0])))
+		}
 		return r.eval(e.x, st)
 	case exprCall, exprNew:
 		return r.evalCall(e, st)
+	case exprObject:
+		var out taintSet
+		for _, a := range e.args {
+			out = merge(out, r.eval(a, st))
+		}
+		return out
+	case exprField:
+		return r.eval(e.x, st).atField(fieldPart(e.name))
 	case exprConcat, exprOther:
 		out := r.eval(e.x, st)
 		for _, a := range e.args {
 			out = merge(out, r.eval(a, st))
 		}
-		return out
+		return out.scalar()
 	case exprLambda:
 		r.walkFn(e.fn, st, nil)
 	case exprNot:
@@ -539,12 +588,12 @@ func (r *irRun) rootSource(e *expr) (string, bool) {
 	return "", false
 }
 
-func (r *irRun) evalMember(e *expr, st istate) taintSet {
+func (r *irRun) evalMember(e *expr, st istate) (out taintSet) {
+	if name, field, ok := r.pathOf(e); ok {
+		defer func() { out = out.clear(st.validated(name, field)) }()
+	}
 	if re, ok := r.spec.sourceVarMembers[e.name]; ok && e.x != nil && e.x.kind == exprName && re.MatchString(e.x.name) && !r.shadow[e.x.name] {
 		return r.source(e.pos, "web form field")
-	}
-	if name, f, ok := r.pathOf(e); ok && st.marked(name, f) {
-		return st.read(name, f)
 	}
 	if desc, ok := r.spec.sourceMembers[e.name]; ok && !r.shadow[rootName(e)] {
 		return r.source(e.pos, desc)
@@ -629,7 +678,7 @@ func (r *irRun) evalCall(e *expr, st istate) taintSet {
 			added = merge(added, t)
 		}
 		if name, f, ok := r.pathOf(fn.x); ok {
-			st.write(name, f, added, true)
+			r.writeEffect(name, f, added, st)
 		}
 	}
 	// A call on request data returns request data, unless the call is itself a sanitizer
@@ -680,13 +729,14 @@ func (r *irRun) evalCall(e *expr, st istate) taintSet {
 		}
 		var out taintSet
 		for _, key := range keys {
+			r.dependsOn(key)
 			if sum, ok := r.sums[key]; ok {
-				out = merge(out, r.applyIR(e, key, sum, args, recvT))
+				out = merge(out, r.applyIR(e, key, sum, args, recvT, st, recvExpr))
 			}
 		}
 		return out
 	}
-	return all
+	return all.scalar()
 }
 
 // lookupSink finds the sink for a call: by qualified name, else by method name on any
@@ -821,11 +871,9 @@ func (r *irRun) sanitized(t taintSet, qname, field string, recvExpr *expr) taint
 func (r *irRun) targets(fn, call *expr, st istate) []string {
 	var keys []string
 	add := func(m *module, class, name string) {
-		for _, f := range m.funcs {
-			if f.name == name && f.class == class {
-				keys = append(keys, funcKey(m, f))
-				return
-			}
+		key := funcKey(m, &funcIR{name: name, class: class})
+		if r.proj.functions[key] != nil {
+			keys = append(keys, key)
 		}
 	}
 	switch fn.kind {
@@ -847,6 +895,9 @@ func (r *irRun) targets(fn, call *expr, st istate) []string {
 			keys = append(keys, r.proj.methods[fn.name+".<init>"]...)
 		}
 	case exprMember:
+		if r.spec.name == "rb" && fn.name == "new" && fn.x.kind == exprName && r.proj.classes[fn.x.name] != "" {
+			return r.narrow(r.proj.methods[fn.x.name+".<init>"])
+		}
 		if r.selfName(fn.x) && r.class != "" {
 			add(r.mod, r.class, fn.name)
 			if len(keys) == 0 {
@@ -911,57 +962,68 @@ func (r *irRun) targets(fn, call *expr, st istate) []string {
 	return r.narrow(keys)
 }
 
-func (r *irRun) applyIR(c *expr, key string, sum *summary, args []taintSet, recvT taintSet) taintSet {
+func (r *irRun) applyIR(c *expr, key string, sum *summary, args []taintSet, recvT taintSet, st istate, recvExpr *expr) taintSet {
 	np := 0
-	if f := r.funcByKey(key); f != nil {
+	f := r.funcByKey(key)
+	if f != nil {
 		np = len(f.params)
 	}
-	argAt := func(p int) taintSet {
+	argAt := func(p int, field string) taintSet {
 		if p == recvParam {
-			return recvT
+			return recvT.selectField(field)
 		}
 		var out taintSet
 		for j, t := range args {
-			// Keyword arguments are matched by position, which is the common case for the
-			// small set of helpers the analysis follows.
-			if j == p || (np > 0 && j >= np && p == np-1) {
+			position := j
+			if j < len(c.kw) && c.kw[j] != "" && f != nil {
+				position = -1
+				for i, param := range f.params {
+					if param.name == c.kw[j] {
+						position = i
+						break
+					}
+				}
+			}
+			if position == p || (np > 0 && position >= np && p == np-1) {
 				out = merge(out, t)
 			}
 		}
-		return out
+		return out.selectField(field)
 	}
 	callStep := "passed to " + shortName(key[strings.LastIndex(key, "#")+1:])
 	for _, sk := range sum.sinks {
-		for _, at := range argAt(sk.param) {
+		for _, at := range argAt(sk.param, sk.field) {
 			if hit := at.kinds & sk.kind; hit != 0 {
 				at.flow = &flow{pos: c.pos, msg: callStep, prev: at.flow}
 				r.reachSink(sk.pos, sk.name, hit, at, sk.flow)
 			}
 		}
 	}
-	var out taintSet
-	for _, rt := range sum.ret {
-		if rt.param < 0 {
-			out = merge(out, taintSet{{key: rt.key, param: -1, kinds: rt.kinds, flow: &flow{pos: c.pos, msg: "returned by " + callStep[len("passed to "):], prev: rt.flow}}})
+	var constructed taintSet
+	for _, e := range sum.effects {
+		t := substitute(e.taint, argAt).step(c.pos, "written by "+callStep[len("passed to "):])
+		if e.param == recvParam && f != nil && f.name == "<init>" {
+			constructed = merge(constructed, t.atField(e.field))
 			continue
 		}
-		out = merge(out, argAt(rt.param).clear(^rt.kinds).step(c.pos, "flows through "+callStep[len("passed to "):]))
+		target := recvExpr
+		if e.param != recvParam {
+			if e.param >= len(c.args) {
+				continue
+			}
+			target = c.args[e.param]
+		}
+		if target != nil {
+			if name, field, ok := r.pathOf(target); ok {
+				r.writeEffect(name, fieldJoin(field, e.field), t, st)
+			}
+		}
 	}
-	return out
+	return merge(constructed, substitute(sum.ret, argAt).step(c.pos, "returned by "+callStep[len("passed to "):]))
 }
 
 func (r *irRun) funcByKey(key string) *funcIR {
-	file, _, _ := strings.Cut(key, "#")
-	m := r.proj.mods[file]
-	if m == nil {
-		return nil
-	}
-	for _, f := range m.funcs {
-		if funcKey(m, f) == key {
-			return f
-		}
-	}
-	return nil
+	return r.proj.functions[key]
 }
 
 func (r *irRun) checkSink(c *expr, name string, s sink, args []taintSet, recv taintSet) {
@@ -1047,9 +1109,16 @@ func (r *irRun) assign(lhs *expr, t taintSet, st istate) {
 			return
 		}
 		st.write(name, f, t, false)
+		if f != "" {
+			r.recordEffects(name, f, t, st)
+		}
 	case exprIndex:
-		if name, f, ok := r.pathOf(lhs.x); ok {
+		if name, f, ok := r.pathOf(lhs); ok {
+			st.write(name, f, t, false)
+			r.recordEffects(name, f, t, st)
+		} else if name, f, ok := r.pathOf(lhs.x); ok {
 			st.write(name, f, t, true)
+			r.recordEffects(name, f, t, st)
 		}
 	default:
 		r.eval(lhs, st)
@@ -1059,51 +1128,79 @@ func (r *irRun) assign(lhs *expr, t taintSet, st istate) {
 func (r *irRun) block(list []*stmt, st istate) {
 	for _, s := range list {
 		r.stmt(s, st)
+		if terminatesIR([]*stmt{s}) {
+			break
+		}
 	}
 }
 
 func terminatesIR(list []*stmt) bool {
-	if len(list) == 0 {
-		return false
-	}
-	switch s := list[len(list)-1]; s.kind {
-	case stmtReturn, stmtJump:
-		return true
-	case stmtIf:
-		return terminatesIR(s.then) && terminatesIR(s.els)
+	for _, s := range list {
+		switch s.kind {
+		case stmtReturn, stmtJump:
+			return true
+		case stmtIf:
+			if terminatesIR(s.then) && terminatesIR(s.els) {
+				return true
+			}
+		}
 	}
 	return false
 }
 
-func (r *irRun) validWhenTrue(c *expr) []*expr {
+type validatedIR struct {
+	value *expr
+	kinds kind
+}
+
+func (r *irRun) validWhenTrue(c *expr, st istate) []validatedIR {
+	if c == nil {
+		return nil
+	}
 	switch c.kind {
 	case exprAnd:
-		return append(r.validWhenTrue(c.args[0]), r.validWhenTrue(c.args[1])...)
+		return append(r.validWhenTrue(c.args[0], st), r.validWhenTrue(c.args[1], st)...)
 	case exprIn:
-		return []*expr{c.args[0]}
+		k := c.guard
+		if k == 0 {
+			k = kAll
+		}
+		if c.str == "prefix" {
+			if !r.pathBoundary(c.x) || !r.normalizedPath(c.args[0]) {
+				return nil
+			}
+			k = kPath
+		} else if len(r.eval(c.x, st)) > 0 {
+			return nil // a request-controlled collection is not a trusted allowlist
+		}
+		return []validatedIR{{c.args[0], k}}
 	}
 	return nil
 }
 
-func (r *irRun) validWhenFalse(c *expr) []*expr {
+func (r *irRun) validWhenFalse(c *expr, st istate) []validatedIR {
+	if c == nil {
+		return nil
+	}
 	switch c.kind {
 	case exprNot:
-		return r.validWhenTrue(c.x)
+		return r.validWhenTrue(c.x, st)
 	case exprOr:
-		return append(r.validWhenFalse(c.args[0]), r.validWhenFalse(c.args[1])...)
+		return append(r.validWhenFalse(c.args[0], st), r.validWhenFalse(c.args[1], st)...)
 	}
 	return nil
 }
 
-func (r *irRun) markValid(vals []*expr, st istate) {
+func (r *irRun) markValid(vals []validatedIR, st istate) {
 	for _, v := range vals {
-		if name, f, ok := r.pathOf(v); ok {
-			st.write(name, f, nil, false)
-			st.mark(name, f)
-		} else if root := rootName(v); root != "" && !r.spec.self[root] {
+		if name, f, ok := r.pathOf(v.value); ok {
+			if !widenedField(f) {
+				st.mark(name, f, v.kinds)
+			}
+		} else if root := rootName(v.value); root != "" && !r.spec.self[root] {
 			// A check on dest.getCanonicalPath() or p.resolve(x) vouches for the variable
 			// it was derived from.
-			st.write(root, "", nil, false)
+			st.mark(root, "", v.kinds)
 		}
 	}
 }
@@ -1128,8 +1225,22 @@ func (r *irRun) stmt(s *stmt, st istate) {
 				v = merge(r.eval(l, st), t)
 			}
 			r.checkPollution(l, st)
+			if l.kind == exprName && l.local {
+				r.localNames[l.name] = true
+			}
+			if l.kind == exprName && !s.aug && s.rhs != nil {
+				other := ""
+				if s.rhs.kind == exprName && !r.strVars[s.rhs.name] && !isNumericType(r.types[s.rhs.name]) {
+					other = s.rhs.name
+				}
+				if name, field, ok := r.pathOf(l); ok && field == "" {
+					st.bind(name, other)
+				}
+			}
 			r.assign(l, v, st)
 			if l.kind == exprName {
+				r.cleanPaths[l.name] = r.normalizedPath(s.rhs)
+				r.boundaries[l.name] = r.pathBoundary(s.rhs)
 				r.strVars[l.name] = r.isString(s.rhs) || (s.aug && r.strVars[l.name])
 			}
 			if l.kind == exprName {
@@ -1146,7 +1257,9 @@ func (r *irRun) stmt(s *stmt, st istate) {
 			}
 			r.checkAssignMisuse(l, s.rhs)
 			if l.kind == exprName && !s.binds {
-				r.shadow[l.name] = true
+				if _, field, ok := r.pathOf(l); ok && field == "" {
+					r.shadow[l.name] = true
+				}
 			}
 			if l.kind != exprName {
 				// session["k"] = v and flask.session[k] = v: both the key and the value are
@@ -1217,7 +1330,9 @@ func (r *irRun) stmt(s *stmt, st istate) {
 		}
 	case stmtJump:
 		r.eval(s.rhs, st)
-		if s.loop && r.loopAcc != nil {
+		if s.next && r.continueAcc != nil {
+			r.continueAcc.union(st)
+		} else if s.loop && r.loopAcc != nil {
 			r.loopAcc.union(st)
 		}
 	case stmtIf:
@@ -1245,15 +1360,33 @@ func (r *irRun) stmt(s *stmt, st istate) {
 			}
 		}()
 		then := st.clone()
+		entryConsts, entryStrs, entryTypes, entryShadow := cloneMap(r.consts), cloneMap(r.strs), cloneMap(r.types), cloneMap(r.shadow)
+		entryClean, entryBounds, entryStrings := cloneMap(r.cleanPaths), cloneMap(r.boundaries), cloneMap(r.strVars)
+		entryLocals := cloneMap(r.localNames)
 		if s.cond != nil {
-			r.markValid(r.validWhenTrue(s.cond), then)
+			r.markValid(r.validWhenTrue(s.cond, st), then)
 		}
 		r.block(s.then, then)
+		thenTypes, thenShadow := r.types, r.shadow
+		thenClean, thenBounds, thenStrings := r.cleanPaths, r.boundaries, r.strVars
+		r.consts, r.strs, r.types, r.shadow = cloneMap(entryConsts), cloneMap(entryStrs), cloneMap(entryTypes), cloneMap(entryShadow)
+		r.cleanPaths, r.boundaries, r.strVars = cloneMap(entryClean), cloneMap(entryBounds), cloneMap(entryStrings)
+		r.localNames = cloneMap(entryLocals)
 		els := st.clone()
 		if s.cond != nil {
-			r.markValid(r.validWhenFalse(s.cond), els)
+			r.markValid(r.validWhenFalse(s.cond, st), els)
 		}
 		r.block(s.els, els)
+		elseTypes, elseShadow := r.types, r.shadow
+		r.localNames = entryLocals
+		r.consts, r.strs = entryConsts, entryStrs
+		r.types = commonMap(thenTypes, elseTypes)
+		r.shadow = commonMap(thenShadow, elseShadow)
+		r.cleanPaths = commonMap(thenClean, r.cleanPaths)
+		r.boundaries = commonMap(thenBounds, r.boundaries)
+		for name, v := range thenStrings {
+			r.strVars[name] = r.strVars[name] || v
+		}
 		switch thenEnds, elseEnds := terminatesIR(s.then), terminatesIR(s.els); {
 		case thenEnds && !elseEnds:
 			st.replace(els, els)
@@ -1263,26 +1396,62 @@ func (r *irRun) stmt(s *stmt, st istate) {
 			st.replace(then, els)
 		}
 	case stmtLoop:
-		t := r.eval(s.rhs, st)
+		t := r.eval(s.rhs, st).scalar()
+		entryLocals := cloneMap(r.localNames)
 		forget := map[string]bool{}
 		assignedNames(s.then, forget)
 		for n := range forget {
 			delete(r.consts, n)
 			delete(r.strs, n)
+			delete(r.cleanPaths, n)
+			delete(r.boundaries, n)
 		}
 		prev := r.loopAcc
+		prevContinue := r.continueAcc
 		r.loopAcc = istate{}
-		for range 2 {
+		converged := false
+		for range maxLoopRounds {
+			r.localNames = cloneMap(entryLocals)
+			for n := range forget {
+				delete(r.consts, n)
+				delete(r.strs, n)
+				delete(r.cleanPaths, n)
+				delete(r.boundaries, n)
+			}
+			r.continueAcc = istate{}
+			before := st.signature()
+			r.eval(s.cond, st)
 			body := st.clone()
 			for _, l := range s.lhs {
 				r.assign(l, t, body)
 			}
 			r.block(s.then, body)
-			st.union(body)
+			back := r.continueAcc
+			if !terminatesIR(s.then) {
+				back.union(body)
+			}
+			if len(back) > 0 {
+				st.replace(st.clone(), back)
+			}
+			if before == st.signature() {
+				converged = true
+				break
+			}
+		}
+		if !converged {
+			r.reportLimit(s.pos, "loop analysis exceeded its convergence budget")
+		}
+		for n := range forget {
+			delete(r.consts, n)
+			delete(r.strs, n)
+			delete(r.cleanPaths, n)
+			delete(r.boundaries, n)
 		}
 		// A break leaves with the state it had, which the end of the body never sees.
 		st.union(r.loopAcc)
 		r.loopAcc = prev
+		r.continueAcc = prevContinue
+		r.localNames = entryLocals
 	case stmtBranch:
 		entry := st.clone()
 		forget := map[string]bool{}
@@ -1349,6 +1518,9 @@ func (r *irRun) analyze(f *funcIR) *summary {
 	r.strVars = map[string]bool{}
 	r.types = map[string]string{}
 	r.shadow = map[string]bool{}
+	r.localNames = map[string]bool{}
+	r.cleanPaths = map[string]bool{}
+	r.boundaries = map[string]bool{}
 	r.checked = map[string]bool{}
 	r.consts = map[string]int64{}
 	r.strs = map[string]string{}
@@ -1365,8 +1537,10 @@ func (r *irRun) analyze(f *funcIR) *summary {
 	st := istate{}
 	if f.class != "" {
 		st[ikey{recvName, ""}] = taintSet{{key: "pr", param: recvParam, kinds: kAll}}
+		st[ikey{recvName, originField}] = origin(recvParam)
 	}
 	for i, p := range f.params {
+		r.localNames[p.name] = true
 		if p.ty != "" {
 			r.types[p.name] = r.resolveType(p.ty)
 		}
@@ -1378,6 +1552,7 @@ func (r *irRun) analyze(f *funcIR) *summary {
 			t = merge(t, r.source(f.pos, p.source))
 		}
 		st[ikey{p.name, ""}] = t
+		st[ikey{p.name, originField}] = origin(i)
 	}
 	r.block(f.body, st)
 	if len(r.cookies) > 0 && !(r.cookieSecure && r.cookieHTTPOnly) {
@@ -1390,10 +1565,10 @@ func (r *irRun) analyze(f *funcIR) *summary {
 			r.reportMisuse(pos, ruleFor2(r.spec.name, ruleXXE), "the XML parser factory is used without disabling DTDs or external entities")
 		}
 	}
-	sum := &summary{ret: r.ctx.ret}
+	sum := &summary{ret: r.ctx.ret, effects: r.ctx.fieldEffects()}
 	seen := map[string]bool{}
 	for _, k := range r.ctx.sinks {
-		id := fmt.Sprintf("%d|%d|%s|%d", k.param, k.kind, k.name, k.pos)
+		id := fmt.Sprintf("%d|%s|%d|%s|%d", k.param, k.field, k.kind, k.name, k.pos)
 		if !seen[id] {
 			seen[id] = true
 			sum.sinks = append(sum.sinks, k)
@@ -1406,6 +1581,12 @@ func (r *irRun) analyze(f *funcIR) *summary {
 		}
 		if x.pos != y.pos {
 			return x.pos < y.pos
+		}
+		if x.field != y.field {
+			return x.field < y.field
+		}
+		if x.kind != y.kind {
+			return x.kind < y.kind
 		}
 		return x.name < y.name
 	})
@@ -1420,23 +1601,6 @@ func (r *irRun) safely(f *funcIR) (sum *summary, ok bool) {
 		}
 	}()
 	return r.analyze(f), true
-}
-
-// analyzeModule runs every function of a module, plus its top-level code, and returns
-// the functions whose analysis failed.
-func analyzeModule(sh *shared, spec *langSpec, proj *project, m *module, base *analyzer) (failed []string) {
-	run := &irRun{analyzer: base, spec: spec, proj: proj, mod: m}
-	run.langName = spec.name
-	all := append([]*funcIR{{name: "<module>", body: m.top}}, m.funcs...)
-	for _, f := range all {
-		sum, ok := run.safely(f)
-		if !ok {
-			failed = append(failed, m.path)
-			continue
-		}
-		sh.sums[funcKey(m, f)] = sum
-	}
-	return failed
 }
 
 // isString reports whether an expression is text the function built itself: a literal, a

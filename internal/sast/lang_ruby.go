@@ -146,7 +146,7 @@ func (r *rubyLower) stmt(n *node) []*stmt {
 		}
 		return []*stmt{s}
 	case "break", "next", "redo", "retry":
-		return []*stmt{{kind: stmtJump, pos: r.pos(n), loop: true}}
+		return []*stmt{{kind: stmtJump, pos: r.pos(n), loop: true, next: k != "break"}}
 	case "if", "unless", "elsif":
 		cond := r.expr(r.field(n, "condition"))
 		if k == "unless" && cond != nil {
@@ -168,7 +168,7 @@ func (r *rubyLower) stmt(n *node) []*stmt {
 		}
 		return []*stmt{{kind: stmtIf, pos: r.pos(n), cond: cond, then: r.stmt(r.field(n, "body"))}}
 	case "while", "until", "while_modifier", "until_modifier":
-		return []*stmt{{kind: stmtBranch, pos: r.pos(n), arms: [][]*stmt{r.body(r.field(n, "body"))}}}
+		return []*stmt{{kind: stmtLoop, pos: r.pos(n), then: r.body(r.field(n, "body")), cond: r.expr(r.field(n, "condition"))}}
 	case "for":
 		s := &stmt{kind: stmtLoop, pos: r.pos(n), then: r.body(r.field(n, "body"))}
 		s.lhs = r.targets(r.field(n, "pattern"))
@@ -322,7 +322,9 @@ func (r *rubyLower) expr(n *node) *expr {
 		return nil
 	}
 	switch k := r.kind(n); k {
-	case "identifier", "constant", "self", "instance_variable", "class_variable", "global_variable":
+	case "instance_variable":
+		return &expr{kind: exprMember, pos: r.pos(n), name: strings.TrimPrefix(r.text(n), "@"), x: &expr{kind: exprName, pos: r.pos(n), name: "self"}}
+	case "identifier", "constant", "self", "class_variable", "global_variable":
 		e := r.mk(exprName, n)
 		e.name = r.text(n)
 		return e
@@ -508,6 +510,7 @@ func (r *rubyLower) call(n *node) *expr {
 	if recv != nil && method == "start_with?" && len(e.args) == 1 {
 		in := r.mk(exprIn, n)
 		in.x, in.args = e.args[0], []*expr{e.x.x}
+		in.str = "prefix"
 		if as := r.named(r.field(n, "arguments")); len(as) == 1 {
 			return withWeakAllow(in, r.weakAllow(r.pos(n), r.text(recv), r.text(as[0])))
 		}

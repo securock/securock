@@ -5,6 +5,24 @@ import (
 	"strings"
 )
 
+func cloneMap[K comparable, V any](m map[K]V) map[K]V {
+	out := make(map[K]V, len(m))
+	for k, v := range m {
+		out[k] = v
+	}
+	return out
+}
+
+func commonMap[K comparable, V comparable](a, b map[K]V) map[K]V {
+	out := map[K]V{}
+	for k, v := range a {
+		if w, ok := b[k]; ok && v == w {
+			out[k] = v
+		}
+	}
+	return out
+}
+
 // Constant folding. Test code, feature flags and generated code are full of conditions
 // such as (7 * 42) - num > 200 whose outcome is fixed; the branch that cannot run must
 // not contribute taint.

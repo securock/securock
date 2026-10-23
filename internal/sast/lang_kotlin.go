@@ -334,7 +334,7 @@ func (k *ktLower) stmt(n *node) []*stmt {
 			}
 			return []*stmt{s}
 		case strings.HasPrefix(t, "break"), strings.HasPrefix(t, "continue"):
-			return []*stmt{{kind: stmtJump, pos: k.pos(n), loop: true}}
+			return []*stmt{{kind: stmtJump, pos: k.pos(n), loop: true, next: strings.HasPrefix(t, "continue")}}
 		}
 		return []*stmt{{kind: stmtJump, pos: k.pos(n)}}
 	case "if_expression":
@@ -358,7 +358,7 @@ func (k *ktLower) stmt(n *node) []*stmt {
 				arm = k.body(c)
 			}
 		}
-		return []*stmt{{kind: stmtBranch, pos: k.pos(n), arms: [][]*stmt{arm}}}
+		return []*stmt{{kind: stmtLoop, pos: k.pos(n), then: arm}}
 	case "when_expression":
 		s := &stmt{kind: stmtBranch, pos: k.pos(n)}
 		for _, e := range k.named(n) {
@@ -670,6 +670,7 @@ func (k *ktLower) call(n *node) *expr {
 			if len(e.args) == 1 {
 				in := k.mk(exprIn, n)
 				in.x, in.args = e.args[0], []*expr{e.x.x}
+				in.str = "prefix"
 				return withWeakAllow(in, k.weakAllow(k.pos(n), k.text(callee), k.text(n)))
 			}
 		case "format", "joinToString", "plus":

@@ -193,6 +193,12 @@ func (j *javaLower) classDecl(n *node) {
 						j.mod.fields[name] = map[string]string{}
 					}
 					j.mod.fields[name][j.text(j.field(d, "name"))] = ty
+					if strings.Contains(j.fieldModifiers(m), "static") {
+						if j.mod.staticFields == nil {
+							j.mod.staticFields = map[string]bool{}
+						}
+						j.mod.staticFields[name+"."+j.text(j.field(d, "name"))] = true
+					}
 					// static final String KEY = "...": a constant other code can read.
 					if v := j.field(d, "value"); v != nil && j.kind(v) == "string_literal" && strings.Contains(j.fieldModifiers(m), "final") {
 						id := j.mk(exprName, d)
@@ -345,6 +351,7 @@ func (j *javaLower) stmt(n *node) []*stmt {
 			v := j.field(d, "value")
 			name := j.mk(exprName, d)
 			name.name = j.text(j.field(d, "name"))
+			name.local = true
 			if ty != "var" {
 				name.ty = ty
 			}
@@ -367,7 +374,7 @@ func (j *javaLower) stmt(n *node) []*stmt {
 	case "throw_statement", "yield_statement":
 		return []*stmt{{kind: stmtJump, pos: j.pos(n)}}
 	case "break_statement", "continue_statement":
-		return []*stmt{{kind: stmtJump, pos: j.pos(n), loop: true}}
+		return []*stmt{{kind: stmtJump, pos: j.pos(n), loop: true, next: k == "continue_statement"}}
 	case "if_statement":
 		s := &stmt{kind: stmtIf, pos: j.pos(n), cond: j.expr(j.field(n, "condition")), then: j.block(j.field(n, "consequence"))}
 		if alt := j.field(n, "alternative"); alt != nil {
@@ -384,9 +391,9 @@ func (j *javaLower) stmt(n *node) []*stmt {
 		if init := j.field(n, "init"); init != nil {
 			out = append(out, j.stmt(init)...)
 		}
-		return append(out, &stmt{kind: stmtBranch, pos: j.pos(n), arms: [][]*stmt{j.block(j.field(n, "body"))}})
+		return append(out, &stmt{kind: stmtLoop, pos: j.pos(n), then: j.block(j.field(n, "body")), cond: j.expr(j.field(n, "condition"))})
 	case "while_statement", "do_statement":
-		return []*stmt{{kind: stmtBranch, pos: j.pos(n), arms: [][]*stmt{j.block(j.field(n, "body"))}}}
+		return []*stmt{{kind: stmtLoop, pos: j.pos(n), then: j.block(j.field(n, "body")), cond: j.expr(j.field(n, "condition"))}}
 	case "block", "synchronized_statement", "labeled_statement":
 		var out []*stmt
 		for _, c := range j.named(n) {
@@ -594,6 +601,7 @@ func (j *javaLower) invoke(n *node) *expr {
 	if obj != nil && name == "startsWith" && len(args) == 1 {
 		e := j.mk(exprIn, n)
 		e.x, e.args = j.expr(args[0]), []*expr{j.expr(obj)}
+		e.str = "prefix"
 		return withWeakAllow(e, j.weakAllow(j.pos(n), j.text(obj), j.text(args[0])))
 	}
 	if obj != nil && name == "contains" && len(args) == 1 {

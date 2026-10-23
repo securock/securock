@@ -24,10 +24,14 @@ type flow struct {
 // atom is one origin of taint: an untrusted source (param < 0) or a parameter of the
 // function being analyzed (param >= 0, resolved at call sites through summaries).
 type atom struct {
-	key   string
-	param int
-	kinds kind
-	flow  *flow
+	key     string
+	param   int
+	field   string       // field read from the originating parameter
+	path    string       // field occupied in the resulting value
+	ref     types.Object // alias metadata, never a tainted value
+	refName string
+	kinds   kind
+	flow    *flow
 }
 
 // taintSet is sorted by key so every iteration over it is deterministic.
@@ -43,14 +47,26 @@ func merge(a, b taintSet) taintSet {
 	out := make(taintSet, 0, len(a)+len(b))
 	out = append(out, a...)
 	for _, x := range b {
-		i := slices.IndexFunc(out, func(y atom) bool { return y.key == x.key })
+		i := slices.IndexFunc(out, func(y atom) bool { return y.key == x.key && y.field == x.field && y.path == x.path })
 		if i < 0 {
 			out = append(out, x)
-		} else if out[i].kinds|x.kinds != out[i].kinds {
+		} else {
 			out[i].kinds |= x.kinds
+			if flowLess(x.flow, out[i].flow) {
+				out[i].flow = x.flow
+			}
 		}
 	}
-	sort.Slice(out, func(i, j int) bool { return out[i].key < out[j].key })
+	sort.Slice(out, func(i, j int) bool {
+		x, y := out[i], out[j]
+		if x.key != y.key {
+			return x.key < y.key
+		}
+		if x.field != y.field {
+			return x.field < y.field
+		}
+		return x.path < y.path
+	})
 	return out
 }
 
@@ -78,7 +94,7 @@ func (t taintSet) keep(k kind) taintSet {
 func (t taintSet) step(pos token.Pos, msg string) taintSet {
 	out := make(taintSet, len(t))
 	for i, a := range t {
-		a.flow = &flow{pos: pos, msg: msg, prev: a.flow}
+		a.flow = addFlow(a.flow, pos, msg)
 		out[i] = a
 	}
 	return out
@@ -91,7 +107,7 @@ func appendFlow(base, tail *flow) *flow {
 		steps = append(steps, f)
 	}
 	for _, s := range slices.Backward(steps) {
-		base = &flow{pos: s.pos, msg: s.msg, prev: base}
+		base = addFlow(base, s.pos, s.msg)
 	}
 	return base
 }
@@ -119,8 +135,8 @@ func (s state) replace(a, b state) {
 	// A value is validated after the branches only if it was validated in both.
 	for k := range a {
 		if isMarker(k.field) {
-			if _, both := b[k]; both {
-				s[k] = a[k]
+			if v, both := b[k]; both {
+				s[k] = a[k].keep(markerKinds(v))
 			}
 		}
 	}
@@ -142,13 +158,9 @@ const markerPrefix = "\x00v:"
 
 func isMarker(field string) bool { return strings.HasPrefix(field, markerPrefix) }
 
-func (s state) mark(obj types.Object, field string) {
-	s[vkey{obj, markerPrefix + field}] = taintSet{{key: "valid"}}
-}
-
-func (s state) marked(obj types.Object, field string) bool {
-	_, ok := s[vkey{obj, markerPrefix + field}]
-	return ok
+func (s state) mark(obj types.Object, field string, kinds kind) {
+	k := vkey{obj, markerPrefix + field}
+	s[k] = merge(s[k], taintSet{{key: "valid", kinds: kinds}})
 }
 
 // related reports whether two field paths overlap: one is a prefix of the other.
@@ -159,30 +171,45 @@ func related(a, b string) bool {
 func (s state) read(obj types.Object, field string) taintSet {
 	var out taintSet
 	for k, v := range s {
-		if k.obj == obj && related(k.field, field) {
-			out = merge(out, v)
+		if k.obj == obj && !isMetadata(k.field) && related(k.field, field) {
+			out = merge(out, readField(v, k.field, field))
 		}
 	}
-	return out
+	return out.clear(s.validated(obj, field))
 }
 
 func (s state) write(obj types.Object, field string, t taintSet, weak bool) {
+	if field != "" {
+		for _, peer := range s.aliases(obj) {
+			if peer != obj {
+				s.writeLocal(peer, field, t, true)
+			}
+		}
+	}
+	s.writeLocal(obj, field, t, weak)
+}
+
+func (s state) writeLocal(obj types.Object, field string, t taintSet, weak bool) {
+	s.invalidate(obj, field)
+	weak = weak || widenedField(field)
 	if !weak {
 		for k := range s {
-			if k.obj == obj && (k.field == field || strings.HasPrefix(k.field, field+".")) {
+			if k.obj == obj && !isMetadata(k.field) && (k.field == field || strings.HasPrefix(k.field, field+".")) {
 				delete(s, k)
 			}
 		}
 	}
-	if len(t) > 0 {
-		k := vkey{obj, field}
-		s[k] = merge(s[k], t)
+	for _, at := range t {
+		k := vkey{obj, fieldJoin(field, at.path)}
+		at.path = ""
+		s[k] = merge(s[k], taintSet{at})
 	}
 }
 
 // paramSink records that a function's parameter reaches a dangerous call.
 type paramSink struct {
 	param int
+	field string
 	kind  kind
 	name  string
 	pos   token.Pos
@@ -190,30 +217,40 @@ type paramSink struct {
 }
 
 type summary struct {
-	ret   taintSet
-	sinks []paramSink
+	ret     taintSet
+	sinks   []paramSink
+	effects []fieldEffect
 }
 
 func (s *summary) signature() string {
 	var b strings.Builder
 	for _, a := range s.ret {
-		fmt.Fprintf(&b, "r%s:%d;", a.key, a.kinds)
+		fmt.Fprintf(&b, "r%s:%d;", atomKey(a), a.kinds)
 	}
 	for _, k := range s.sinks {
-		fmt.Fprintf(&b, "s%d:%d:%s:%d;", k.param, k.kind, k.name, k.pos)
+		fmt.Fprintf(&b, "s%d:%s:%d:%s:%d;", k.param, k.field, k.kind, k.name, k.pos)
+	}
+	for _, e := range s.effects {
+		fmt.Fprintf(&b, "e%d:%s{", e.param, e.field)
+		for _, at := range e.taint {
+			fmt.Fprintf(&b, "%s:%d;", atomKey(at), at.kinds)
+		}
+		b.WriteByte('}')
 	}
 	return b.String()
 }
 
 type funcCtx struct {
-	oks     map[types.Object]ast.Expr // "v, ok := m[k]": ok validates k
-	cleaned map[types.Object]bool     // variables holding the result of filepath.Join/Clean/Abs
-	loopAcc state                     // states at break/continue in the innermost loop
-	name    string
-	label   string
-	ret     taintSet
-	sinks   []paramSink
-	litDeep int
+	effects     []fieldEffect
+	oks         map[types.Object]ast.Expr // "v, ok := m[k]": ok validates k
+	cleaned     map[vkey]bool             // values holding the result of filepath.Join/Clean/Abs
+	loopAcc     state                     // states at break/continue in the innermost loop
+	continueAcc state
+	name        string
+	label       string
+	ret         taintSet
+	sinks       []paramSink
+	litDeep     int
 	// entry marks a function whose callers are out of sight; pnames names its parameters.
 	entry  bool
 	pnames map[int]string
@@ -231,6 +268,8 @@ type impl struct {
 
 // shared holds what every function analysis in a run reads and extends.
 type shared struct {
+	current    string
+	dependents map[string]map[string]bool
 	// declTypes holds the type as written for each parameter and variable, so a method
 	// call on a value whose package is not available can still be named by the import path.
 	declTypes map[types.Object]ast.Expr
@@ -318,13 +357,14 @@ func (a *analyzer) pathOf(e ast.Expr) (obj types.Object, field string, weak, ok 
 		}
 		o, f, w, k := a.pathOf(e.X)
 		if k {
-			return o, f + "." + e.Sel.Name, w, true
+			return o, fieldJoin(f, fieldPart(e.Sel.Name)), w, true
 		}
 	case *ast.StarExpr:
 		return a.pathOf(e.X)
 	case *ast.IndexExpr:
 		o, f, _, k := a.pathOf(e.X)
-		return o, f, true, k
+		part := a.indexField(e.Index)
+		return o, fieldJoin(f, part), part == "", k
 	case *ast.UnaryExpr:
 		if e.Op == token.AND {
 			return a.pathOf(e.X)
@@ -408,7 +448,7 @@ func (a *analyzer) evalRaw(e ast.Expr, st state) taintSet {
 	case *ast.CallExpr:
 		return a.evalCall(e, st)
 	case *ast.BinaryExpr:
-		return merge(a.eval(e.X, st), a.eval(e.Y, st))
+		return merge(a.eval(e.X, st), a.eval(e.Y, st)).scalar()
 	case *ast.UnaryExpr:
 		return a.eval(e.X, st)
 	case *ast.StarExpr:
@@ -419,6 +459,9 @@ func (a *analyzer) evalRaw(e ast.Expr, st state) taintSet {
 		return a.eval(e.X, st)
 	case *ast.IndexExpr:
 		a.eval(e.Index, st)
+		if obj, f, _, ok := a.pathOf(e); ok {
+			return merge(a.readVar(st, obj, f), a.eval(e.X, st).selectField(a.indexField(e.Index)))
+		}
 		return a.eval(e.X, st)
 	case *ast.TypeAssertExpr:
 		return a.eval(e.X, st)
@@ -426,8 +469,20 @@ func (a *analyzer) evalRaw(e ast.Expr, st state) taintSet {
 		return a.eval(e.Value, st)
 	case *ast.CompositeLit:
 		var out taintSet
-		for _, el := range e.Elts {
-			out = merge(out, a.eval(el, st))
+		for i, el := range e.Elts {
+			field := ""
+			value := el
+			if kv, ok := el.(*ast.KeyValueExpr); ok {
+				value = kv.Value
+				if id, ok := kv.Key.(*ast.Ident); ok {
+					field = fieldPart(id.Name)
+				} else {
+					field = a.indexField(kv.Key)
+				}
+			} else if typ, ok := typeUnder(a.info.TypeOf(e)).(*types.Struct); ok && i < typ.NumFields() {
+				field = fieldPart(typ.Field(i).Name())
+			}
+			out = merge(out, a.eval(value, st).atField(field))
 		}
 		return out
 	case *ast.FuncLit:
@@ -446,15 +501,15 @@ func (a *analyzer) evalSelector(e *ast.SelectorExpr, st state) taintSet {
 			return nil
 		}
 	}
-	validated := false
+	validated := kind(0)
 	if obj, f, _, ok := a.pathOf(e); ok {
-		validated = st.marked(obj, f)
+		validated = st.validated(obj, f)
 	}
-	if e.Sel.Name == "Name" && isArchiveEntry(a.info.TypeOf(e.X)) && !validated {
-		return a.source(e.Pos(), archiveDesc)
+	if e.Sel.Name == "Name" && isArchiveEntry(a.info.TypeOf(e.X)) {
+		return a.source(e.Pos(), archiveDesc).clear(validated)
 	}
-	if desc, ok := requestFields[e.Sel.Name]; ok && isRequest(a.info.TypeOf(e.X)) && !validated {
-		return a.source(e.Pos(), desc)
+	if desc, ok := requestFields[e.Sel.Name]; ok && isRequest(a.info.TypeOf(e.X)) {
+		return a.source(e.Pos(), desc).clear(validated)
 	}
 	if obj, f, _, ok := a.pathOf(e); ok {
 		t := a.readVar(st, obj, f)
@@ -465,7 +520,7 @@ func (a *analyzer) evalSelector(e *ast.SelectorExpr, st state) taintSet {
 				break
 			}
 			if desc, ok := requestFields[sel.Sel.Name]; ok && isRequest(a.info.TypeOf(sel.X)) {
-				t = merge(t, a.source(sel.Pos(), desc))
+				t = merge(t, a.source(sel.Pos(), desc).clear(validated))
 			}
 			x = unparen(sel.X)
 		}
@@ -585,11 +640,12 @@ func (a *analyzer) evalCall(c *ast.CallExpr, st state) taintSet {
 	if k, ok := sanitizers[name]; ok {
 		return all.clear(k)
 	}
+	a.dependsOn(name)
 	if sum, ok := a.sums[name]; ok {
-		return a.applySummary(c, name, sum, argT, recvT)
+		return a.applySummary(c, name, sum, argT, recvT, st, recvExpr)
 	}
 	if recvExpr != nil {
-		if t, ok := a.dispatch(c, recvExpr, argT, recvT); ok {
+		if t, ok := a.dispatch(c, recvExpr, argT, recvT, st); ok {
 			return t
 		}
 	}
@@ -601,7 +657,7 @@ func (a *analyzer) evalCall(c *ast.CallExpr, st state) taintSet {
 			return nil
 		}
 	}
-	return all
+	return all.scalar()
 }
 
 func identOf(e ast.Expr) *ast.Ident {
@@ -649,7 +705,7 @@ func (a *analyzer) applyFill(c *ast.CallExpr, f fill, argT []taintSet, recvT tai
 	if f.rest {
 		for i := f.to; i < len(c.Args); i++ {
 			if obj, field, _, ok := a.pathOf(c.Args[i]); ok {
-				st.write(obj, field, t, true)
+				a.writeEffect(obj, field, t, st)
 			}
 		}
 		return
@@ -664,7 +720,7 @@ func (a *analyzer) applyFill(c *ast.CallExpr, f fill, argT []taintSet, recvT tai
 		return
 	}
 	if obj, field, _, ok := a.pathOf(target); ok {
-		st.write(obj, field, t, true)
+		a.writeEffect(obj, field, t, st)
 	}
 }
 
@@ -720,7 +776,7 @@ func (a *analyzer) checkSink(c *ast.CallExpr, name string, s sink, argT []taintS
 func (a *analyzer) reachSink(pos token.Pos, name string, hit kind, at atom, inner *flow) {
 	trace := appendFlow(at.flow, inner)
 	if at.param >= 0 {
-		a.ctx.sinks = append(a.ctx.sinks, paramSink{param: at.param, kind: hit, name: name, pos: pos, flow: trace})
+		a.ctx.sinks = append(a.ctx.sinks, paramSink{param: at.param, field: at.field, kind: hit, name: name, pos: pos, flow: trace})
 		if pn, ok := a.ctx.pnames[at.param]; ok && a.ctx.entry {
 			src := a.source(a.ctx.pos, "parameter "+pn+" of "+a.ctx.label)[0]
 			src.flow = appendFlow(src.flow, at.flow)
@@ -771,15 +827,15 @@ func shortName(n string) string {
 	return pkgPrefix.ReplaceAllString(n, "")
 }
 
-func (a *analyzer) applySummary(c *ast.CallExpr, name string, sum *summary, argT []taintSet, recvT taintSet) taintSet {
+func (a *analyzer) applySummary(c *ast.CallExpr, name string, sum *summary, argT []taintSet, recvT taintSet, st state, recvExpr ast.Expr) taintSet {
 	np, variadic := 0, false
 	if sig, ok := a.info.TypeOf(c.Fun).(*types.Signature); ok {
 		np, variadic = sig.Params().Len(), sig.Variadic()
 	}
 	// argAt is the taint feeding parameter p; variadic extras all feed the last one.
-	argAt := func(p int) taintSet {
+	argAt := func(p int, field string) taintSet {
 		if p == recvParam {
-			return recvT
+			return recvT.selectField(field)
 		}
 		var out taintSet
 		for j, t := range argT {
@@ -787,30 +843,37 @@ func (a *analyzer) applySummary(c *ast.CallExpr, name string, sum *summary, argT
 				out = merge(out, t)
 			}
 		}
-		return out
+		return out.selectField(field)
 	}
 	callStep := "passed to " + shortName(name)
 	for _, sk := range sum.sinks {
-		for _, at := range argAt(sk.param) {
+		for _, at := range argAt(sk.param, sk.field) {
 			if hit := at.kinds & sk.kind; hit != 0 {
 				at.flow = &flow{pos: c.Pos(), msg: callStep, prev: at.flow}
 				a.reachSink(sk.pos, sk.name, hit, at, sk.flow)
 			}
 		}
 	}
-	var out taintSet
-	for _, r := range sum.ret {
-		if r.param < 0 {
-			out = merge(out, taintSet{{key: r.key, param: -1, kinds: r.kinds, flow: &flow{pos: c.Pos(), msg: "returned by " + shortName(name), prev: r.flow}}})
-			continue
+	for _, e := range sum.effects {
+		t := substitute(e.taint, argAt).step(c.Pos(), "written by "+shortName(name))
+		target := recvExpr
+		if e.param != recvParam {
+			if e.param >= len(c.Args) {
+				continue
+			}
+			target = c.Args[e.param]
 		}
-		out = merge(out, argAt(r.param).clear(^r.kinds).step(c.Pos(), "flows through "+shortName(name)))
+		if target != nil {
+			if obj, field, _, ok := a.pathOf(target); ok {
+				a.writeEffect(obj, fieldJoin(field, e.field), t, st)
+			}
+		}
 	}
-	return out
+	return substitute(sum.ret, argAt).step(c.Pos(), "returned by "+shortName(name))
 }
 
 // dispatch applies the summaries of every concrete method an interface call may reach.
-func (a *analyzer) dispatch(c *ast.CallExpr, recvExpr ast.Expr, argT []taintSet, recvT taintSet) (taintSet, bool) {
+func (a *analyzer) dispatch(c *ast.CallExpr, recvExpr ast.Expr, argT []taintSet, recvT taintSet, st state) (taintSet, bool) {
 	sel, ok := unparen(c.Fun).(*ast.SelectorExpr)
 	if !ok {
 		return nil, false
@@ -827,12 +890,16 @@ func (a *analyzer) dispatch(c *ast.CallExpr, recvExpr ast.Expr, argT []taintSet,
 	var out taintSet
 	found := false
 	for _, m := range a.methods[sel.Sel.Name] {
+		if !types.Implements(m.recv, iface) {
+			continue
+		}
+		a.dependsOn(m.key)
 		sum, ok := a.sums[m.key]
-		if !ok || !types.Implements(m.recv, iface) {
+		if !ok {
 			continue
 		}
 		found = true
-		out = merge(out, a.applySummary(c, m.key, sum, argT, recvT))
+		out = merge(out, a.applySummary(c, m.key, sum, argT, recvT, st, recvExpr))
 	}
 	return out, found
 }
@@ -865,6 +932,7 @@ func (a *analyzer) assign(lhs ast.Expr, t taintSet, st state) {
 		a.eval(lhs, st)
 		return
 	}
+	delete(a.ctx.oks, obj)
 	if inert(obj.Type()) && field == "" {
 		t = nil
 	}
@@ -881,6 +949,16 @@ func (a *analyzer) assign(lhs ast.Expr, t taintSet, st state) {
 		a.globals[obj] = merge(a.globals[obj], src)
 	}
 	st.write(obj, field, t, weak)
+	if isDeref(lhs) && field == "" {
+		for _, peer := range st.aliases(obj) {
+			if peer != obj {
+				st.writeLocal(peer, field, t, true)
+			}
+		}
+	}
+	if field != "" || isDeref(lhs) {
+		a.recordEffects(obj, field, t, st)
+	}
 }
 
 func (a *analyzer) stmt(s ast.Stmt, st state) {
@@ -908,7 +986,9 @@ func (a *analyzer) stmt(s ast.Stmt, st state) {
 			}
 			for i, n := range vs.Names {
 				if i < len(vs.Values) {
-					a.assign(n, a.eval(vs.Values[i], st), st)
+					t := a.eval(vs.Values[i], st)
+					a.bindAssignment(n, vs.Values[i], st)
+					a.assign(n, t, st)
 				}
 			}
 		}
@@ -917,18 +997,21 @@ func (a *analyzer) stmt(s ast.Stmt, st state) {
 	case *ast.IfStmt:
 		a.stmt2(s.Init, st)
 		a.eval(s.Cond, st)
+		entryCleaned, entryOKs := cloneMap(a.ctx.cleaned), cloneMap(a.ctx.oks)
 		then := st.clone()
-		a.markValid(a.validWhenTrue(s.Cond), then)
+		a.markValid(a.validWhenTrue(s.Cond, st), then)
 		a.block(s.Body.List, then)
+		thenCleaned, thenOKs := a.ctx.cleaned, a.ctx.oks
+		a.ctx.cleaned, a.ctx.oks = cloneMap(entryCleaned), cloneMap(entryOKs)
 		els := st.clone()
-		a.markValid(a.validWhenFalse(s.Cond), els)
+		a.markValid(a.validWhenFalse(s.Cond, st), els)
 		elseEnds := false
 		if s.Else != nil {
 			a.stmt(s.Else, els)
-			if b, ok := s.Else.(*ast.BlockStmt); ok {
-				elseEnds = terminates(b.List)
-			}
+			elseEnds = terminates([]ast.Stmt{s.Else})
 		}
+		a.ctx.cleaned = commonMap(thenCleaned, a.ctx.cleaned)
+		a.ctx.oks = commonMap(thenOKs, a.ctx.oks)
 		switch thenEnds := terminates(s.Body.List); {
 		case thenEnds && !elseEnds:
 			st.replace(els, els)
@@ -938,27 +1021,54 @@ func (a *analyzer) stmt(s ast.Stmt, st state) {
 			st.replace(then, els)
 		}
 	case *ast.BranchStmt:
-		if (s.Tok == token.BREAK || s.Tok == token.CONTINUE) && a.ctx.loopAcc != nil {
+		if s.Tok == token.GOTO || s.Label != nil {
+			a.reportLimit(s.Pos(), "goto or labeled control flow is not modeled")
+		}
+		if s.Tok == token.CONTINUE && a.ctx.continueAcc != nil {
+			a.ctx.continueAcc.union(st)
+		} else if s.Tok == token.BREAK && a.ctx.loopAcc != nil {
 			a.ctx.loopAcc.union(st)
 		}
 	case *ast.ForStmt:
 		a.stmt2(s.Init, st)
 		prev := a.ctx.loopAcc
+		prevContinue := a.ctx.continueAcc
 		a.ctx.loopAcc = state{}
-		for range 2 {
+		converged := false
+		for range maxLoopRounds {
+			a.ctx.continueAcc = state{}
+			before := st.signature()
 			a.eval(s.Cond, st)
 			body := st.clone()
 			a.block(s.Body.List, body)
-			a.stmt2(s.Post, body)
-			st.union(body)
+			back := a.ctx.continueAcc
+			if !terminates(s.Body.List) {
+				back.union(body)
+			}
+			if len(back) > 0 {
+				a.stmt2(s.Post, back)
+				st.replace(st.clone(), back)
+			}
+			if before == st.signature() {
+				converged = true
+				break
+			}
+		}
+		if !converged {
+			a.reportLimit(s.Pos(), "loop analysis exceeded its convergence budget")
 		}
 		st.union(a.ctx.loopAcc)
 		a.ctx.loopAcc = prev
+		a.ctx.continueAcc = prevContinue
 	case *ast.RangeStmt:
-		t := a.eval(s.X, st)
+		t := a.eval(s.X, st).scalar()
 		prev := a.ctx.loopAcc
+		prevContinue := a.ctx.continueAcc
 		a.ctx.loopAcc = state{}
-		for range 2 {
+		converged := false
+		for range maxLoopRounds {
+			a.ctx.continueAcc = state{}
+			before := st.signature()
 			body := st.clone()
 			if s.Key != nil {
 				a.assign(s.Key, t, body)
@@ -967,10 +1077,24 @@ func (a *analyzer) stmt(s ast.Stmt, st state) {
 				a.assign(s.Value, t, body)
 			}
 			a.block(s.Body.List, body)
-			st.union(body)
+			back := a.ctx.continueAcc
+			if !terminates(s.Body.List) {
+				back.union(body)
+			}
+			if len(back) > 0 {
+				st.replace(st.clone(), back)
+			}
+			if before == st.signature() {
+				converged = true
+				break
+			}
+		}
+		if !converged {
+			a.reportLimit(s.Pos(), "loop analysis exceeded its convergence budget")
 		}
 		st.union(a.ctx.loopAcc)
 		a.ctx.loopAcc = prev
+		a.ctx.continueAcc = prevContinue
 	case *ast.SwitchStmt:
 		a.stmt2(s.Init, st)
 		a.eval(s.Tag, st)
@@ -1018,7 +1142,16 @@ func (a *analyzer) stmt2(s ast.Stmt, st state) {
 func (a *analyzer) block(list []ast.Stmt, st state) {
 	for _, s := range list {
 		a.stmt(s, st)
+		if terminates([]ast.Stmt{s}) {
+			break
+		}
 	}
+}
+
+func (a *analyzer) reportLimit(pos token.Pos, reason string) {
+	l := a.loc(pos)
+	key := fmt.Sprintf("limit|%s|%d", l.File, l.Line)
+	a.found[key] = finding.Finding{ID: "sast:analysis-incomplete", Severity: finding.SeverityInfo, Title: "Source analysis incomplete", Detail: reason, Subject: l.File, Location: l}
 }
 
 // clauses runs each switch/select clause from the same entry state and merges the
@@ -1070,7 +1203,7 @@ func (a *analyzer) noteCleaned(s *ast.AssignStmt) {
 		return
 	}
 	for i, l := range s.Lhs {
-		obj, _, _, ok := a.pathOf(l)
+		obj, field, _, ok := a.pathOf(l)
 		if !ok {
 			continue
 		}
@@ -1082,16 +1215,16 @@ func (a *analyzer) noteCleaned(s *ast.AssignStmt) {
 			}
 		}
 		if cleaned {
-			a.ctx.cleaned[obj] = true
+			a.ctx.cleaned[vkey{obj, field}] = true
 		} else {
-			delete(a.ctx.cleaned, obj)
+			delete(a.ctx.cleaned, vkey{obj, field})
 		}
 	}
 }
 
 func (a *analyzer) assignStmt(s *ast.AssignStmt, st state) {
 	defer a.noteCleaned(s)
-	a.noteOK(s)
+	defer a.noteOK(s)
 	if len(s.Rhs) == 1 && len(s.Lhs) > 1 {
 		t := a.eval(s.Rhs[0], st)
 		for _, l := range s.Lhs {
@@ -1112,6 +1245,9 @@ func (a *analyzer) assignStmt(s *ast.AssignStmt, st state) {
 			// x += y keeps what x already held.
 			t = merge(a.eval(l, st), t)
 		}
+		if s.Tok == token.ASSIGN || s.Tok == token.DEFINE {
+			a.bindAssignment(l, s.Rhs[i], st)
+		}
 		a.assign(l, t, st)
 	}
 }
@@ -1122,10 +1258,13 @@ func (a *analyzer) analyzeFunc(fd *ast.FuncDecl, name string) *summary {
 	st := state{}
 	a.ctx.entry, a.ctx.pos = a.orphans[name], fd.Pos()
 	a.ctx.oks = map[types.Object]ast.Expr{}
-	a.ctx.cleaned = map[types.Object]bool{}
+	a.ctx.cleaned = map[vkey]bool{}
 	if fd.Recv != nil && len(fd.Recv.List) > 0 && len(fd.Recv.List[0].Names) > 0 {
 		if o, ok := a.info.Defs[fd.Recv.List[0].Names[0]].(*types.Var); ok && o.Name() != "_" {
 			st[vkey{o, ""}] = taintSet{{key: "pr", param: recvParam, kinds: kAll}}
+			if _, ptr := o.Type().(*types.Pointer); ptr {
+				st[vkey{o, originField}] = origin(recvParam)
+			}
 		}
 	}
 	i := 0
@@ -1133,6 +1272,10 @@ func (a *analyzer) analyzeFunc(fd *ast.FuncDecl, name string) *summary {
 		for _, n := range f.Names {
 			if o, ok := a.info.Defs[n].(*types.Var); ok && n.Name != "_" && !inert(o.Type()) {
 				st[vkey{o, ""}] = taintSet{{key: fmt.Sprintf("p%d", i), param: i, kinds: kAll}}
+				switch typeUnder(o.Type()).(type) {
+				case *types.Pointer, *types.Map, *types.Slice:
+					st[vkey{o, originField}] = origin(i)
+				}
 				if a.ctx.pnames == nil {
 					a.ctx.pnames = map[int]string{}
 				}
@@ -1145,10 +1288,10 @@ func (a *analyzer) analyzeFunc(fd *ast.FuncDecl, name string) *summary {
 		}
 	}
 	a.block(fd.Body.List, st)
-	sum := &summary{ret: a.ctx.ret}
+	sum := &summary{ret: a.ctx.ret, effects: a.ctx.fieldEffects()}
 	seen := map[string]bool{}
 	for _, k := range a.ctx.sinks {
-		id := fmt.Sprintf("%d|%d|%s|%d", k.param, k.kind, k.name, k.pos)
+		id := fmt.Sprintf("%d|%s|%d|%s|%d", k.param, k.field, k.kind, k.name, k.pos)
 		if !seen[id] {
 			seen[id] = true
 			sum.sinks = append(sum.sinks, k)
@@ -1161,6 +1304,12 @@ func (a *analyzer) analyzeFunc(fd *ast.FuncDecl, name string) *summary {
 		}
 		if x.pos != y.pos {
 			return x.pos < y.pos
+		}
+		if x.field != y.field {
+			return x.field < y.field
+		}
+		if x.kind != y.kind {
+			return x.kind < y.kind
 		}
 		return x.name < y.name
 	})
@@ -1188,28 +1337,28 @@ func declName(fd *ast.FuncDecl) string {
 	}
 }
 
-// signature identifies the shared analysis state, so a fixed point can be detected.
-func (sh *shared) signature() string {
-	keys := make([]string, 0, len(sh.sums))
-	for k := range sh.sums {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-	var b strings.Builder
-	for _, k := range keys {
-		fmt.Fprintf(&b, "%s{%s}", k, sh.sums[k].signature())
-	}
+func (sh *shared) globalSignature() string {
 	gl := make([]string, 0, len(sh.globals))
 	for o, t := range sh.globals {
 		var g strings.Builder
 		fmt.Fprintf(&g, "%s.%d", o.Name(), o.Pos())
 		for _, at := range t {
-			fmt.Fprintf(&g, ":%s/%d", at.key, at.kinds)
+			fmt.Fprintf(&g, ":%s/%d", atomKey(at), at.kinds)
 		}
 		gl = append(gl, g.String())
 	}
 	sort.Strings(gl)
-	return b.String() + strings.Join(gl, ";")
+	return strings.Join(gl, ";")
+}
+
+func (sh *shared) dependsOn(key string) {
+	if key == "" || sh.current == "" {
+		return
+	}
+	if sh.dependents[key] == nil {
+		sh.dependents[key] = map[string]bool{}
+	}
+	sh.dependents[key][sh.current] = true
 }
 
 // safely runs analyzeFunc and reports whether it completed.

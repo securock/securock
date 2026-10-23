@@ -27,20 +27,24 @@ const (
 	exprBin                    // arithmetic or comparison: op in str, operands in Args
 	exprCond                   // x ? Args[0] : Args[1]
 	exprOther                  // anything else: taint of the children
+	exprObject                 // object/dictionary literal: preserve children's fields
+	exprField                  // a named entry of an object; name is the property
 )
 
 type expr struct {
-	kind exprKind
-	pos  token.Pos
-	name string  // identifier, or member name
-	str  string  // string literal value
-	x    *expr   // base, callee, or operand
-	args []*expr // call arguments, concat parts, index, or children
+	kind  exprKind
+	pos   token.Pos
+	name  string  // identifier, or member name
+	str   string  // string literal value
+	guard kind    // classes neutralized by a validation form; zero means all
+	x     *expr   // base, callee, or operand
+	args  []*expr // call arguments, concat parts, index, or children
 	// kw holds the names of keyword arguments, parallel to args (empty for positional).
 	kw []string
 	fn *funcIR
 	// ty is the declared type of an identifier at its declaration, as written.
-	ty string
+	ty    string
+	local bool // explicitly declared local, even when its type is inferred
 }
 
 type stmtKind int
@@ -68,6 +72,7 @@ type stmt struct {
 	// loop marks a break or continue: control leaves for the end of the loop, so the
 	// state at this point still reaches the code after it.
 	loop bool
+	next bool // continue/next feeds the next iteration; break only feeds the exit
 	// binds marks an assignment the frontend made up (a loop or callback parameter), which
 	// must not hide a request object of the same name.
 	binds bool
@@ -107,7 +112,8 @@ type module struct {
 	// topStrs caches the module-level string constants (irRun.moduleStrs).
 	topStrs map[string]string
 	// fields maps class -> field -> declared type, for languages that declare them.
-	fields map[string]map[string]string
+	fields       map[string]map[string]string
+	staticFields map[string]bool // Class.field is not part of an instance's state
 	// supers maps class -> declared supertypes (extends, implements), so a call through
 	// an interface reaches the classes implementing it.
 	supers map[string][]string

@@ -293,7 +293,8 @@ data: they flag the call (`hashlib.md5`, `requests.get(verify=False)`,
 false, `Digest::MD5`) by its arguments. A call that states
 `usedforsecurity=False` is not flagged.
 
-`sast:analysis-incomplete` (info) marks a file that could not be analyzed.
+`sast:analysis-incomplete` (info) marks a file that could not be analyzed, including
+analysis that exhausted its convergence budget.
 
 Three of these depend on what the data can be. `nosql-injection` fires when a
 request object reaches a query filter (`User.findOne({name: req.body.name})`,
@@ -319,7 +320,10 @@ Zip slip is reported as `path-traversal` when an archive entry name (Go `zip.Fil
 `tar.Header.Name`, Python `namelist()` and `ZipInfo.filename`, Java `ZipEntry.getName()`,
 `entry.path` in Node, PHP `getNameIndex`, Ruby `entry.name`) reaches a file operation. A
 check that keeps the path inside the destination ends it: `filepath.IsLocal`, rejecting
-`..`, a prefix check on a cleaned path, or `startsWith` on a canonical path. Python
+`..`, or a prefix check on a cleaned/canonical path that includes the directory boundary
+(`dest + path.sep`, `dest.getCanonicalPath() + File.separator`). A bare prefix is
+insufficient: `/safe-other` starts with `/safe`. These path checks do not neutralize SQL
+injection or XSS. Python
 `tarfile.extractall` and `shutil.unpack_archive` without `filter=` are reported as
 `zip-slip`.
 
@@ -374,7 +378,12 @@ URL in JavaScript; Flask, Django, FastAPI and Tornado in Python; servlets,
 Spring and JAX-RS in Java; ASP.NET Core controller actions (`[FromQuery]`, `[FromBody]`, `Request.Query`)
 and WebForms input controls (`txtName.Text`) in C#, with ASP.NET Core settings checked too (CORS with credentials for any origin, cookie `SecurePolicy`/`SameSite`, JWT audience/issuer validation off, certificate callbacks that always return true); the PHP superglobals and Laravel requests; Rails
 and Sinatra `params`. Taint is tracked per field, through closures, interface
-and inheritance calls, and across functions and files. A sanitizer clears only
+and inheritance calls, and across functions and files. Function summaries preserve
+parameter/receiver field dependencies and writes through reference arguments, so
+`request → setter → field → getter → SQL` is followed without treating an unrelated
+field on the same object as part of the query. Constructors and returned Go structs,
+JavaScript objects and Python dictionaries preserve their modeled fields too.
+A sanitizer clears only
 the classes it neutralizes: HTML escaping stops `xss` but not SQL injection,
 while an integer conversion or a digest clears everything. Test files,
 `vendor`, `node_modules`, `testdata`, build output, and generated files are not
@@ -384,9 +393,26 @@ A file that does not parse is reported as `sast:analysis-incomplete`: its
 vulnerabilities are unknown, not absent. A value that passes a strict check and
 then leaves the function on failure (`if !allowed[x] { return }`, or an
 anchored regular expression that admits only letters, digits and a few
-separators) counts as validated. Channels, reflection, sessions and other
-storage round trips, and field-level state of a method receiver are not
-modeled, so a clean run is not proof of safety.
+separators) counts as validated for the classes that check prevents. Assignments,
+including writes through a modeled alias, invalidate affected validation facts.
+Request-controlled collections are not trusted as allowlists.
+
+The analyzer follows direct local reference aliases (Go pointers/maps/slices and
+objects in the other languages), and distinguishes them from Go struct value copies.
+Aliases that are only possible on some branches and writes summarized across calls
+are updated conservatively: these can retain taint and report a safe overwrite.
+Reference identity returned by helpers, aliases to nested subobjects, reflection,
+channels, sessions and other storage round trips are not fully modeled, so a clean
+run is not proof of safety.
+
+Call summaries are reanalyzed when their dependencies change, rather than stopping
+after a fixed number of whole-project passes. Loop-carried taint is propagated to a
+fixed point, with `break` kept separate from `continue`. Computation is bounded:
+loops allow 128 propagation rounds, and function analyses share a project-sized
+work budget (at most 1,000,000 evaluations). Exhaustion produces
+`sast:analysis-incomplete`, retaining the findings already obtained. Field paths
+deeper than eight segments are conservatively merged into the enclosing object,
+which can increase false positives.
 
 JavaScript functions are followed whether they are declared, assigned to a `const`, or
 written in the older constructor style (`function Dao(db) { this.find = (x) => {...} }`
@@ -408,7 +434,9 @@ library code whose callers validate their input.
 ### How accurate is sast
 
 Accuracy is measured against the OWASP Benchmark, a labeled suite of small web handlers
-that the analyzer was not written around. The score is the true-positive rate minus
+that the analyzer was not written around. The table records the last published
+measurements; it is not a new measurement of every subsequent dataflow change.
+The score is the true-positive rate minus
 the false-positive rate; a tool that guesses scores 0.
 
 | Suite                       | True positives | False positives | Score |

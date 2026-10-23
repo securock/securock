@@ -348,6 +348,14 @@ func (c *csLower) fieldDecl(class string, m *node) {
 		c.mod.fields[class] = map[string]string{}
 	}
 	c.mod.fields[class][name] = ty
+	for _, ch := range c.named(m) {
+		if c.kind(ch) == "modifier" && (c.text(ch) == "static" || c.text(ch) == "const") {
+			if c.mod.staticFields == nil {
+				c.mod.staticFields = map[string]bool{}
+			}
+			c.mod.staticFields[class+"."+name] = true
+		}
+	}
 	// const string K = "..." and static readonly string K = "...": a constant other code reads.
 	if d := c.firstOfKind(c.firstOfKind(m, "variable_declaration"), "variable_declarator"); d != nil {
 		mods := ""
@@ -485,6 +493,7 @@ func (c *csLower) declarators(n *node) []*stmt {
 		}
 		name := c.mk(exprName, d)
 		name.name = c.text(c.field(d, "name"))
+		name.local = true
 		if ty != "var" && c.kind(c.field(vd, "type")) != "implicit_type" {
 			name.ty = ty
 		}
@@ -528,7 +537,7 @@ func (c *csLower) stmt(n *node) []*stmt {
 	case "throw_statement":
 		return []*stmt{{kind: stmtJump, pos: c.pos(n)}}
 	case "break_statement", "continue_statement":
-		return []*stmt{{kind: stmtJump, pos: c.pos(n), loop: true}}
+		return []*stmt{{kind: stmtJump, pos: c.pos(n), loop: true, next: k == "continue_statement"}}
 	case "if_statement":
 		s := &stmt{kind: stmtIf, pos: c.pos(n), cond: c.expr(c.field(n, "condition")), then: c.block(c.field(n, "consequence"))}
 		if alt := c.field(n, "alternative"); alt != nil {
@@ -547,9 +556,9 @@ func (c *csLower) stmt(n *node) []*stmt {
 		if init := c.field(n, "initializer"); init != nil && c.kind(init) == "variable_declaration" {
 			out = append(out, c.declarators(init)...)
 		}
-		return append(out, &stmt{kind: stmtBranch, pos: c.pos(n), arms: [][]*stmt{c.block(c.field(n, "body"))}})
+		return append(out, &stmt{kind: stmtLoop, pos: c.pos(n), then: c.block(c.field(n, "body")), cond: c.expr(c.field(n, "condition"))})
 	case "while_statement", "do_statement":
-		return []*stmt{{kind: stmtBranch, pos: c.pos(n), arms: [][]*stmt{c.block(c.field(n, "body"))}}}
+		return []*stmt{{kind: stmtLoop, pos: c.pos(n), then: c.block(c.field(n, "body")), cond: c.expr(c.field(n, "condition"))}}
 	case "block", "checked_statement", "unsafe_statement", "lock_statement", "labeled_statement":
 		var inner []*stmt
 		for _, ch := range c.named(n) {
@@ -625,10 +634,10 @@ func (c *csLower) expr(n *node) *expr {
 		return nil
 	}
 	switch k := c.kind(n); k {
-	case "identifier", "this_expression", "base_expression", "predefined_type":
+	case "identifier", "this", "base", "this_expression", "base_expression", "predefined_type":
 		e := c.mk(exprName, n)
 		e.name = c.text(n)
-		if k == "this_expression" {
+		if k == "this_expression" || k == "base_expression" || k == "base" {
 			e.name = "this"
 		}
 		return e
@@ -839,6 +848,7 @@ func (c *csLower) invoke(n *node) *expr {
 				in := c.mk(exprIn, n)
 				if e.x.name == "StartsWith" {
 					in.x, in.args = e.args[0], []*expr{e.x.x}
+					in.str = "prefix"
 				} else {
 					in.x, in.args = e.x.x, []*expr{e.args[0]}
 				}
@@ -849,7 +859,9 @@ func (c *csLower) invoke(n *node) *expr {
 			}
 		case "IsLocalUrl":
 			if len(e.args) == 1 {
-				return guardOf(c.pos(n), e.args[0])
+				g := guardOf(c.pos(n), e.args[0])
+				g.guard = kRedirect
+				return g
 			}
 		case "Format", "Concat", "Join":
 			if e.x.x != nil && e.x.x.kind == exprName && (e.x.x.name == "string" || e.x.x.name == "String") {

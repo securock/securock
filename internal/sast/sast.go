@@ -27,8 +27,8 @@ import (
 )
 
 const (
-	maxFileBytes = 2 << 20
-	maxRounds    = 8
+	maxFileBytes  = 2 << 20
+	maxLoopRounds = 128
 )
 
 // skipDirs are never descended into: dependencies, VCS data, and test fixtures that
@@ -133,11 +133,12 @@ func taint(fset *token.FileSet, root string, pkgs []*pkg, mods []*module, props 
 		return out
 	}
 	sh := &shared{
-		declTypes: map[types.Object]ast.Expr{},
-		sums:      map[string]*summary{},
-		methods:   map[string][]impl{},
-		globals:   map[types.Object]taintSet{},
-		regexps:   map[types.Object]string{},
+		declTypes:  map[types.Object]ast.Expr{},
+		sums:       map[string]*summary{},
+		methods:    map[string][]impl{},
+		globals:    map[types.Object]taintSet{},
+		regexps:    map[types.Object]string{},
+		dependents: map[string]map[string]bool{},
 	}
 	if opts.AssumeParams {
 		sh.orphans = orphanFuncs(pkgs, fns2names(fns))
@@ -162,39 +163,90 @@ func taint(fset *token.FileSet, root string, pkgs []*pkg, mods []*module, props 
 	}
 	proj := newProject(mods)
 	proj.props = props
-	var found map[string]finding.Finding
-	var failed []finding.Finding
-	prev := ""
-	for range maxRounds {
-		found = map[string]finding.Finding{}
-		for _, f := range fns {
-			a := &analyzer{shared: sh, fset: fset, info: f.pkg.info, rel: rel, found: found}
-			sum, ok := a.safely(f.decl, f.name)
-			if !ok {
-				// Never let a bug in the analyzer pass for a clean result.
-				l := a.loc(f.decl.Pos())
-				found["incomplete|"+l.File+"|"+f.name] = unanalyzed(root, filepath.Join(root, l.File), "analyzing "+f.name+" failed")
-				continue
-			}
-			sh.sums[f.name] = sum
-		}
-		failed = failed[:0]
-		base := &analyzer{shared: sh, fset: fset, rel: rel, found: found}
-		for _, m := range mods {
-			spec := frontends[m.lang].spec
-			for _, path := range analyzeModule(sh, spec, proj, m, base) {
-				failed = append(failed, unanalyzed(root, filepath.Join(root, path), "analyzing a function in it failed"))
-			}
-		}
-		// Summaries and global taint only grow, so a round that changes neither is final.
-		cur := sh.signature()
-		if cur == prev {
-			break
-		}
-		prev = cur
+	type job struct {
+		key, file string
+		run       func(map[string]finding.Finding) (*summary, bool)
 	}
-	for _, f := range failed {
-		found["incomplete|"+f.Subject+"|"+f.Detail] = f
+	var jobs []job
+	for _, f := range fns {
+		jobs = append(jobs, job{f.name, rel(f.decl.Pos()), func(found map[string]finding.Finding) (*summary, bool) {
+			a := &analyzer{shared: sh, fset: fset, info: f.pkg.info, rel: rel, found: found}
+			return a.safely(f.decl, f.name)
+		}})
+	}
+	for _, m := range mods {
+		for _, f := range append([]*funcIR{{name: "<module>", body: m.top}}, m.funcs...) {
+			jobs = append(jobs, job{funcKey(m, f), m.path, func(found map[string]finding.Finding) (*summary, bool) {
+				spec := frontends[m.lang].spec
+				a := &analyzer{shared: sh, fset: fset, rel: rel, found: found, langName: spec.name}
+				r := &irRun{analyzer: a, spec: spec, proj: proj, mod: m}
+				return r.safely(f)
+			}})
+		}
+	}
+	index := map[string]int{}
+	queue := make([]int, len(jobs))
+	queued := make([]bool, len(jobs))
+	results := make([]map[string]finding.Finding, len(jobs))
+	for i, j := range jobs {
+		index[j.key] = i
+		queue[i] = i
+		queued[i] = true
+	}
+	enqueue := func(i int) {
+		if !queued[i] {
+			queue = append(queue, i)
+			queued[i] = true
+		}
+	}
+	// Dependency-driven reanalysis handles arbitrarily deep call chains without
+	// re-running every function on every round. The budget also bounds cycles.
+	budget := min(1_000_000, max(10_000, len(jobs)*128))
+	steps := 0
+	for len(queue) > 0 && steps < budget {
+		i := queue[0]
+		queue = queue[1:]
+		queued[i] = false
+		steps++
+		j := jobs[i]
+		sh.current = j.key
+		beforeGlobals := sh.globalSignature()
+		found := map[string]finding.Finding{}
+		sum, ok := j.run(found)
+		if !ok {
+			found["incomplete|"+j.key] = unanalyzed(root, filepath.Join(root, j.file), "analyzing a function in it failed")
+		} else {
+			old := sh.sums[j.key]
+			sh.sums[j.key] = sum
+			if old == nil || old.signature() != sum.signature() {
+				var deps []string
+				for key := range sh.dependents[j.key] {
+					deps = append(deps, key)
+				}
+				sort.Strings(deps)
+				for _, key := range deps {
+					if n, ok := index[key]; ok {
+						enqueue(n)
+					}
+				}
+			}
+		}
+		results[i] = found
+		if beforeGlobals != sh.globalSignature() {
+			for n := range jobs {
+				enqueue(n)
+			}
+		}
+	}
+	found := map[string]finding.Finding{}
+	for _, result := range results {
+		for key, f := range result {
+			found[key] = f
+		}
+	}
+	for _, i := range queue {
+		j := jobs[i]
+		found["budget|"+j.file] = unanalyzed(root, filepath.Join(root, j.file), "interprocedural analysis exceeded its convergence budget")
 	}
 	keys := make([]string, 0, len(found))
 	for k := range found {

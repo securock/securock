@@ -41,9 +41,12 @@ even when the lockfile already records them. The GitHub Action default
 - obfuscated capability use that the package source heuristics miss
 - vulnerabilities in your own code that `sast` does not model: it follows
   data through functions and files in Go, JavaScript/TypeScript, Python,
-  Java, PHP and Ruby but not through reflection, channels, sessions, or
+  Java, Kotlin, C#, PHP and Ruby, including modeled receiver-field updates and
+  direct local reference aliases. Reflection, channels, sessions, returned-reference
+  identity and nested-subobject aliases are not fully modeled, nor are
   other languages, so a clean `sast` run is not
-  proof of safety
+  proof of safety. Exhausted analysis budgets are reported as incomplete;
+  conservative field/alias merging can also produce false positives
 - provenance signed by an OIDC issuer outside the trusted GitHub Actions
   / GitLab patterns Securock accepts for `verified`, or provenance whose
   source/builder/workflow/ref/predicate type is outside an active policy

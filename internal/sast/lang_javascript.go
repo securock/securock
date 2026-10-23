@@ -192,7 +192,7 @@ func (j *jsLower) stmt(n *node) []*stmt {
 		}
 		return []*stmt{s}
 	case "break_statement", "continue_statement":
-		return []*stmt{{kind: stmtJump, pos: j.pos(n), loop: true}}
+		return []*stmt{{kind: stmtJump, pos: j.pos(n), loop: true, next: k == "continue_statement"}}
 	case "if_statement":
 		s := &stmt{kind: stmtIf, pos: j.pos(n), cond: j.expr(j.field(n, "condition")), then: j.body(j.field(n, "consequence"))}
 		if alt := j.field(n, "alternative"); alt != nil {
@@ -211,10 +211,10 @@ func (j *jsLower) stmt(n *node) []*stmt {
 			out = append(out, j.stmt(init)...)
 		}
 		body := j.body(j.field(n, "body"))
-		out = append(out, &stmt{kind: stmtBranch, pos: j.pos(n), arms: [][]*stmt{body}})
+		out = append(out, &stmt{kind: stmtLoop, pos: j.pos(n), then: body, cond: j.expr(j.field(n, "condition"))})
 		return out
 	case "while_statement", "do_statement":
-		return []*stmt{{kind: stmtBranch, pos: j.pos(n), arms: [][]*stmt{j.body(j.field(n, "body"))}}}
+		return []*stmt{{kind: stmtLoop, pos: j.pos(n), then: j.body(j.field(n, "body")), cond: j.expr(j.field(n, "condition"))}}
 	case "statement_block":
 		return []*stmt{{kind: stmtBranch, pos: j.pos(n), arms: [][]*stmt{j.stmts(j.named(n))}}}
 	case "switch_statement":
@@ -768,11 +768,16 @@ func (j *jsLower) expr(n *node) *expr {
 		return j.cond(n, j.expr(j.field(n, "condition")), j.expr(j.field(n, "consequence")), j.expr(j.field(n, "alternative")))
 	case "object":
 		// { origin: true, credentials: true } hands credentials to any website.
-		e := j.mk(exprOther, n)
+		e := j.mk(exprObject, n)
 		var origin, creds, secret, keys *node
 		sessionOpts := false
 		for _, c := range j.named(n) {
 			if x := j.expr(c); x != nil {
+				if j.kind(c) == "pair" && j.kind(j.field(c, "key")) != "computed_property_name" {
+					x = &expr{kind: exprField, pos: j.pos(c), name: strings.Trim(j.text(j.field(c, "key")), `"'`), x: x}
+				} else if j.kind(c) == "shorthand_property_identifier" {
+					x = &expr{kind: exprField, pos: j.pos(c), name: j.text(c), x: x}
+				}
 				e.args = append(e.args, x)
 			}
 			if j.kind(c) == "pair" {
@@ -921,6 +926,7 @@ func (j *jsLower) call(n *node, k exprKind, fn *node) *expr {
 			if as := j.named(j.field(n, "arguments")); len(as) == 1 {
 				e := j.mk(exprIn, n)
 				e.x, e.args = j.expr(as[0]), []*expr{j.expr(j.field(fn, "object"))}
+				e.str = "prefix"
 				return withWeakAllow(e, j.weakAllow(j.pos(n), j.text(j.field(fn, "object")), j.text(as[0])))
 			}
 		} else if m == "includes" || m == "has" {

@@ -1296,8 +1296,8 @@ func h(rp *repo, r *http.Request) {
 	rp.all()
 }
 
-=== fp-gap-receiver-other-field
-// fp-gap: sast:go/sql-injection
+=== safe-receiver-other-field
+// want: none
 package main
 
 import (
