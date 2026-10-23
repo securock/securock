@@ -8,6 +8,11 @@ on:
 permissions:
   contents: read
 
+# A newer push to the same pull request makes the older run pointless.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -20,16 +25,35 @@ jobs:
         run: go test ./...
       - name: Action script
         run: bash action/run_test.sh
+
+  race:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
       - name: Race
         run: go test -race ./...
+
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
       - name: Vet
         run: go vet ./...
       - name: Tidy
         run: go mod tidy && git diff --exit-code
+      # Build once: `go run` would relink the binary for every example.
+      - name: Build
+        run: go build -o bin/ ./cmd/securock
       - name: Examples
         run: |
           for d in examples/*/; do
-            go run ./cmd/securock verify --offline "$d"
+            bin/securock verify --offline "$d"
           done
 
   govulncheck:
@@ -58,19 +82,22 @@ jobs:
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
+      - name: Build
+        run: go build -o bin/ ./cmd/securock
       - name: Version
-        run: go run ./cmd/securock version
+        shell: bash
+        run: bin/securock version
       - name: Scan examples
         shell: bash
         run: |
           for d in examples/*/; do
-            go run ./cmd/securock scan --offline --no-fail "$d"
+            bin/securock scan --offline --no-fail "$d"
           done
       - name: Verify examples
         shell: bash
         run: |
           for d in examples/*/; do
-            go run ./cmd/securock verify --offline "$d"
+            bin/securock verify --offline "$d"
           done
 
   release-snapshot:
