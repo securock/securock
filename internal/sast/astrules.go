@@ -123,6 +123,9 @@ func astRules(fset *token.FileSet, p *pkg, rel func(token.Pos) string) []finding
 							}
 						}
 					}
+					if idx, ok := goKeyArg[name]; ok && idx < len(n.Args) && constBytes(p.info, n.Args[idx]) {
+						r.add(n.Pos(), ruleHardCryptoKey, "the key passed to "+shortName(name)+" is written in the source")
+					}
 					if name == "crypto/rsa.GenerateKey" && len(n.Args) == 2 {
 						if tv := p.info.Types[n.Args[1]]; tv.Value != nil && tv.Value.Kind() == constant.Int {
 							if v, exact := constant.Int64Val(tv.Value); exact && v < 2048 {
@@ -216,6 +219,24 @@ func astRules(fset *token.FileSet, p *pkg, rel func(token.Pos) string) []finding
 		}
 	}
 	return r.out
+}
+
+// goKeyArg maps a call to the index of its key argument.
+var goKeyArg = map[string]int{
+	"crypto/aes.NewCipher": 0, "crypto/hmac.New": 1,
+	"golang.org/x/crypto/chacha20poly1305.New": 0, "golang.org/x/crypto/chacha20poly1305.NewX": 0,
+}
+
+// constBytes reports a constant string, or []byte of one: []byte("key"), or a const.
+func constBytes(info *types.Info, e ast.Expr) bool {
+	e = unparen(e)
+	if c, ok := e.(*ast.CallExpr); ok && len(c.Args) == 1 {
+		if _, isType := info.Types[c.Fun]; isType && info.Types[c.Fun].IsType() {
+			e = unparen(c.Args[0])
+		}
+	}
+	tv := info.Types[e]
+	return tv.Value != nil && tv.Value.Kind() == constant.String && len(constant.StringVal(tv.Value)) >= 4
 }
 
 // oldTLS reports a constant TLS version older than 1.2.

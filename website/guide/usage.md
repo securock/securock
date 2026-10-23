@@ -262,7 +262,7 @@ PHP (`php`), and Ruby (`rb`). Rule ids are `sast:LANGUAGE/RULE`:
 | `tls-verification-disabled`    | 295  | medium   | all                     |
 | `jwt-unverified`               | 347  | high     | JS, Python, Java, Ruby  |
 | `hardcoded-signing-key`        | 321  | high     | JS, Java                |
-| `hardcoded-key`                | 321  | medium   | JS, Python, Java        |
+| `hardcoded-key`                | 321  | medium   | Go, JS, Python, Java    |
 | `permit-all`                   | 862  | high     | Java                    |
 | `xxe`                          | 611  | high     | Python, Java, PHP, Ruby |
 | `debug-enabled`                | 489  | medium   | Python, PHP, Ruby       |

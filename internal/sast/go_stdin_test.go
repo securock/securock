@@ -50,6 +50,19 @@ import ("os"; "syscall")
 func main() {
 	syscall.ForkExec(os.Args[1], nil, nil)
 }`, []string{"sast:go/command-injection"}},
+		{"aes key as a byte conversion", `package main
+import "crypto/aes"
+func main() { aes.NewCipher([]byte("0123456789abcdef")) }`, []string{"sast:go/hardcoded-key"}},
+		{"aes key as a constant", `package main
+import "crypto/aes"
+const key = "0123456789abcdef"
+func main() { aes.NewCipher([]byte(key)) }`, []string{"sast:go/hardcoded-key"}},
+		{"aes key from the environment", `package main
+import ("crypto/aes"; "os")
+func main() { aes.NewCipher([]byte(os.Getenv("KEY"))) }`, nil},
+		{"hmac key literal", `package main
+import ("crypto/hmac"; "crypto/sha256")
+func main() { hmac.New(sha256.New, []byte("shared-secret")) }`, []string{"sast:go/hardcoded-key"}},
 		{"rsa key too small", `package main
 import ("crypto/rand"; "crypto/rsa")
 func main() { rsa.GenerateKey(rand.Reader, 1<<10) }`, []string{"sast:go/weak-crypto"}},
