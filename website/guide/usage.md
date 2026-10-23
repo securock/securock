@@ -260,7 +260,9 @@ and Ruby (`rb`). Rule ids are `sast:LANGUAGE/RULE`:
 | `insecure-deserialization`     | 502  | high     | all but Go              |
 | `weak-crypto`                  | 327  | medium   | all                     |
 | `tls-verification-disabled`    | 295  | medium   | all                     |
-| `jwt-unverified`               | 347  | high     | JS, Python              |
+| `jwt-unverified`               | 347  | high     | JS, Python, Java, Ruby  |
+| `hardcoded-signing-key`        | 321  | high     | Java                    |
+| `permit-all`                   | 862  | high     | Java                    |
 | `xxe`                          | 611  | high     | Python, Java, PHP, Ruby |
 | `debug-enabled`                | 489  | medium   | Python, PHP, Ruby       |
 | `insecure-cookie`              | 614  | medium   | all but Ruby, PHP       |
@@ -269,7 +271,7 @@ and Ruby (`rb`). Rule ids are `sast:LANGUAGE/RULE`:
 | `weak-allowlist`               | 601  | medium   | JS, Python, Java, Ruby  |
 | `directory-listing`            | 548  | medium   | JS                      |
 | `prompt-injection`             | 1427 | medium   | JS, Python              |
-| `csrf-disabled`                | 352  | medium   | Ruby                    |
+| `csrf-disabled`                | 352  | medium   | Ruby, Java              |
 | `variable-extraction`          | 621  | high     | PHP                     |
 | `insecure-temp-file`           | 377  | low      | Python                  |
 | `world-writable`               | 732  | medium   | all                     |

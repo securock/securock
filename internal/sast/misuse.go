@@ -36,6 +36,12 @@ type misuse struct {
 	// argRe maps an argument index to a pattern its variable name must match:
 	// md5($password) matters, md5($cacheKey) does not.
 	argRe map[int]*regexp.Regexp
+	// recvCall requires the receiver to be the result of a call with this name:
+	// http.csrf().disable() and authorize.anyRequest().permitAll().
+	recvCall string
+	// literal requires these arguments to be string literals (a signing key written in
+	// the source rather than read from configuration).
+	literal map[int]bool
 	// recv limits a method misuse to receivers rooted at one of these variable names.
 	recv []string
 }
@@ -79,6 +85,10 @@ var (
 		"Use AES-GCM or ChaCha20-Poly1305 with a random nonce, and SHA-256 or better for hashing.", finding.SeverityMedium}
 	ruleDeserCfg = rule{"sast:go/insecure-deserialization", "CWE-502", "Insecure deserialization is configured",
 		"Use a data-only serializer such as JSON.", finding.SeverityHigh}
+	rulePermitAll = rule{"sast:go/permit-all", "CWE-862", "Every request is permitted without authentication",
+		"Require authentication by default and open up only the specific public paths.", finding.SeverityHigh}
+	ruleHardKey = rule{"sast:go/hardcoded-signing-key", "CWE-321", "Token signing key is written in the source",
+		"Load the key from a secret store or the environment, rotate the exposed one, and use a key of at least 256 random bits.", finding.SeverityHigh}
 	ruleExtract = rule{"sast:go/variable-extraction", "CWE-621", "Request data is imported into the variable scope",
 		"Read the specific parameters you need instead of extract()ing the request.", finding.SeverityHigh}
 )
@@ -125,6 +135,19 @@ func matchesAny(have string, want []string) bool {
 }
 
 func (m misuse) matches(c *expr, constText func(*expr) (string, bool)) bool {
+	if m.recvCall != "" {
+		if c.x == nil || c.x.kind != exprMember || c.x.x == nil || c.x.x.kind != exprCall || c.x.x.x == nil || lastName(c.x.x.x) != m.recvCall {
+			return false
+		}
+	}
+	for i := range m.literal {
+		if i >= len(c.args) || c.args[i].kind != exprStr || len(c.args[i].str) < 4 {
+			return false
+		}
+	}
+	if len(m.literal) > 0 && len(m.args) == 0 && len(m.kw) == 0 && m.argc == 0 {
+		return true
+	}
 	if len(m.recv) > 0 {
 		if c.x == nil || c.x.kind != exprMember || !matchesName(rootName(c.x.x), m.recv) {
 			return false
@@ -207,7 +230,7 @@ func (m misuse) matches(c *expr, constText func(*expr) (string, bool)) bool {
 			return false
 		}
 	}
-	return len(m.args) > 0 || len(m.kw) > 0
+	return len(m.args) > 0 || len(m.kw) > 0 || m.recvCall != "" || len(m.recv) > 0
 }
 
 // checkMisuse reports the unsafe forms of a call to qname (or to a method called field).

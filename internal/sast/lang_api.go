@@ -83,6 +83,20 @@ func init() {
 	for _, m := range []string{"md5", "md5Hex", "getMd5Digest", "sha1", "sha1Hex", "getSha1Digest", "shaHex", "sha"} {
 		jv.misuse["org.apache.commons.codec.digest.DigestUtils."+m] = []misuse{bare(ruleWeakCrypto, "MD5 and SHA-1 are broken for collision resistance")}
 	}
+	// JWT libraries (jjwt, java-jwt) and Spring Security configuration.
+	jv.misuse["?.setSigningKey"] = []misuse{{rule: ruleHardKey, detail: "the signing key is a string literal", literal: map[int]bool{0: true}}}
+	jv.misuse["?.signWith"] = append(jv.misuse["?.signWith"], md(ruleJWT, "the algorithm none issues unsigned tokens", map[int][]string{0: {"none"}}), md(ruleJWT, "the algorithm none issues unsigned tokens", map[int][]string{1: {"none"}}))
+	jv.misuse["?.parseClaimsJwt"] = []misuse{bare(ruleJWT, "parseClaimsJwt accepts tokens that carry no signature")}
+	jv.misuse["?.parsePlaintextJwt"] = []misuse{bare(ruleJWT, "parsePlaintextJwt accepts tokens that carry no signature")}
+	jv.misuse["com.auth0.jwt.JWT.decode"] = []misuse{bare(ruleJWT, "JWT.decode does not verify the signature; use a verifier")}
+	jv.misuse["com.auth0.jwt.algorithms.Algorithm.none"] = []misuse{bare(ruleJWT, "the algorithm none issues unsigned tokens")}
+	jv.misuse["?.disable"] = []misuse{
+		{rule: ruleCSRF, detail: "csrf().disable() turns off CSRF protection", recvCall: "csrf"},
+		{rule: ruleCSRF, detail: "CSRF protection is disabled", recv: []string{"csrf"}},
+	}
+	jv.misuse["?.permitAll"] = []misuse{{rule: rulePermitAll, detail: "anyRequest().permitAll() leaves every endpoint open", recvCall: "anyRequest"}}
+	jv.simpleTypes["JWT"] = "com.auth0.jwt.JWT"
+	jv.simpleTypes["Algorithm"] = "com.auth0.jwt.algorithms.Algorithm"
 	jv.cookieCtors = map[string]bool{"javax.servlet.http.Cookie": true, "jakarta.servlet.http.Cookie": true}
 	jv.simpleTypes["NullCipher"] = "javax.crypto.NullCipher"
 	jv.simpleTypes["SSLContext"] = "javax.net.ssl.SSLContext"

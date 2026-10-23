@@ -353,3 +353,28 @@ func TestVendoredLibrariesAndScopeNames(t *testing.T) {
 		t.Fatalf("Go in a directory called libs is still first-party: got %v", got)
 	}
 }
+
+func TestJavaJWTAndSpringSecurity(t *testing.T) {
+	tests := []struct {
+		name string
+		src  string
+		want []string
+	}{
+		{"hard-coded signing key", "public class A {\n  Object f(String t) { return io.jsonwebtoken.Jwts.parser().setSigningKey(\"secretkey1234\").parseClaimsJws(t); }\n}\n", []string{"sast:java/hardcoded-signing-key"}},
+		{"signing key from configuration", "public class A {\n  Object f(String t, String key) { return io.jsonwebtoken.Jwts.parser().setSigningKey(key).parseClaimsJws(t); }\n}\n", nil},
+		{"unsigned token accepted", "public class A {\n  Object f(String t) { return io.jsonwebtoken.Jwts.parser().parseClaimsJwt(t); }\n}\n", []string{"sast:java/jwt-unverified"}},
+		{"auth0 decode without verification", "import com.auth0.jwt.JWT;\npublic class A {\n  Object f(String t) { return JWT.decode(t); }\n}\n", []string{"sast:java/jwt-unverified"}},
+		{"csrf disabled", "public class A {\n  void f(Object http) throws Exception { http.csrf().disable(); }\n}\n", []string{"sast:java/csrf-disabled"}},
+		{"csrf disabled with a lambda", "public class A {\n  void f(Object http) throws Exception { http.csrf(csrf -> csrf.disable()); }\n}\n", []string{"sast:java/csrf-disabled"}},
+		{"permitAll for every request", "public class A {\n  void f(Object http) throws Exception { http.authorizeHttpRequests().anyRequest().permitAll(); }\n}\n", []string{"sast:java/permit-all"}},
+		{"permitAll for one path", "public class A {\n  void f(Object http) throws Exception { http.authorizeHttpRequests().requestMatchers(\"/health\").permitAll(); }\n}\n", nil},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := analyze(t, map[string]string{"A.java": tt.src})
+			if !slices.Equal(got, tt.want) {
+				t.Fatalf("got %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
