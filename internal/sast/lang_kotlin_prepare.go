@@ -14,7 +14,7 @@ func prepareKotlin(src []byte) []byte {
 	return markIndexedAssignments(blankTypeArguments(blankVisibility(blankExtensionAnnotations(blankClassRefs(src)))))
 }
 
-var reClassRef = regexp.MustCompile(`::class(\.java|\.kotlin)?`)
+var reClassRef = regexp.MustCompile(`::class(\.(javaObjectType|javaPrimitiveType|java|kotlin)\b)?`)
 
 // blankClassRefs overwrites Kotlin class literals (Foo::class) with spaces of the same
 // length: the Kotlin grammar rejects `@OptIn(Foo::class)` before an extension function,
