@@ -339,3 +339,17 @@ func TestSpringConfig(t *testing.T) {
 		})
 	}
 }
+
+func TestVendoredLibrariesAndScopeNames(t *testing.T) {
+	got := analyze(t, map[string]string{
+		"static/js/libs/mode.js": "var rules = { token : \"meta.tag.punctuation.tag-close.xml\" };\nvar k = { password: \"Zq8vN2kLm4TxR7pW\" };\n",
+		"app/mode.js":            "var rules = { token : \"meta.tag.punctuation.tag-close.xml\" };\n",
+	})
+	if len(got) != 0 {
+		t.Fatalf("a scope name is not a secret and a vendored library is not analyzed: got %v", got)
+	}
+	got = analyze(t, map[string]string{"libs/Util.go": "package libs\nimport \"crypto/md5\"\nfunc F(b []byte) { md5.Sum(b) }\n"})
+	if len(got) != 1 {
+		t.Fatalf("Go in a directory called libs is still first-party: got %v", got)
+	}
+}

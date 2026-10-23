@@ -40,7 +40,7 @@ var (
 	reKeyedBare   = regexp.MustCompile(`(?i)^\s*([A-Za-z0-9_.-]*(?:password|passwd|secret|api[_-]?key|access[_-]?key|auth[_-]?token|private[_-]?key|client[_-]?secret|token)[A-Za-z0-9_.-]*)\s*[:=]\s*([^\s"'#]{12,128})\s*$`)
 	// referenceLike values name another variable (var.db_password, config.apiKey,
 	// my_secret_name) rather than being a credential.
-	referenceLike   = regexp.MustCompile(`^(?:[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_\[\]]*)+|[a-z_][a-z0-9_]*|[A-Z_][A-Z0-9_]*)$`)
+	referenceLike   = regexp.MustCompile(`^(?:[A-Za-z_][A-Za-z0-9_-]*(?:\.[A-Za-z_][A-Za-z0-9_\[\]-]*)+|[a-z_][a-z0-9_]*|[A-Z_][A-Z0-9_]*)$`)
 	placeholderWord = regexp.MustCompile(`(?i)example|sample|dummy|fake|placeholder|changeme|your[_-]|xxxx|redacted|\*{4}`)
 )
 

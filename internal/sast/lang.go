@@ -46,7 +46,7 @@ func skippedFile(name string) bool {
 var skippedDirs = map[string]bool{
 	"dist": true, "build": true, "out": true, "coverage": true, "target": true,
 	"__pycache__": true, "venv": true, "site-packages": true, "bower_components": true,
-	"__tests__": true, "tests": true, "test": true, "spec": true, "e2e": true,
+	"libs": true, "third_party": true, "thirdparty": true, "__tests__": true, "tests": true, "test": true, "spec": true, "e2e": true,
 }
 
 type lowering struct {
