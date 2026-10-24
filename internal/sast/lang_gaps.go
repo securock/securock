@@ -34,6 +34,12 @@ func init() {
 	for _, f := range []string{"flask.jsonify", "flask.render_template", "django.shortcuts.render", "django.http.JsonResponse"} {
 		py.sanitizers[f] = kXSS
 	}
+	// Rendering a template whose file name is request data executes that file's
+	// content as a Jinja template; a template is always a developer-written
+	// constant. Raw output of request data inside an escaped template is checked
+	// separately against the template file.
+	py.sinks["flask.render_template"] = sink{kind: kCode, args: []int{0}}
+	py.sinks["django.shortcuts.render"] = sink{kind: kCode, args: []int{1}}
 	py.assignRoots = map[string]kind{"session": kRand | kTrust, "mysession": kRand | kTrust}
 	py.sinks["codecs.open"] = sink{kind: kPath, args: []int{0}}
 	py.sinks["io.open"] = sink{kind: kPath, args: []int{0}}

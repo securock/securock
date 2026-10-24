@@ -205,6 +205,9 @@ type project struct {
 	globalCSRF       bool
 	pyRouteParts     map[*funcIR][]string
 	pyConstantWrites map[string]bool
+	// templates holds the raw-output variables of the project's template files,
+	// keyed by their path relative to the scanned root.
+	templates map[string]*templateOutputs
 }
 
 func funcKey(m *module, f *funcIR) string {
@@ -698,6 +701,19 @@ func (r *irRun) sourceByPrefix(q string) (string, bool) {
 	return "", false
 }
 
+// pyRegexSubjectArg is the index of the subject argument of the re functions
+// whose result is built from it: split and findall take the subject second, and
+// sub/subn take the replacement string second and the subject third.
+func pyRegexSubjectArg(qname string) (int, bool) {
+	switch qname {
+	case "re.split", "re.findall":
+		return 1, true
+	case "re.sub", "re.subn":
+		return 2, true
+	}
+	return 0, false
+}
+
 func (r *irRun) evalCall(e *expr, st istate) taintSet {
 	args := make([]taintSet, len(e.args))
 	literals := map[int]processVector{}
@@ -788,6 +804,7 @@ func (r *irRun) evalCall(e *expr, st istate) taintSet {
 	r.checkJavaScriptWhere(e, checkArgs, st)
 	r.checkMisuse(e, qname, field)
 	r.checkExtras(e, qname, field, fn, st)
+	r.checkTemplateRender(e, qname, args, st)
 	if r.spec.name == "java" && len(e.args) == 1 {
 		switch qname {
 		case "java.util.Random.nextBytes", "java.util.random.RandomGenerator.nextBytes":
@@ -832,6 +849,13 @@ func (r *irRun) evalCall(e *expr, st istate) taintSet {
 	if qname != "" {
 		if desc, ok := r.sourceByPrefix(qname); ok {
 			return r.sanitized(r.source(e.pos, desc), qname, field, recvExpr)
+		}
+	}
+	if r.spec.name == "py" && len(args) >= 2 {
+		if i, ok := pyRegexSubjectArg(qname); ok && len(args) > i {
+			// These re functions transform their subject: what they return is the
+			// subject's data, not a match object, so its taint survives.
+			return args[i]
 		}
 	}
 	all := forgetXPathContext(recvT)

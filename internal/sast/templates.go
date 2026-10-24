@@ -45,6 +45,74 @@ var templatePatterns = []templatePattern{
 // constantOutput matches a raw print whose expression is a plain string literal.
 var constantOutput = regexp.MustCompile(`(\{\{|<%-|<%==|\{\{\{|\{!!)\s*['"][^'"]*['"]\s*(\|\s*(safe|raw))?\s*(\}\}|%>|\}\}\}|!!\})`)
 
+// templateOutputs lists the variables a Jinja/Django template prints without the
+// engine's HTML escaping: with the safe/raw filter, or inside a script element,
+// where escaping markup is not enough to make the value safe JavaScript.
+type templateOutputs struct {
+	rawHTML   map[string]bool
+	rawScript map[string]bool
+}
+
+var (
+	jinjaOutputRe  = regexp.MustCompile(`\{\{\s*([^{}]+?)\s*\}\}`)
+	jinjaCommentRe = regexp.MustCompile(`(?s)\{#.*?#\}`)
+	jinjaVarPathRe = regexp.MustCompile(`^([A-Za-z_]\w*(?:\.[A-Za-z_]\w*)*)`)
+	escapeFilterRe = regexp.MustCompile(`\|\s*(?:safe|raw)\b`)
+	jsSafeFilterRe = regexp.MustCompile(`\|\s*(?:tojson|escapejs)\b`)
+	scriptBoundary = regexp.MustCompile(`(?i)<script\b|</script\s*>`)
+)
+
+// parseTemplateOutputs extracts which variables a template prints raw. Only
+// these two spellings are modeled; autoescape-off blocks and custom filters are
+// not, so a template not using them is treated as escaped.
+func parseTemplateOutputs(src string) *templateOutputs {
+	src = jinjaCommentRe.ReplaceAllString(src, " ")
+	var scriptRanges [][2]int
+	inScript, start := false, 0
+	for _, m := range scriptBoundary.FindAllStringIndex(src, -1) {
+		if inScript {
+			if strings.HasPrefix(strings.ToLower(src[m[0]:m[1]]), "</") {
+				scriptRanges = append(scriptRanges, [2]int{start, m[0]})
+				inScript = false
+			}
+			continue
+		}
+		if !strings.HasPrefix(strings.ToLower(src[m[0]:m[1]]), "</") {
+			inScript, start = true, m[1]
+		}
+	}
+	if inScript {
+		scriptRanges = append(scriptRanges, [2]int{start, len(src)})
+	}
+	out := &templateOutputs{rawHTML: map[string]bool{}, rawScript: map[string]bool{}}
+	for _, m := range jinjaOutputRe.FindAllStringSubmatchIndex(src, -1) {
+		expr := src[m[2]:m[3]]
+		root := jinjaVarPathRe.FindString(expr)
+		if root == "" {
+			continue
+		}
+		inScript := false
+		for _, r := range scriptRanges {
+			if m[0] >= r[0] && m[0] < r[1] {
+				inScript = true
+				break
+			}
+		}
+		switch {
+		case escapeFilterRe.MatchString(expr):
+			out.rawHTML[root] = true
+			if inScript {
+				out.rawScript[root] = true
+			}
+		case inScript && !jsSafeFilterRe.MatchString(expr):
+			// HTML-escaped markup is still code in a script element; only a
+			// JavaScript-context serializer makes it safe.
+			out.rawScript[root] = true
+		}
+	}
+	return out
+}
+
 func hasSuffixAny(name string, suffixes []string) bool {
 	low := strings.ToLower(name)
 	for _, s := range suffixes {
