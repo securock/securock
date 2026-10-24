@@ -28,7 +28,9 @@ file that cannot be parsed is reported as sast:analysis-incomplete rather than s
 silently. React's dangerouslySetInnerHTML is a sink in JSX and TSX. Dockerfiles,
 Kubernetes and Compose manifests, Terraform, and GitHub Actions workflows are checked for
 unsafe settings (sast:iac/*), and text files are scanned for committed credentials
-(sast:secrets/*).`,
+(sast:secrets/*). Packages the repository ships in vendor/, node_modules/ or
+site-packages/ are analyzed as well, so a helper in an installed package is followed
+into the API it calls; the package's own findings are not reported.`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			threshold, err := finding.ParseSeverity(failOn)

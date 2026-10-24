@@ -113,6 +113,9 @@ type funcIR struct {
 type module struct {
 	lang string
 	path string // relative to the scanned root
+	// lib marks a module that comes from a third-party package: its findings are
+	// not reported, but its summaries are used.
+	lib bool
 	// imports maps a local name to the qualified name it stands for:
 	// "cp" -> "child_process", "exec" -> "child_process.exec".
 	imports map[string]string

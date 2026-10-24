@@ -71,7 +71,7 @@ func AnalyzeWith(root string, opts Options) ([]finding.Finding, error) {
 	fset := token.NewFileSet()
 	var out []finding.Finding
 
-	pkgs, mods, props, templates, incomplete, err := load(fset, abs)
+	pkgs, mods, props, templates, libs, incomplete, err := load(fset, abs)
 	if err != nil {
 		return nil, err
 	}
@@ -96,22 +96,25 @@ func AnalyzeWith(root string, opts Options) ([]finding.Finding, error) {
 		}
 		return filepath.ToSlash(r)
 	}
-	out = append(out, taint(fset, abs, pkgs, mods, props, templates, rel, opts)...)
+	out = append(out, taint(fset, abs, pkgs, mods, props, templates, libs, rel, opts)...)
 	for _, p := range pkgs {
 		out = append(out, astRules(fset, p, rel)...)
 	}
 	return finding.New("sast", dedupeSecrets(out)).Findings, nil
 }
 
+// goFunc is a Go function declaration to analyze.
+type goFunc struct {
+	decl *ast.FuncDecl
+	name string
+	pkg  *pkg
+}
+
 // taint runs the interprocedural analysis to a fixed point over function summaries.
 // Findings are taken from the final round only, once every summary is complete.
-func taint(fset *token.FileSet, root string, pkgs []*pkg, mods []*module, props map[string]string, templates map[string]*templateOutputs, rel func(token.Pos) string, opts Options) []finding.Finding {
-	type fn struct {
-		decl *ast.FuncDecl
-		name string
-		pkg  *pkg
-	}
-	var fns []fn
+func taint(fset *token.FileSet, root string, pkgs []*pkg, mods []*module, props map[string]string, templates map[string]*templateOutputs, libs *librarySet, rel func(token.Pos) string, opts Options) []finding.Finding {
+	var out []finding.Finding
+	var fns []goFunc
 	for _, p := range pkgs {
 		for _, f := range p.files {
 			for _, d := range f.Decls {
@@ -120,12 +123,12 @@ func taint(fset *token.FileSet, root string, pkgs []*pkg, mods []*module, props 
 					continue
 				}
 				if obj, ok := p.info.Defs[fd.Name].(*types.Func); ok {
-					fns = append(fns, fn{fd, normalize(obj.FullName()), p})
+					fns = append(fns, goFunc{fd, normalize(obj.FullName()), p})
 				}
 			}
 		}
 	}
-	fns2names := func(fs []fn) []string {
+	fns2names := func(fs []goFunc) []string {
 		var out []string
 		for _, f := range fs {
 			out = append(out, f.name)
@@ -164,20 +167,89 @@ func taint(fset *token.FileSet, root string, pkgs []*pkg, mods []*module, props 
 	proj := newProject(mods)
 	proj.props = props
 	proj.templates = templates
-	type job struct {
-		key, file string
-		run       func(map[string]finding.Finding) (*summary, bool)
+	proj.pkgEntries = libs.entries
+	// The third-party packages are analyzed first, on their own: their findings
+	// are not reported, but their summaries are, so that a call from the
+	// project into a package is followed like a call into the project's own
+	// helper.
+	var libMods []*module
+	var ownMods []*module
+	for _, m := range mods {
+		if m.lib {
+			libMods = append(libMods, m)
+		} else {
+			ownMods = append(ownMods, m)
+		}
 	}
-	var jobs []job
+	if len(libMods) > 0 {
+		libSh := &shared{
+			declTypes:  map[types.Object]ast.Expr{},
+			sums:       map[string]*summary{},
+			methods:    map[string][]impl{},
+			globals:    map[types.Object]taintSet{},
+			regexps:    map[types.Object]string{},
+			dependents: map[string]map[string]bool{},
+		}
+		libJobs := irJobs(fset, libMods, rel, libSh, proj)
+		_, pending := runJobs(libSh, libJobs, root, maxLibrarySteps)
+		for key, sum := range libSh.sums {
+			sh.sums[key] = sum
+		}
+		if len(pending) > 0 {
+			// The behavior of the packages that were left out is unknown, not
+			// absent: name the first of them.
+			for _, i := range pending {
+				if i < len(libJobs) {
+					if file := libs.fileOf(libJobs[i].key); file != "" {
+						out = append(out, libraryUnanalyzed(file, "some of its functions could not be analyzed"))
+						break
+					}
+				}
+			}
+		}
+	}
+	jobs := goJobs(fset, fns, rel, sh)
+	jobs = append(jobs, irJobs(fset, ownMods, rel, sh, proj)...)
+	found, pending := runJobs(sh, jobs, root, min(1_000_000, max(10_000, len(jobs)*128)))
+	for _, i := range pending {
+		j := jobs[i]
+		found["budget|"+j.file] = unanalyzed(root, filepath.Join(root, j.file), "interprocedural analysis exceeded its convergence budget")
+	}
+	keys := make([]string, 0, len(found))
+	for k := range found {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	for _, k := range keys {
+		out = append(out, found[k])
+	}
+	return out
+}
+
+// analysisJob is one function to analyze.
+type analysisJob struct {
+	key, file string
+	run       func(map[string]finding.Finding) (*summary, bool)
+}
+
+// goJobs are the Go functions to analyze.
+func goJobs(fset *token.FileSet, fns []goFunc, rel func(token.Pos) string, sh *shared) []analysisJob {
+	var jobs []analysisJob
 	for _, f := range fns {
-		jobs = append(jobs, job{f.name, rel(f.decl.Pos()), func(found map[string]finding.Finding) (*summary, bool) {
+		jobs = append(jobs, analysisJob{f.name, rel(f.decl.Pos()), func(found map[string]finding.Finding) (*summary, bool) {
 			a := &analyzer{shared: sh, fset: fset, info: f.pkg.info, rel: rel, found: found}
 			return a.safely(f.decl, f.name)
 		}})
 	}
+	return jobs
+}
+
+// irJobs are the functions of the given modules to analyze.
+func irJobs(fset *token.FileSet, mods []*module, rel func(token.Pos) string, sh *shared, proj *project) []analysisJob {
+	var jobs []analysisJob
 	for _, m := range mods {
 		for _, f := range append([]*funcIR{{name: "<module>", body: m.top}}, m.funcs...) {
-			jobs = append(jobs, job{funcKey(m, f), m.path, func(found map[string]finding.Finding) (*summary, bool) {
+			jobs = append(jobs, analysisJob{funcKey(m, f), m.path, func(found map[string]finding.Finding) (*summary, bool) {
 				spec := frontends[m.lang].spec
 				a := &analyzer{shared: sh, fset: fset, rel: rel, found: found, langName: spec.name}
 				r := &irRun{analyzer: a, spec: spec, proj: proj, mod: m}
@@ -185,6 +257,13 @@ func taint(fset *token.FileSet, root string, pkgs []*pkg, mods []*module, props 
 			}})
 		}
 	}
+	return jobs
+}
+
+// runJobs analyzes the jobs until their summaries stop changing and returns the
+// findings of the final round. The jobs left over when the budget is spent are
+// returned as well: their summaries are incomplete, not absent.
+func runJobs(sh *shared, jobs []analysisJob, root string, budget int) (map[string]finding.Finding, []int) {
 	index := map[string]int{}
 	queue := make([]int, len(jobs))
 	queued := make([]bool, len(jobs))
@@ -202,7 +281,6 @@ func taint(fset *token.FileSet, root string, pkgs []*pkg, mods []*module, props 
 	}
 	// Dependency-driven reanalysis handles arbitrarily deep call chains without
 	// re-running every function on every round. The budget also bounds cycles.
-	budget := min(1_000_000, max(10_000, len(jobs)*128))
 	steps := 0
 	for len(queue) > 0 && steps < budget {
 		i := queue[0]
@@ -245,25 +323,15 @@ func taint(fset *token.FileSet, root string, pkgs []*pkg, mods []*module, props 
 			found[key] = f
 		}
 	}
-	for _, i := range queue {
-		j := jobs[i]
-		found["budget|"+j.file] = unanalyzed(root, filepath.Join(root, j.file), "interprocedural analysis exceeded its convergence budget")
-	}
-	keys := make([]string, 0, len(found))
-	for k := range found {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-	out := make([]finding.Finding, 0, len(keys))
-	for _, k := range keys {
-		out = append(out, found[k])
-	}
-	return out
+	return found, queue
 }
 
-func load(fset *token.FileSet, root string) ([]*pkg, []*module, map[string]string, map[string]*templateOutputs, []finding.Finding, error) {
+// load reads the sources of a scan: the project's own code, the third-party
+// packages that ship with it, and the files that could not be analyzed.
+func load(fset *token.FileSet, root string) ([]*pkg, []*module, map[string]string, map[string]*templateOutputs, *librarySet, []finding.Finding, error) {
 	props := map[string]string{}
 	templates := map[string]*templateOutputs{}
+	libs := &librarySet{files: map[string]string{}, modules: map[string]bool{}, entries: map[string]string{}}
 	modDir, modPath := findModule(root)
 	var pkgs []*pkg
 	var mods []*module
@@ -360,10 +428,29 @@ func load(fset *token.FileSet, root string) ([]*pkg, []*module, map[string]strin
 		return nil
 	}
 	if err := walk(root, false); err != nil {
-		return nil, nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, nil, err
 	}
 	sort.Slice(mods, func(i, j int) bool { return mods[i].path < mods[j].path })
-	return pkgs, mods, props, templates, incomplete, nil
+	// Third-party packages that ship with the repository are analyzed too, so
+	// that a helper in a vendored package is followed into the API it calls.
+	langs := map[string]bool{}
+	specs := map[string]bool{}
+	taken := map[string]bool{}
+	for _, m := range mods {
+		langs[m.lang] = true
+		taken[m.path] = true
+		collectSpecs(m, specs)
+	}
+	if len(langs) > 0 && len(specs) > 0 {
+		if roots := findLibraryRoots(root); len(roots) > 0 {
+			set, libMods, libFindings := loadLibraries(fset, root, roots, specs, langs, taken)
+			libs = set
+			mods = append(mods, libMods...)
+			incomplete = append(incomplete, libFindings...)
+		}
+	}
+	sort.Slice(mods, func(i, j int) bool { return mods[i].path < mods[j].path })
+	return pkgs, mods, props, templates, libs, incomplete, nil
 }
 
 // unanalyzed is the fail-closed result for a file the analyzer could not read: the

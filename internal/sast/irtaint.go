@@ -208,6 +208,12 @@ type project struct {
 	// templates holds the raw-output variables of the project's template files,
 	// keyed by their path relative to the scanned root.
 	templates map[string]*templateOutputs
+	// libModules are the logical paths of the modules that come from a
+	// third-party package.
+	libModules map[string]bool
+	// pkgEntries are the entry points of the JavaScript packages in the
+	// repository, by package name.
+	pkgEntries map[string]string
 }
 
 func funcKey(m *module, f *funcIR) string {
@@ -218,25 +224,36 @@ func funcKey(m *module, f *funcIR) string {
 }
 
 func newProject(mods []*module) *project {
-	p := &project{mods: map[string]*module{}, classes: map[string]string{}, functions: map[string]*funcIR{}, methods: map[string][]string{}, byName: map[string][]string{}}
+	p := &project{mods: map[string]*module{}, classes: map[string]string{}, functions: map[string]*funcIR{}, methods: map[string][]string{}, byName: map[string][]string{}, libModules: map[string]bool{}}
 	for _, m := range mods {
 		p.mods[m.path] = m
 		p.globalCSRF = p.globalCSRF || m.globalCSRF
 		// A class with only constants has no methods but can still be named: Keys.JWT.
-		for class := range m.fields {
-			if p.classes[class] == "" {
-				p.classes[class] = m.path
+		if !m.lib {
+			for class := range m.fields {
+				if p.classes[class] == "" {
+					p.classes[class] = m.path
+				}
 			}
 		}
+		if m.lib {
+			// A package's own functions are reachable by import, but they are
+			// not guessed by name: a name shared with the project's code is
+			// the project's.
+			p.libModules[m.path] = true
+		}
 		for _, f := range m.funcs {
-			if key := funcKey(m, f); p.functions[key] == nil {
+			key := funcKey(m, f)
+			if p.functions[key] == nil {
 				p.functions[key] = f
+			}
+			if m.lib {
+				continue
 			}
 			if f.class == "" {
 				continue
 			}
 			p.classes[f.class] = m.path
-			key := funcKey(m, f)
 			p.methods[f.class+"."+f.name] = append(p.methods[f.class+"."+f.name], key)
 			if f.name != "<init>" {
 				p.byName[f.name] = append(p.byName[f.name], key)
@@ -258,7 +275,15 @@ func (p *project) resolveModule(from *module, spec string) *module {
 	switch from.lang {
 	case "js", "ts":
 		if !strings.HasPrefix(spec, ".") {
-			return nil
+			// A package installed in the repository: node_modules/<spec>.
+			if entry, ok := p.pkgEntries[spec]; ok {
+				cands = append(cands, entry)
+			}
+			for _, ext := range []string{".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs"} {
+				cands = append(cands, spec+ext, path.Join(spec, "index"+ext))
+			}
+			cands = append(cands, spec)
+			break
 		}
 		base := path.Join(dir, spec)
 		for _, ext := range []string{".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs"} {
@@ -1049,23 +1074,45 @@ func (r *irRun) sanitized(t taintSet, qname, field string, recvExpr *expr) taint
 // targets are the summary keys of the project functions a call may reach.
 func (r *irRun) targets(fn, call *expr, st istate) []string {
 	var keys []string
-	add := func(m *module, class, name string) {
+	var add func(m *module, class, name string, depth int)
+	add = func(m *module, class, name string, depth int) {
 		key := funcKey(m, &funcIR{name: name, class: class})
 		if r.proj.functions[key] != nil {
 			keys = append(keys, key)
+			return
+		}
+		if m == nil || class != "" || depth > 4 {
+			return
+		}
+		// A package that re-exports a symbol: follow the import to the module
+		// that defines it.
+		if ref, ok := m.locals[name]; ok && ref.name != "" {
+			if tm := r.proj.resolveModule(m, ref.spec); tm != nil && tm != m {
+				add(tm, "", ref.name, depth+1)
+			}
 		}
 	}
 	switch fn.kind {
 	case exprName:
 		if r.class != "" {
 			// A bare call inside a class may be a call to one of its methods.
-			add(r.mod, r.class, fn.name)
+			add(r.mod, r.class, fn.name, 0)
 		}
-		add(r.mod, "", fn.name)
+		add(r.mod, "", fn.name, 0)
 		if len(keys) == 0 {
 			if ref, ok := r.mod.locals[fn.name]; ok && ref.name != "" {
 				if m := r.proj.resolveModule(r.mod, ref.spec); m != nil {
-					add(m, "", ref.name)
+					add(m, "", ref.name, 0)
+				}
+			}
+		}
+		if len(keys) == 0 {
+			// A named import from an installed package: import { debounce } from "lodash".
+			if q, ok := r.mod.imports[fn.name]; ok {
+				if i := strings.LastIndex(q, "."); i > 0 {
+					if m := r.proj.resolveModule(r.mod, q[:i]); m != nil {
+						add(m, "", q[i+1:], 0)
+					}
 				}
 			}
 		}
@@ -1078,7 +1125,7 @@ func (r *irRun) targets(fn, call *expr, st istate) []string {
 			return r.narrow(r.proj.methods[fn.x.name+".<init>"])
 		}
 		if r.selfName(fn.x) && r.class != "" {
-			add(r.mod, r.class, fn.name)
+			add(r.mod, r.class, fn.name, 0)
 			if len(keys) == 0 {
 				keys = append(keys, r.proj.methods[r.class+"."+fn.name]...)
 			}
@@ -1100,9 +1147,15 @@ func (r *irRun) targets(fn, call *expr, st istate) []string {
 				}
 				if spec != "" {
 					if m := r.proj.resolveModule(r.mod, spec); m != nil {
-						add(m, "", fn.name)
+						add(m, "", fn.name, 0)
 						return r.narrow(keys)
 					}
+				}
+			} else if q, ok := r.mod.imports[fn.x.name]; ok {
+				// An installed package used through its namespace: pkg.fn(x).
+				if m := r.proj.resolveModule(r.mod, q); m != nil {
+					add(m, "", fn.name, 0)
+					return r.narrow(keys)
 				}
 			}
 		}
@@ -1174,7 +1227,13 @@ func (r *irRun) applyIR(c *expr, key string, sum *summary, args []taintSet, recv
 		for _, at := range argAt(sk.param, sk.field) {
 			if hit := at.kinds & sk.kind; hit != 0 {
 				at.flow = &flow{pos: c.pos, msg: callStep, prev: at.flow}
-				r.reachSink(sk.pos, sk.name, hit, at, sk.flow)
+				pos := sk.pos
+				if i := strings.LastIndex(key, "#"); i > 0 && r.proj.libModules[key[:i]] {
+					// The sink is inside a third-party package: the finding
+					// belongs to the call in the project, not to the package.
+					pos = c.pos
+				}
+				r.reachSink(pos, sk.name, hit, at, at.flow)
 			}
 		}
 	}
