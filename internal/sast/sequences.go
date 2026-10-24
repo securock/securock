@@ -150,10 +150,17 @@ func (r *irRun) initSequence(s *stmt, st istate) {
 }
 
 func sequenceIndex(index int64, size int, negative bool) (int, bool) {
+	if size < 0 || size > maxSequenceElements {
+		return 0, false
+	}
 	if negative && index < 0 {
 		index += int64(size)
 	}
-	return int(index), index >= 0 && index < int64(size)
+	// Check the fixed tracking bound before narrowing, including on 32-bit hosts.
+	if index < 0 || index >= maxSequenceElements || index >= int64(size) {
+		return 0, false
+	}
+	return int(index), true
 }
 
 func (r *irRun) readSequence(e *expr, st istate) (taintSet, bool) {
@@ -230,11 +237,12 @@ func (r *irRun) sequenceCall(e *expr, args []taintSet, st istate) (taintSet, boo
 			}
 			v = min(int64(size), max(0, v))
 		}
-		if v < 0 || v > int64(size) {
+		i, valid := sequenceIndex(v, size+1, false)
+		if !valid {
 			return nil, false
 		}
-		values = slices.Insert(values, int(v), args[1])
-		texts = slices.Insert(texts, int(v), r.sequenceText(e.args[1]))
+		values = slices.Insert(values, i, args[1])
+		texts = slices.Insert(texts, i, r.sequenceText(e.args[1]))
 	case java && fn.name == "set" && len(args) == 2:
 		i, ok := index(0)
 		if !ok {
