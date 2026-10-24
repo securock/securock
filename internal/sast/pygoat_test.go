@@ -20,8 +20,8 @@ func TestPyGoat(t *testing.T) {
 	if root == "" {
 		t.Skip("set SECUROCK_PYGOAT to the pinned PyGoat checkout to run")
 	}
-	// Pin the reviewed source and templates, including evidence for known misses.
-	// A different checkout must not silently change the meaning of these labels.
+	// Pin the reviewed source and templates. A different checkout must not
+	// silently change the meaning of these labels.
 	inputs := []struct{ path, sha256 string }{
 		{"command_injection_lab/app.py", "43af219c885b2948c308d3756b1a70e12b12f93ca13b7e049bb103d577e46dcc"},
 		{"crypto_failure_lab/app.py", "50aa54e576db335a59677160ea2ae18dd69212cffde2969cf397208a97dd6c17"},
@@ -62,10 +62,10 @@ func TestPyGoat(t *testing.T) {
 		{"crypto_failure_lab", "app.py", "lab1", "weak-crypto", true, true},
 		{"crypto_failure_lab", "app.py", "custom_hash", "weak-crypto", true, true},
 		{"xxe_lab", "app.py", "xxe_parse", "xxe", true, true},
-		{"xss_lab", "app.py", "lab1", "xss", true, false},
-		{"xss_lab", "app.py", "lab2", "xss", true, false},
-		{"xss_lab", "app.py", "lab3", "xss", true, false},
-		{"template_injection_lab", "app.py", "view_blog", "code-injection", true, false},
+		{"xss_lab", "app.py", "lab1", "xss", true, true},
+		{"xss_lab", "app.py", "lab2", "xss", true, true},
+		{"xss_lab", "app.py", "lab3", "xss", true, true},
+		{"template_injection_lab", "app.py", "view_blog", "code-injection", true, true},
 	}
 	// Each Flask lab is a separate application. Analyzing the repository as one
 	// project conflates unrelated app.py modules and their same-named functions.
