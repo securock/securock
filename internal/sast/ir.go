@@ -11,34 +11,36 @@ import "go/token"
 type exprKind int
 
 const (
-	exprName   exprKind = iota // identifier
-	exprMember                 // X.Name
-	exprIndex                  // X[Args[0]]
-	exprCall                   // X(Args...)
-	exprNew                    // new X(Args...)
-	exprStr                    // string literal; Str holds the value
-	exprNum                    // number, boolean, null: inert
-	exprConcat                 // string building: +, template/f-string/interpolation, join
-	exprLambda                 // function expression; Fn holds the body
-	exprNot                    // !X
-	exprAnd                    // Args[0] && Args[1]
-	exprOr                     // Args[0] || Args[1]
-	exprIn                     // Args[0] is a member of the collection X (a validation form)
-	exprBin                    // arithmetic or comparison: op in str, operands in Args
-	exprCond                   // x ? Args[0] : Args[1]
-	exprOther                  // anything else: taint of the children
-	exprObject                 // object/dictionary literal: preserve children's fields
-	exprField                  // a named entry of an object; name is the property
+	exprName     exprKind = iota // identifier
+	exprMember                   // X.Name
+	exprIndex                    // X[Args[0]]
+	exprCall                     // X(Args...)
+	exprNew                      // new X(Args...)
+	exprStr                      // string literal; Str holds the value
+	exprNum                      // number, boolean, null: inert
+	exprConcat                   // string building: +, template/f-string/interpolation, join
+	exprLambda                   // function expression; Fn holds the body
+	exprNot                      // !X
+	exprAnd                      // Args[0] && Args[1]
+	exprOr                       // Args[0] || Args[1]
+	exprIn                       // Args[0] is a member of the collection X (a validation form)
+	exprBin                      // arithmetic or comparison: op in str, operands in Args
+	exprCond                     // x ? Args[0] : Args[1]
+	exprOther                    // anything else: taint of the children
+	exprObject                   // object/dictionary literal: preserve children's fields
+	exprField                    // a named entry of an object; name is the property
+	exprSequence                 // list literal; exact positions only for unescaped local assignments
 )
 
 type expr struct {
-	kind  exprKind
-	pos   token.Pos
-	name  string  // identifier, or member name
-	str   string  // string literal value
-	guard kind    // classes neutralized by a validation form; zero means all
-	x     *expr   // base, callee, or operand
-	args  []*expr // call arguments, concat parts, index, or children
+	kind        exprKind
+	pos         token.Pos
+	name        string  // identifier, or member name
+	str         string  // string literal value
+	unknownText bool    // literal spelling or formatting is not a decoded constant value
+	guard       kind    // classes neutralized by a validation form; zero means all
+	x           *expr   // base, callee, or operand
+	args        []*expr // call arguments, concat parts, index, or children
 	// kw holds the names of keyword arguments, parallel to args (empty for positional).
 	kw []string
 	fn *funcIR
@@ -69,6 +71,10 @@ type stmt struct {
 	then []*stmt
 	els  []*stmt
 	arms [][]*stmt
+	// labels parallels arms for a switch/match; an empty label list is the default.
+	// Unknown patterns retain an opaque expression, preventing constant selection.
+	labels           [][]*expr
+	fallthroughCases bool
 	// loop marks a break or continue: control leaves for the end of the loop, so the
 	// state at this point still reaches the code after it.
 	loop bool

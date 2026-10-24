@@ -1,8 +1,10 @@
 package sast
 
 import (
+	"math/big"
 	"strconv"
 	"strings"
+	"unicode/utf16"
 )
 
 func cloneMap[K comparable, V any](m map[K]V) map[K]V {
@@ -62,22 +64,53 @@ func parseIntLiteral(s string) (int64, bool) {
 // constInt evaluates an integer expression made of literals and variables that still
 // hold a known value.
 func (r *irRun) constInt(e *expr) (int64, bool) {
-	if e == nil {
+	if e == nil || e.unknownText {
 		return 0, false
 	}
 	switch e.kind {
 	case exprNum:
+		if r.spec.name == "java" && strings.HasPrefix(e.str, "'") {
+			text, err := strconv.Unquote(e.str)
+			chars := utf16.Encode([]rune(text))
+			if err == nil && len(chars) == 1 {
+				return int64(chars[0]), true
+			}
+			return 0, false
+		}
 		return parseIntLiteral(e.str)
 	case exprName:
 		v, ok := r.consts[e.name]
 		return v, ok
+	case exprCall:
+		if r.spec.name == "java" && e.x != nil && e.x.kind == exprMember && e.x.name == "charAt" && len(e.args) == 1 {
+			text, known := r.strOf(e.x.x)
+			index, ok := r.constInt(e.args[0])
+			chars := utf16.Encode([]rune(text))
+			if known && ok && index >= 0 && index < int64(len(chars)) {
+				return int64(chars[index]), true
+			}
+		}
 	case exprConcat:
 		// string building and addition share a node; two integer operands add.
 		if len(e.args) == 2 {
 			a, ok1 := r.constInt(e.args[0])
 			b, ok2 := r.constInt(e.args[1])
 			if ok1 && ok2 {
+				if r.spec.name == "py" {
+					if e.str == "%" {
+						return pythonIntOp("%", a, b)
+					}
+					return pythonIntOp("+", a, b)
+				}
 				return a + b, true
+			}
+		}
+	case exprOther:
+		if r.spec.name == "py" && len(e.args) == 2 {
+			a, ok1 := r.constInt(e.args[0])
+			b, ok2 := r.constInt(e.args[1])
+			if ok1 && ok2 {
+				return pythonIntOp(e.str, a, b)
 			}
 		}
 	case exprBin:
@@ -105,6 +138,78 @@ func (r *irRun) constInt(e *expr) (int64, bool) {
 		}
 	}
 	return 0, false
+}
+
+// A switch can discard alternatives only when both the selector and every label
+// have a known value. Guards, captures and unsupported patterns keep all arms.
+func (r *irRun) constantCase(s *stmt) (int, bool) {
+	if s.cond == nil || len(s.labels) != len(s.arms) {
+		return 0, false
+	}
+	text, strOK := r.strOf(s.cond)
+	num, numOK := r.constInt(s.cond)
+	if !strOK && !numOK {
+		return 0, false
+	}
+	selected, fallback := -1, -1
+	for i, labels := range s.labels {
+		if len(labels) == 0 {
+			fallback = i
+		}
+		for _, label := range labels {
+			match := false
+			if strOK {
+				value, ok := r.strOf(label)
+				if !ok {
+					return 0, false
+				}
+				match = text == value
+			} else {
+				value, ok := r.constInt(label)
+				if !ok {
+					return 0, false
+				}
+				match = num == value
+			}
+			if match && selected < 0 {
+				selected = i
+			}
+		}
+	}
+	if selected < 0 {
+		selected = fallback
+	}
+	return selected, true
+}
+
+// Python integers do not wrap, and // and % round toward negative infinity.
+// Values outside the tracked range stay unknown instead of pruning a live branch.
+func pythonIntOp(op string, a, b int64) (int64, bool) {
+	x, y, out := big.NewInt(a), big.NewInt(b), new(big.Int)
+	switch op {
+	case "+":
+		out.Add(x, y)
+	case "-":
+		out.Sub(x, y)
+	case "*":
+		out.Mul(x, y)
+	case "//", "%":
+		if b == 0 {
+			return 0, false
+		}
+		rem := new(big.Int)
+		out.QuoRem(x, y, rem)
+		if rem.Sign() != 0 && (a < 0) != (b < 0) {
+			out.Sub(out, big.NewInt(1))
+			rem.Add(rem, y)
+		}
+		if op == "%" {
+			out = rem
+		}
+	default:
+		return 0, false
+	}
+	return out.Int64(), out.IsInt64()
 }
 
 // constBool evaluates a condition whose outcome is fixed.
@@ -149,6 +254,18 @@ func (r *irRun) constBool(e *expr) (bool, bool) {
 		a, ok1 := r.constInt(e.args[0])
 		b, ok2 := r.constInt(e.args[1])
 		if !ok1 || !ok2 {
+			if r.spec.name == "py" {
+				x, sx := r.strOf(e.args[0])
+				y, sy := r.strOf(e.args[1])
+				if sx && sy {
+					switch e.str {
+					case "==":
+						return x == y, true
+					case "!=":
+						return x != y, true
+					}
+				}
+			}
 			return false, false
 		}
 		switch e.str {

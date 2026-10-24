@@ -86,7 +86,18 @@ func (s istate) clone() istate {
 }
 
 func (s istate) union(o istate) {
+	for k, v := range s {
+		if k.field == sequenceField && taintSignature(v) != taintSignature(o[k]) {
+			s[k] = taintSet{{key: "unknown"}}
+		}
+	}
 	for k, v := range o {
+		if k.field == sequenceField {
+			if _, ok := s[k]; !ok {
+				s[k] = taintSet{{key: "unknown"}}
+			}
+			continue
+		}
 		if isMarker(k.field) {
 			continue
 		}
@@ -105,6 +116,9 @@ func (s istate) replace(a, b istate) {
 	s.union(b)
 	// A value is validated after the branches only if it was validated in both.
 	for k := range a {
+		if k.field == sequenceField && taintSignature(a[k]) == taintSignature(b[k]) {
+			s[k] = a[k]
+		}
 		if isMarker(k.field) {
 			if v, both := b[k]; both {
 				s[k] = a[k].keep(markerKinds(v))
@@ -145,6 +159,10 @@ func (s istate) write(name, field string, t taintSet, weak bool) {
 
 func (s istate) writeLocal(name, field string, t taintSet, weak bool) {
 	s.invalidate(name, field)
+	s.invalidateSequenceText(name, field)
+	if field == "" && !weak {
+		delete(s, ikey{name, configUnknownField})
+	}
 	weak = weak || widenedField(field)
 	if !weak {
 		for k := range s {
@@ -393,6 +411,10 @@ func (r *irRun) typeOf(e *expr, st istate) string {
 		return ""
 	}
 	switch e.kind {
+	case exprIndex:
+		if ty := r.typeOf(e.x, st); strings.HasSuffix(ty, "[]") {
+			return r.resolveType(strings.TrimSuffix(ty, "[]"))
+		}
 	case exprName:
 		if t, ok := r.types[e.name]; ok {
 			return t
@@ -406,6 +428,14 @@ func (r *irRun) typeOf(e *expr, st istate) string {
 		if r.selfName(e.x) && r.class != "" {
 			if t, ok := r.mod.fieldType(r.class, e.name); ok {
 				return t
+			}
+		}
+	case exprOther:
+		if r.spec.name == "py" && e.str == "/" {
+			for _, operand := range e.args {
+				if ty := r.typeOf(operand, st); isPythonPath(ty) {
+					return ty
+				}
 			}
 		}
 	case exprNew:
@@ -431,6 +461,10 @@ func (r *irRun) typeOf(e *expr, st istate) string {
 		}
 	}
 	return ""
+}
+
+func isPythonPath(ty string) bool {
+	return ty == "pathlib.Path" || ty == "pathlib.PosixPath" || ty == "pathlib.WindowsPath"
 }
 
 func (m *module) fieldType(class, name string) (string, bool) {
@@ -468,6 +502,9 @@ func (r *irRun) eval(e *expr, st istate) (result taintSet) {
 	if e == nil {
 		return nil
 	}
+	if r.spec.name == "py" && e.kind == exprConcat && (e.str == "+" || e.str == "interpolate") {
+		return r.xpathConcat(e, st)
+	}
 	if e.kind == exprName || e.kind == exprIndex {
 		if name, field, ok := r.pathOf(e); ok {
 			defer func() { result = result.clear(st.validated(name, field)) }()
@@ -489,6 +526,9 @@ func (r *irRun) eval(e *expr, st istate) (result taintSet) {
 		for _, a := range e.args {
 			r.eval(a, st)
 		}
+		if value, ok := r.readSequence(e, st); ok {
+			return value
+		}
 		if e.x.kind == exprName {
 			if desc, ok := r.spec.sourceRoots[e.x.name]["*"]; ok && !r.shadow[e.x.name] {
 				return r.source(e.pos, desc)
@@ -508,8 +548,12 @@ func (r *irRun) eval(e *expr, st istate) (result taintSet) {
 		}
 		return out
 	case exprField:
-		return r.eval(e.x, st).atField(fieldPart(e.name))
-	case exprConcat, exprOther:
+		t := r.eval(e.x, st)
+		if r.sequenceValue(e.x, st) {
+			t = t.scalar()
+		}
+		return t.atField(fieldPart(e.name))
+	case exprConcat, exprOther, exprSequence:
 		out := r.eval(e.x, st)
 		for _, a := range e.args {
 			out = merge(out, r.eval(a, st))
@@ -640,11 +684,24 @@ func (r *irRun) sourceByPrefix(q string) (string, bool) {
 
 func (r *irRun) evalCall(e *expr, st istate) taintSet {
 	args := make([]taintSet, len(e.args))
+	literals := map[int]processVector{}
 	for i, a := range e.args {
-		args[i] = r.eval(a, st)
+		if r.spec.name == "py" && a.kind == exprSequence && len(a.args) <= maxSequenceElements {
+			args[i], literals[i] = r.evalProcessVector(a, st)
+		} else {
+			args[i] = r.eval(a, st)
+		}
+		if r.sequenceValue(a, st) {
+			args[i] = args[i].scalar()
+		}
 	}
 	fn := e.x
 	qname, recvExpr, field := r.resolve(fn, st)
+	r.checkPythonProcess(e, qname, literals, st)
+	if value, ok := r.sequenceCall(e, args, st); ok {
+		return value
+	}
+	r.escapeSequences(e, args, recvExpr, st)
 	var recvT taintSet
 	switch {
 	case recvExpr != nil:
@@ -655,11 +712,68 @@ func (r *irRun) evalCall(e *expr, st istate) taintSet {
 		recvT = r.eval(fn, st)
 	}
 
+	if r.spec.name == "py" && fn.kind == exprMember && isConfigParserType(r.typeOf(fn.x, st)) {
+		name, f, known := r.pathOf(fn.x)
+		configField := func(section, key *expr) (string, bool) {
+			if !known || section == nil || key == nil {
+				return "", false
+			}
+			s, okS := r.strOf(section)
+			k, okK := r.strOf(key)
+			if !okS || !okK {
+				return "", false
+			}
+			return fieldJoin(f, fieldJoin(fieldPart(s), fieldPart(k))), true
+		}
+		switch fn.name {
+		case "set":
+			if section, key := argAt(e, 0), argAt(e, 1); len(args) > 2 {
+				if field, ok := configField(section, key); ok {
+					r.writeEffect(name, field, args[2].scalar(), st)
+				} else {
+					st[ikey{name, configUnknownField}] = merge(st[ikey{name, configUnknownField}], args[2].scalar())
+				}
+			}
+		case "read_dict":
+			if len(args) > 0 {
+				st[ikey{name, configUnknownField}] = merge(st[ikey{name, configUnknownField}], args[0].scalar())
+			}
+		case "get", "getint", "getfloat", "getboolean":
+			if len(args) >= 2 {
+				if field, ok := configField(argAt(e, 0), argAt(e, 1)); ok {
+					out := merge(st.read(name, field).scalar(), st[ikey{name, configUnknownField}])
+					if len(args) > 2 {
+						out = merge(out, args[2].scalar())
+					}
+					return out
+				}
+			}
+			return merge(recvT, st[ikey{name, configUnknownField}])
+		}
+	}
+	checkArgs := args
+	if r.spec.name == "py" && qname == "flask.make_response" && len(e.args) > 0 {
+		// make_response((body, headers)): only the body is written as the page.
+		if body := e.args[0]; body.kind == exprOther && len(body.args) >= 2 {
+			checkArgs = append([]taintSet(nil), args...)
+			checkArgs[0] = r.eval(body.args[0], st)
+		}
+	}
 	if s, name, ok := r.lookupSink(qname, recvExpr, field); ok {
-		r.checkSink(e, name, s, args, recvT)
+		r.checkSink(e, name, s, checkArgs, recvT)
 	}
 	r.checkMisuse(e, qname, field)
 	r.checkExtras(e, qname, field, fn, st)
+	if r.spec.name == "java" && len(e.args) == 1 {
+		switch qname {
+		case "java.util.Random.nextBytes", "java.util.random.RandomGenerator.nextBytes":
+			// nextBytes mutates its output buffer. Follow the generator's actual
+			// taint rather than assuming a Random-typed SecureRandom is weak.
+			if name, path, ok := r.pathOf(e.args[0]); ok {
+				r.writeEffect(name, path, recvT.keep(kRand), st)
+			}
+		}
+	}
 	if r.spec.weakRNG[qname] {
 		// Not just a hint by name: the value itself is tracked to where it is used.
 		return merge(recvT, r.source(e.pos, randomDesc))
@@ -696,9 +810,9 @@ func (r *irRun) evalCall(e *expr, st istate) taintSet {
 			return r.sanitized(r.source(e.pos, desc), qname, field, recvExpr)
 		}
 	}
-	all := recvT
+	all := forgetXPathContext(recvT)
 	for _, t := range args {
-		all = merge(all, t)
+		all = merge(all, forgetXPathContext(t))
 	}
 	if k, ok := r.spec.sanitizers[qname]; ok {
 		return all.clear(k)
@@ -711,6 +825,11 @@ func (r *irRun) evalCall(e *expr, st istate) taintSet {
 		return nil
 	}
 	if keys := r.targets(fn, e, st); len(keys) > 0 {
+		// Context safety is local to a constructed expression; a helper may wrap
+		// or transform it. Do not promote that fact into a parameter sanitizer.
+		for i := range args {
+			args[i] = forgetXPathContext(args[i])
+		}
 		for _, key := range keys {
 			if key != r.ctx.name {
 				continue
@@ -734,13 +853,20 @@ func (r *irRun) evalCall(e *expr, st istate) taintSet {
 				out = merge(out, r.applyIR(e, key, sum, args, recvT, st, recvExpr))
 			}
 		}
-		return out
+		return forgetXPathContext(out)
 	}
 	return all.scalar()
 }
 
 // lookupSink finds the sink for a call: by qualified name, else by method name on any
 // receiver the sink admits.
+func argAt(e *expr, i int) *expr {
+	if e != nil && i >= 0 && i < len(e.args) {
+		return e.args[i]
+	}
+	return nil
+}
+
 func (r *irRun) lookupSink(qname string, recv *expr, field string) (sink, string, bool) {
 	if s, ok := r.spec.sinks[qname]; ok && !strings.HasPrefix(qname, "?.") {
 		return s, qname, true
@@ -1090,6 +1216,9 @@ func (r *irRun) checkSink(c *expr, name string, s sink, args []taintSet, recv ta
 		isDirect := c.args[i].kind == exprName || c.args[i].kind == exprMember || c.args[i].kind == exprIndex
 		for _, at := range args[i] {
 			hit := at.kinds & s.kind
+			if at.xpathSafe {
+				hit &^= kXPath
+			}
 			if !isDirect {
 				hit &^= s.directFor
 			}
@@ -1158,6 +1287,8 @@ func (r *irRun) validWhenTrue(c *expr, st istate) []validatedIR {
 		return nil
 	}
 	switch c.kind {
+	case exprNot:
+		return r.validWhenFalse(c.x, st)
 	case exprAnd:
 		return append(r.validWhenTrue(c.args[0], st), r.validWhenTrue(c.args[1], st)...)
 	case exprIn:
@@ -1183,6 +1314,19 @@ func (r *irRun) validWhenFalse(c *expr, st istate) []validatedIR {
 		return nil
 	}
 	switch c.kind {
+	case exprIn:
+		if r.spec.name == "py" && c.str == "" && len(c.args) == 1 {
+			if text, ok := r.strOf(c.args[0]); ok {
+				if text == "'" || text == "\"" {
+					return []validatedIR{{c.x, quoteFact(text[0])}}
+				}
+				if strings.Contains(text, "..") {
+					// Reaching here means the value does not contain "..", so it
+					// cannot climb out of the directory by a relative component.
+					return []validatedIR{{c.x, kPath}}
+				}
+			}
+		}
 	case exprNot:
 		return r.validWhenTrue(c.x, st)
 	case exprOr:
@@ -1197,7 +1341,7 @@ func (r *irRun) markValid(vals []validatedIR, st istate) {
 			if !widenedField(f) {
 				st.mark(name, f, v.kinds)
 			}
-		} else if root := rootName(v.value); root != "" && !r.spec.self[root] {
+		} else if root := rootName(v.value); root != "" && !r.spec.self[root] && v.kinds&(noSingleQuote|noDoubleQuote) == 0 {
 			// A check on dest.getCanonicalPath() or p.resolve(x) vouches for the variable
 			// it was derived from.
 			st.mark(root, "", v.kinds)
@@ -1217,12 +1361,27 @@ func (r *irRun) stmt(s *stmt, st istate) {
 				r.lhsName = l.name
 			}
 		}
-		t := r.eval(s.rhs, st)
+		var t taintSet
+		if r.localSequenceAssignment(s) && s.rhs.kind == exprSequence && len(s.rhs.args) <= maxSequenceElements {
+			for i, value := range s.rhs.args {
+				// Nested sequences are deliberately summarized as a whole value.
+				t = merge(t, r.eval(value, st).scalar().atField(fieldPart(fmt.Sprint(i))))
+			}
+		} else {
+			t = r.eval(s.rhs, st)
+			if r.sequenceValue(s.rhs, st) {
+				t = t.scalar()
+			}
+		}
+		quotes := r.quoteFacts(s.rhs, st)
 		r.lhsName = ""
 		for _, l := range s.lhs {
 			v := t
+			facts := quotes
 			if s.aug {
 				v = merge(r.eval(l, st), t)
+				facts &= r.quoteFacts(l, st)
+				v = forgetXPathContext(v)
 			}
 			r.checkPollution(l, st)
 			if l.kind == exprName && l.local {
@@ -1238,6 +1397,15 @@ func (r *irRun) stmt(s *stmt, st istate) {
 				}
 			}
 			r.assign(l, v, st)
+			if !s.aug {
+				r.assignSequenceText(l, s.rhs, st)
+			}
+			if facts != 0 {
+				r.markValid([]validatedIR{{l, facts}}, st)
+			}
+			if l.kind == exprName && s.aug {
+				st.forgetSequence(l.name, t)
+			}
 			if l.kind == exprName {
 				r.cleanPaths[l.name] = r.normalizedPath(s.rhs)
 				r.boundaries[l.name] = r.pathBoundary(s.rhs)
@@ -1316,8 +1484,12 @@ func (r *irRun) stmt(s *stmt, st istate) {
 				}
 			}
 		}
+		r.initSequence(s, st)
 	case stmtReturn:
 		t := r.eval(s.rhs, st)
+		if r.sequenceValue(s.rhs, st) {
+			t = t.scalar()
+		}
 		if r.fn != nil && r.fn.htmlRoute && s.rhs != nil && r.isString(s.rhs) {
 			for _, at := range t {
 				if hit := at.kinds & kXSS; hit != 0 {
@@ -1453,6 +1625,20 @@ func (r *irRun) stmt(s *stmt, st istate) {
 		r.continueAcc = prevContinue
 		r.localNames = entryLocals
 	case stmtBranch:
+		r.eval(s.cond, st)
+		if selected, ok := r.constantCase(s); ok {
+			prev := r.loopAcc
+			r.loopAcc = istate{}
+			for i := selected; i >= 0 && i < len(s.arms); i++ {
+				r.block(s.arms[i], st)
+				if !s.fallthroughCases || terminatesIR(s.arms[i]) {
+					break
+				}
+			}
+			st.union(r.loopAcc)
+			r.loopAcc = prev
+			break
+		}
 		entry := st.clone()
 		forget := map[string]bool{}
 		for _, arm := range s.arms {
@@ -1464,11 +1650,14 @@ func (r *irRun) stmt(s *stmt, st istate) {
 		}
 		prev := r.loopAcc
 		r.loopAcc = istate{}
+		entryConsts, entryStrs := cloneMap(r.consts), cloneMap(r.strs)
 		for _, arm := range s.arms {
+			r.consts, r.strs = cloneMap(entryConsts), cloneMap(entryStrs)
 			b := entry.clone()
 			r.block(arm, b)
 			st.union(b)
 		}
+		r.consts, r.strs = entryConsts, entryStrs
 		st.union(r.loopAcc)
 		r.loopAcc = prev
 	}
@@ -1536,7 +1725,7 @@ func (r *irRun) analyze(f *funcIR) *summary {
 	r.cookies, r.cookieSecure, r.cookieHTTPOnly = nil, false, false
 	st := istate{}
 	if f.class != "" {
-		st[ikey{recvName, ""}] = taintSet{{key: "pr", param: recvParam, kinds: kAll}}
+		st[ikey{recvName, ""}] = taintSet{{key: "pr", param: recvParam, kinds: kAll | kRand}}
 		st[ikey{recvName, originField}] = origin(recvParam)
 	}
 	for i, p := range f.params {
@@ -1547,7 +1736,7 @@ func (r *irRun) analyze(f *funcIR) *summary {
 		if isNumericType(p.ty) {
 			continue
 		}
-		t := taintSet{{key: fmt.Sprintf("p%d", i), param: i, kinds: kAll}}
+		t := taintSet{{key: fmt.Sprintf("p%d", i), param: i, kinds: kAll | kRand}}
 		if p.source != "" {
 			t = merge(t, r.source(f.pos, p.source))
 		}
@@ -1628,7 +1817,7 @@ func (r *irRun) isString(e *expr) bool {
 // strOf evaluates a string expression made of literals, known string variables, and
 // Properties.getProperty calls whose key the project's .properties files define.
 func (r *irRun) strOf(e *expr) (string, bool) {
-	if e == nil {
+	if e == nil || e.unknownText {
 		return "", false
 	}
 	switch e.kind {
@@ -1637,7 +1826,22 @@ func (r *irRun) strOf(e *expr) (string, bool) {
 	case exprName:
 		v, ok := r.strs[e.name]
 		return v, ok
+	case exprIndex:
+		if r.spec.name == "py" && len(e.args) == 1 {
+			text, known := r.strOf(e.x)
+			index, ok := r.constInt(e.args[0])
+			chars := []rune(text)
+			if index < 0 {
+				index += int64(len(chars))
+			}
+			if known && ok && index >= 0 && index < int64(len(chars)) {
+				return string(chars[index]), true
+			}
+		}
 	case exprConcat:
+		if e.str == "%" {
+			return "", false // formatting is not concatenation of its literal operands
+		}
 		var b strings.Builder
 		for _, a := range e.args {
 			v, ok := r.strOf(a)
@@ -1735,7 +1939,7 @@ func topStrs(m *module) map[string]string {
 	var eval func(e *expr) (string, bool)
 	eval = func(e *expr) (string, bool) {
 		switch {
-		case e == nil:
+		case e == nil || e.unknownText || (e.kind == exprConcat && e.str == "%"):
 			return "", false
 		case e.kind == exprStr:
 			return e.str, true

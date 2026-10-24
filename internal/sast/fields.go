@@ -34,7 +34,7 @@ var fieldEncoder = strings.NewReplacer("%", "%25", ".", "%2e")
 
 func fieldPart(s string) string { return "." + fieldEncoder.Replace(s) }
 
-func atomKey(a atom) string { return fmt.Sprintf("%q|%q|%q", a.key, a.field, a.path) }
+func atomKey(a atom) string { return fmt.Sprintf("%q|%q|%q|%t", a.key, a.field, a.path, a.xpathSafe) }
 
 // selectField projects an object onto one field. A whole-parameter dependency
 // becomes a dependency on that parameter's field, rather than on every field.
@@ -75,6 +75,7 @@ func (t taintSet) scalar() taintSet {
 	var out taintSet
 	for _, a := range t {
 		a.path = ""
+		a.xpathSafe = false
 		out = merge(out, taintSet{a})
 	}
 	return out

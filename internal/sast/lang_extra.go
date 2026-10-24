@@ -76,6 +76,10 @@ func init() {
 	py.assignMisuse["check_hostname"] = assignMisuse{rule: ruleTLS, detail: "check_hostname is False", vals: []string{"=false"}}
 	py.assignMisuse["DEBUG"] = assignMisuse{rule: ruleDebug, detail: "DEBUG is True in the settings", vals: []string{"=true"}, file: "settings"}
 	py.sinks["?.xpath"] = sink{kind: kXPath, args: []int{0}}
+	for _, f := range []string{"select", "iter_select"} {
+		py.sinks["elementpath."+f] = sink{kind: kXPath, args: []int{1}, kw: []string{"path"}}
+	}
+	py.sinks["elementpath.Selector"] = sink{kind: kXPath, args: []int{0}, kw: []string{"path"}}
 	py.sinks["?.search_s"] = sink{kind: kLDAP, args: []int{1, 2}}
 	py.sinks["?.search"] = sink{kind: kLDAP, args: []int{1}, recv: []string{"conn", "ldap", "connection", "ldap_conn", "l"}}
 	py.sinks["re.compile"] = sink{kind: kRegex, args: []int{0}}

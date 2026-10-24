@@ -63,6 +63,11 @@ func pySinks() map[string]sink {
 		m["requests."+f] = sink{kind: kSSRF, args: []int{0}}
 		m["httpx."+f] = sink{kind: kSSRF, args: []int{0}}
 	}
+	for _, typ := range []string{"pathlib.Path", "pathlib.PosixPath", "pathlib.WindowsPath"} {
+		for _, method := range []string{"exists", "is_file", "is_dir", "is_symlink", "stat", "lstat", "open", "readlink"} {
+			m[typ+"."+method] = sink{kind: kPath, args: []int{-1}}
+		}
+	}
 	return m
 }
 
@@ -91,7 +96,7 @@ var pySpec = &langSpec{
 		"psycopg2.connect": "psycopg2.Connection", "psycopg2.Connection.cursor": "psycopg2.Cursor",
 		"pymysql.connect": "pymysql.Connection", "pymysql.Connection.cursor": "pymysql.Cursor",
 	},
-	mutators: map[string]bool{"append": true, "extend": true, "add": true, "update": true, "insert": true, "setdefault": true},
+	mutators: map[string]bool{"append": true, "extend": true, "add": true, "update": true, "insert": true, "setdefault": true, "write": true},
 	self:     map[string]bool{"self": true, "cls": true},
 	shells:   map[string]bool{},
 	builtins: map[string]bool{
@@ -100,7 +105,28 @@ var pySpec = &langSpec{
 	},
 }
 
-func init() { frontends["py"] = &frontend{spec: pySpec, lower: lowerPython} }
+// configUnknownField marks a ConfigParser that received a value under a key the
+// analysis could not determine; get() must then return that value for any key.
+const configUnknownField = "\x00config-unknown"
+
+func isConfigParserType(ty string) bool {
+	return ty == "configparser.ConfigParser" || ty == "configparser.RawConfigParser"
+}
+
+func init() {
+	// A ConfigParser round trip stores text on the receiver and hands it back
+	// from get(); tracking per section and key keeps known-safe values safe.
+	for _, typ := range []string{"configparser.ConfigParser", "configparser.RawConfigParser"} {
+		pySpec.returns[typ] = typ
+	}
+	for _, typ := range []string{"pathlib.Path", "pathlib.PosixPath", "pathlib.WindowsPath"} {
+		pySpec.returns[typ] = typ
+		for _, method := range []string{"joinpath", "with_name", "with_suffix", "absolute", "resolve", "expanduser"} {
+			pySpec.returns[typ+"."+method] = typ
+		}
+	}
+	frontends["py"] = &frontend{spec: pySpec, lower: lowerPython}
+}
 
 type pyLower struct {
 	*lowering
@@ -238,9 +264,16 @@ func (p *pyLower) stmt(n *node) []*stmt {
 		return out
 	case "pass_statement", "global_statement", "nonlocal_statement", "delete_statement", "assert_statement", "print_statement", "type_alias_statement":
 	case "match_statement":
-		s := &stmt{kind: stmtBranch, pos: p.pos(n)}
+		s := &stmt{kind: stmtBranch, pos: p.pos(n), cond: p.expr(p.field(n, "subject"))}
 		for _, c := range p.named(p.field(n, "body")) {
 			s.arms = append(s.arms, p.block(p.field(c, "consequence")))
+			var labels []*expr
+			for _, pat := range p.named(c) {
+				if p.kind(pat) != "block" {
+					labels = append(labels, p.matchLabels(pat)...)
+				}
+			}
+			s.labels = append(s.labels, labels)
 		}
 		return []*stmt{s}
 	default:
@@ -249,6 +282,25 @@ func (p *pyLower) stmt(n *node) []*stmt {
 		}
 	}
 	return nil
+}
+
+func (p *pyLower) matchLabels(n *node) []*expr {
+	if p.text(n) == "_" {
+		return nil
+	}
+	switch p.kind(n) {
+	case "string", "integer", "true", "false", "none":
+		return []*expr{p.expr(n)}
+	case "case_pattern", "union_pattern":
+		var labels []*expr
+		for _, c := range p.named(n) {
+			labels = append(labels, p.matchLabels(c)...)
+		}
+		if len(labels) > 0 {
+			return labels
+		}
+	}
+	return []*expr{p.mk(exprOther, n)}
 }
 
 func (p *pyLower) isExprKind(k string) bool {
@@ -529,13 +581,28 @@ func (p *pyLower) expr(n *node) *expr {
 		return e
 	case "binary_operator":
 		l, r := p.expr(p.field(n, "left")), p.expr(p.field(n, "right"))
-		switch p.opBetween(n) {
+		op := p.opBetween(n)
+		switch op {
 		case "+", "%":
 			e := p.mk(exprConcat, n)
+			e.str = op
 			e.args = []*expr{l, r}
 			return e
 		}
-		return p.other(n, l, r)
+		// Python operators can build strings or paths. Preserve taint unless the
+		// operands are known constants, rather than treating '*' or '/' as sanitizers.
+		e := p.other(n, l, r)
+		e.str = op
+		return e
+	case "unary_operator":
+		op := p.text(p.field(n, "operator"))
+		e := p.other(n, &expr{kind: exprNum, str: "0"}, p.expr(p.field(n, "argument")))
+		e.str = op
+		return e
+	case "conditional_expression":
+		if cs := p.named(n); len(cs) == 3 {
+			return p.cond(n, p.expr(cs[1]), p.expr(cs[0]), p.expr(cs[2]))
+		}
 	case "boolean_operator":
 		kind := exprAnd
 		if p.opBetween(n) == "or" {
@@ -550,22 +617,32 @@ func (p *pyLower) expr(n *node) *expr {
 		return e
 	case "comparison_operator":
 		cs := p.named(n)
-		if len(cs) == 2 {
-			between := strings.Join(strings.Fields(string(p.src[cs[0].EndByte():cs[1].StartByte()])), " ")
+		var result *expr
+		for i := 1; i < len(cs); i++ {
+			left, right := p.expr(cs[i-1]), p.expr(cs[i])
+			between := strings.Join(strings.Fields(string(p.src[cs[i-1].EndByte():cs[i].StartByte()])), " ")
+			var comparison *expr
 			switch between {
 			case "in", "not in":
 				in := p.mk(exprIn, n)
-				in.x, in.args = p.expr(cs[1]), []*expr{p.expr(cs[0])}
-				if between == "in" {
-					return in
+				in.x, in.args = right, []*expr{left}
+				comparison = in
+				if between == "not in" {
+					comparison = p.mk(exprNot, n)
+					comparison.x = in
 				}
-				not := p.mk(exprNot, n)
-				not.x = in
-				return not
+			default:
+				comparison = p.bin(n, between, left, right)
 			}
-			return p.bin(n, "==", p.expr(cs[0]), p.expr(cs[1]))
+			if result == nil {
+				result = comparison
+			} else {
+				both := p.mk(exprAnd, n)
+				both.args = []*expr{result, comparison}
+				result = both
+			}
 		}
-		return p.mk(exprNum, n)
+		return result
 	case "lambda":
 		e := p.mk(exprLambda, n)
 		f := &funcIR{pos: p.pos(n)}
@@ -616,6 +693,15 @@ func (p *pyLower) expr(n *node) *expr {
 			d.args = append(d.args, call)
 		}
 		return d
+	case "list":
+		e := p.mk(exprSequence, n)
+		for _, c := range p.named(n) {
+			if p.kind(c) == "list_splat" {
+				e.kind = exprOther
+			}
+			e.args = append(e.args, p.expr(c))
+		}
+		return e
 	case "named_expression":
 		return p.expr(p.field(n, "value"))
 	}
@@ -641,20 +727,56 @@ func (p *pyLower) stringConst(n *node) string {
 
 // str lowers a string literal; an f-string with interpolations is string building.
 func (p *pyLower) str(n *node) *expr {
+	text := p.text(n)
+	quote := strings.IndexAny(text, "\"'")
+	prefix := ""
+	if quote >= 0 {
+		prefix = strings.ToLower(text[:quote])
+	}
+	raw := strings.Contains(prefix, "r")
 	var subs []*expr
+	interpolated := false
 	for _, c := range p.named(n) {
-		if p.kind(c) == "interpolation" {
+		switch p.kind(c) {
+		case "string_content":
+			part := p.mk(exprStr, c)
+			value, ok := pythonText(p.text(c), raw)
+			part.str = strings.ReplaceAll(strings.ReplaceAll(value, "{{", "{"), "}}", "}")
+			part.unknownText = !ok
+			subs = append(subs, part)
+		case "interpolation":
+			interpolated = true
 			if x := p.expr(p.field(c, "expression")); x != nil {
+				for _, child := range p.named(c) {
+					if p.kind(child) == "type_conversion" || p.kind(child) == "format_specifier" {
+						x = p.other(c, x)
+						break
+					}
+				}
 				subs = append(subs, x)
 			}
 		}
 	}
-	if len(subs) == 0 {
+	if !interpolated {
 		e := p.mk(exprStr, n)
 		e.str = p.stringConst(n)
+		e.unknownText = true
+		if quote >= 0 && !strings.ContainsAny(prefix, "bf") {
+			delimiter := 1
+			if strings.HasPrefix(text[quote:], strings.Repeat(text[quote:quote+1], 3)) {
+				delimiter = 3
+			}
+			if len(text) >= quote+2*delimiter {
+				if value, ok := pythonText(text[quote+delimiter:len(text)-delimiter], raw); ok {
+					e.str, e.unknownText = value, false
+				}
+			}
+		}
 		return e
 	}
 	e := p.mk(exprConcat, n)
+	e.unknownText = true
+	e.str = "interpolate"
 	e.args = subs
 	return e
 }
@@ -693,6 +815,7 @@ func (p *pyLower) call(n *node) *expr {
 		switch e.x.name {
 		case "format", "join", "format_map":
 			c := p.mk(exprConcat, n)
+			c.unknownText = true
 			c.args = append([]*expr{e.x.x}, e.args...)
 			return c
 		case "append", "extend", "add", "insert", "update", "write":

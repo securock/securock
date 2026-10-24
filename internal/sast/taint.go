@@ -24,14 +24,15 @@ type flow struct {
 // atom is one origin of taint: an untrusted source (param < 0) or a parameter of the
 // function being analyzed (param >= 0, resolved at call sites through summaries).
 type atom struct {
-	key     string
-	param   int
-	field   string       // field read from the originating parameter
-	path    string       // field occupied in the resulting value
-	ref     types.Object // alias metadata, never a tainted value
-	refName string
-	kinds   kind
-	flow    *flow
+	key       string
+	param     int
+	field     string       // field read from the originating parameter
+	path      string       // field occupied in the resulting value
+	ref       types.Object // alias metadata, never a tainted value
+	refName   string
+	kinds     kind
+	flow      *flow
+	xpathSafe bool // locally constructed XPath with inputs confined to quoted literals
 }
 
 // taintSet is sorted by key so every iteration over it is deterministic.
@@ -52,6 +53,7 @@ func merge(a, b taintSet) taintSet {
 			out = append(out, x)
 		} else {
 			out[i].kinds |= x.kinds
+			out[i].xpathSafe = out[i].xpathSafe && x.xpathSafe
 			if flowLess(x.flow, out[i].flow) {
 				out[i].flow = x.flow
 			}

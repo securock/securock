@@ -25,9 +25,11 @@ var javaSimpleTypes = func() map[string]string {
 	add("org.springframework.jdbc.core.namedparam", "NamedParameterJdbcTemplate")
 	add("org.springframework.web.client", "RestTemplate")
 	add("org.hibernate", "Session")
-	add("java.util", "UUID")
+	add("java.util", "UUID", "List", "ArrayList", "LinkedList")
 	add("java.util.zip", "ZipEntry", "ZipInputStream", "ZipFile")
 	add("java.util.jar", "JarEntry", "JarInputStream")
+	add("javax.naming.directory", "DirContext", "InitialDirContext")
+	add("javax.naming.ldap", "LdapContext", "InitialLdapContext")
 	return m
 }()
 
@@ -85,6 +87,12 @@ func javaSinks() map[string]sink {
 		"?.query":       {kind: kSQL, args: []int{0}, recv: []string{"jdbcTemplate", "jdbc", "template", "namedParameterJdbcTemplate"}},
 		"?.update":      {kind: kSQL, args: []int{0}, recv: []string{"jdbcTemplate", "jdbc", "template", "namedParameterJdbcTemplate"}},
 		"?.execute":     {kind: kSQL, args: []int{0}, recv: []string{"statement", "stmt", "st", "jdbcTemplate", "jdbc", "template"}},
+	}
+	for _, typ := range []string{"javax.naming.directory.DirContext", "javax.naming.directory.InitialDirContext", "javax.naming.ldap.LdapContext", "javax.naming.ldap.InitialLdapContext"} {
+		m[typ+".search"] = sink{kind: kLDAP, args: []int{0, 1}}
+	}
+	for _, method := range []string{"exists", "isFile", "isDirectory", "canRead", "canWrite", "length", "lastModified", "list", "listFiles", "delete", "mkdir", "mkdirs", "createNewFile"} {
+		m["java.io.File."+method] = sink{kind: kPath, args: []int{-1}}
 	}
 	return m
 }
@@ -229,16 +237,26 @@ func (j *javaLower) collectTypes(n *node, class string) {
 	walk(n)
 }
 
-// typeName is the simple name of a type, without generics or array brackets.
+// Keep array dimensions: byte[] is a mutable reference, not a numeric scalar.
 func (j *javaLower) typeName(n *node) string {
 	if n == nil {
 		return ""
 	}
-	s := j.text(n)
-	if i := strings.IndexAny(s, "<["); i > 0 {
-		s = s[:i]
+	var out strings.Builder
+	depth := 0
+	for _, c := range j.text(n) {
+		switch c {
+		case '<':
+			depth++
+		case '>':
+			depth--
+		default:
+			if depth == 0 {
+				out.WriteRune(c)
+			}
+		}
 	}
-	return strings.TrimSpace(s)
+	return strings.TrimSpace(out.String())
 }
 
 var javaSourceAnnotations = map[string]string{
@@ -427,16 +445,26 @@ func (j *javaLower) stmt(n *node) []*stmt {
 		}
 		return []*stmt{s}
 	case "switch_expression", "switch_statement":
-		s := &stmt{kind: stmtBranch, pos: j.pos(n)}
+		s := &stmt{kind: stmtBranch, pos: j.pos(n), cond: j.expr(j.field(n, "condition")), fallthroughCases: true}
 		if b := j.field(n, "body"); b != nil {
 			for _, g := range j.named(b) {
 				var arm []*stmt
+				var labels []*expr
 				for _, c := range j.named(g) {
-					if kk := j.kind(c); kk != "switch_label" {
+					if j.kind(c) == "switch_label" {
+						for _, label := range j.named(c) {
+							labels = append(labels, j.expr(label))
+						}
+					} else {
 						arm = append(arm, j.stmt(c)...)
 					}
 				}
+				if j.kind(g) == "switch_rule" {
+					// Arrow cases do not fall through to the next case.
+					arm = append(arm, &stmt{kind: stmtJump, pos: j.pos(g), loop: true})
+				}
 				s.arms = append(s.arms, arm)
+				s.labels = append(s.labels, labels)
 			}
 		}
 		return []*stmt{s}
@@ -489,6 +517,7 @@ func (j *javaLower) expr(n *node) *expr {
 		return e
 	case "string_literal":
 		e := j.mk(exprStr, n)
+		e.unknownText = strings.Contains(j.text(n), "\\")
 		for _, c := range j.named(n) {
 			if j.kind(c) == "string_fragment" || j.kind(c) == "escape_sequence" {
 				e.str += j.text(c)
@@ -632,6 +661,7 @@ func (j *javaLower) invoke(n *node) *expr {
 	// String.format("...%s", x) builds a string out of its arguments.
 	if obj != nil && j.text(obj) == "String" && (name == "format" || name == "join") {
 		c := j.mk(exprConcat, n)
+		c.unknownText = true
 		c.args = e.args
 		return c
 	}

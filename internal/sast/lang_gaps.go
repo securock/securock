@@ -77,8 +77,8 @@ func init() {
 	ph.sinks["setcookie"] = sink{kind: kRand, args: []int{1}}
 	for _, pkg := range []string{"javax", "jakarta"} {
 		jv.sinks[pkg+".servlet.http.Cookie"] = sink{kind: kRand, args: []int{1}}
-		jv.sinks[pkg+".servlet.http.HttpSession.setAttribute"] = sink{kind: kTrust, args: []int{1}}
-		jv.sinks[pkg+".servlet.http.HttpSession.putValue"] = sink{kind: kTrust, args: []int{1}}
+		jv.sinks[pkg+".servlet.http.HttpSession.setAttribute"] = sink{kind: kTrust, args: []int{0, 1}}
+		jv.sinks[pkg+".servlet.http.HttpSession.putValue"] = sink{kind: kTrust, args: []int{0, 1}}
 		jv.returns[pkg+".servlet.http.HttpServletRequest.getSession"] = pkg + ".servlet.http.HttpSession"
 		jv.simpleTypes["HttpSession"] = pkg + ".servlet.http.HttpSession"
 	}
