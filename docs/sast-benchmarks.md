@@ -1,7 +1,7 @@
 # SAST benchmarks
 
-OWASP Benchmark and selected PyGoat application cases are development and
-regression suites for Securock's SAST. Their labeled failures inform parser,
+OWASP Benchmark and selected PyGoat, NodeGoat, Juice Shop and DVWA source cases
+are development and regression suites for Securock's SAST. Their labeled failures inform parser,
 dataflow and library-model improvements. They are **not a held-out evaluation**,
 and these scores do not establish parity
 with another scanner or predict accuracy on an arbitrary application.
@@ -161,8 +161,9 @@ checks remain gaps.
 
 The Python SQL category has only five vulnerable cases. High aggregate results
 must not conceal weak individual categories or missing real-world framework
-coverage. Other languages still lack a comparable labeled score. Independent
-real-application evaluation remains necessary before making broader accuracy claims.
+coverage. The selected JavaScript, TypeScript and PHP regressions below are not
+comparable labeled benchmarks. Independent real-application evaluation remains
+necessary before making broader accuracy claims.
 
 ## Reproduce
 
@@ -302,3 +303,162 @@ prevent a neighboring handler's finding from satisfying another case.
 The same SAST benchmark workflow fetches the pinned PyGoat revision and runs
 `TestPyGoat` alongside the two OWASP suites. Normal `go test ./...` skips the
 external PyGoat scan unless `SECUROCK_PYGOAT` is set.
+
+## JavaScript, TypeScript and PHP source regressions
+
+`TestNodeGoat`, `TestJuiceShop` and `TestDVWA` in
+`internal/sast/application_benchmarks_test.go` add manually reviewed source/rule
+cases from intentionally vulnerable applications. These are **selected source
+regressions**, not upstream labeled benchmarks, full-application assessments or
+held-out evaluations. Labels describe the selected vulnerability category only:
+a safe control can have unrelated vulnerabilities or broken functionality.
+
+### Revisions and scope
+
+| Input | Revision |
+| --- | --- |
+| [NodeGoat](https://github.com/OWASP/NodeGoat) (JavaScript) | `c5cb68a7084e4ae7dcc60e6a98768720a81841e8` |
+| [Juice Shop](https://github.com/juice-shop/juice-shop) (TypeScript) | `717f5efa886b0417eeecb52378b03cf10567b7e2` |
+| [DVWA](https://github.com/digininja/DVWA) (PHP) | `a1978a2fed195acd093010af6395f86a281537ca` |
+| Securock analyzer used for this measurement | `45f37f8efbd2ed395cf115578aa425e44e6c246c` |
+
+Measurements use that analyzer with the added test harness, Go 1.27.1 on
+darwin/arm64 and the test cache disabled. The analyzer itself is unchanged.
+Only explicitly listed, SHA-256-pinned inputs are copied byte-for-byte to
+temporary analysis roots; no application, container, JS/TS/PHP runtime or
+application dependency is installed or executed.
+
+- **NodeGoat:** all 17 JavaScript files directly in `app/routes` and `app/data`,
+  plus `config/config.js`, analyzed together with their original relative paths.
+  This retains project-local handler/DAO calls. Templates, assets, the application
+  entrypoint and environment-specific configuration are outside this source selection.
+- **Juice Shop:** `routes/search.ts` and six standalone SQL/NoSQL `codefixes`
+  fragments, each analyzed separately. This avoids conflating mutually exclusive
+  variants with the same exported names. Imported application modules and packages
+  are not copied; unresolved calls use the analyzer's normal conservative models.
+  TypeScript findings use the shared `sast:js/*` rule ids.
+- **DVWA:** ten `source/*.php` files, each analyzed separately because the security
+  levels are mutually exclusive and reuse globals. The selection covers SQL
+  injection, command injection and open redirect, not the surrounding page-rendering
+  flow or other DVWA challenges.
+
+The labels were selected by reading the source before scanning, rather than
+keeping only cases the analyzer detects. A hit requires the expected rule in the
+exact file and inclusive line range below. Multiple sinks in one labeled range
+count as **one case**, not one case per sink; findings in other ranges or rule
+categories are not scored. Missing/changed inputs, invalid/overlapping labels and
+any `analysis-incomplete` finding fail the test. Unit tests verify checksum and
+label validation, variant isolation, and that a neighboring handler, another file
+or another rule cannot satisfy a label.
+
+### Results
+
+| Suite / language | TP | FN | FP | TN | Vulnerable cases detected | Safe controls flagged | Analysis incomplete |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| NodeGoat / JavaScript | 3 | 1 | 0 | 1 | 3/4 | 0/1 | 0 |
+| Juice Shop / TypeScript | 4 | 0 | 2 | 2 | 4/4 | 2/4 | 0 |
+| DVWA / PHP | 7 | 0 | 0 | 3 | 7/7 | 0/3 | 0 |
+
+| Suite / category | TP | FN | FP | TN |
+| --- | ---: | ---: | ---: | ---: |
+| NodeGoat code injection | 1 | 0 | 0 | 0 |
+| NodeGoat NoSQL injection | 0 | 1 | 0 | 0 |
+| NodeGoat SSRF | 1 | 0 | 0 | 0 |
+| NodeGoat open redirect | 1 | 0 | 0 | 1 |
+| Juice Shop SQL injection | 2 | 0 | 1 | 2 |
+| Juice Shop NoSQL injection | 2 | 0 | 1 | 0 |
+| DVWA SQL injection | 1 | 0 | 0 | 1 |
+| DVWA command injection | 3 | 0 | 0 | 1 |
+| DVWA open redirect | 3 | 0 | 0 | 1 |
+
+The one NodeGoat miss is the request threshold flowing through a DAO and nested
+query-builder closure into MongoDB `$where`. The two Juice Shop false positives
+are an unreachable SQL query and a NoSQL update guarded by a string-type check.
+They remain explicitly counted; no engine fixes or label changes conceal them.
+There are only one, four and three safe controls respectively. These counts do
+not support a language-wide or application-wide accuracy/FPR claim, nor a score
+comparable to OWASP Benchmark. Its 2% aggregate FPR ceiling does not apply here.
+JS/TS/PHP support remains experimental beyond this narrow evidence.
+
+### Reviewed NodeGoat labels
+
+Paths are relative to the NodeGoat checkout. Each row is one source/rule case.
+
+| Source / lines | Category | Result | Label rationale |
+| --- | --- | --- | --- |
+| `app/routes/contributions.js:32-34` | Code injection | TP | Three request body values passed to `eval` before validation. |
+| `app/data/allocations-dao.js:86` | NoSQL injection | FN | `allocations.js` passes request `threshold` to the DAO; the nested `searchCriteria` interpolates it into `$where` without escaping. |
+| `app/routes/research.js:16` | SSRF | TP | `needle.get` receives the concatenated request URL and symbol without destination validation. |
+| `app/routes/index.js:72` | Open redirect | TP | `/learn` redirects directly to `req.query.url`. |
+| `app/routes/session.js:36-42` | Open redirect | TN | Login middleware redirects to a fixed `/login` path, not a request-controlled destination. |
+
+### Reviewed Juice Shop labels
+
+Except for the first two rows, paths are relative to `data/static/codefixes`.
+Upstream `_correct` names are not used as vulnerability labels without source
+review. In particular, the SQL variant numbered 3 always rejects ordinary string
+input: no string starts with **both** `apple` and `orange`, so the `||` of their
+negated checks returns before the query. This prevents this SQL injection by
+making the handler unusable, not by correctly sanitizing input. Non-string query
+values fail at the string operations before reaching the query.
+
+| Source / lines | Category | Result | Label rationale |
+| --- | --- | --- | --- |
+| `routes/search.ts:23` | SQL injection | TP | Request search text interpolated into a raw SQL query. |
+| `routes/search.ts:47` | SQL injection | TN | Fixed `SELECT sql FROM sqlite_master` statement with no request interpolation. |
+| `unionSqlInjectionChallenge_1.ts:6` | SQL injection | TP | `replace` discards its return value, leaving request text interpolated into SQL. |
+| `unionSqlInjectionChallenge_2_correct.ts:5-8` | SQL injection | TN | SQL text is fixed and criteria is passed separately as replacements, not interpolated. This label does not establish correct search behavior. |
+| `unionSqlInjectionChallenge_3.ts:10` | SQL injection | FP | Query is unreachable after the always-rejecting prefix check described above. |
+| `noSqlReviewsChallenge_1.ts:10-13` | NoSQL injection | TP | Rejecting only `$ne` still allows other query operators such as `$gt` in request `id`. |
+| `noSqlReviewsChallenge_2.ts:4-7` | NoSQL injection | TP | Unvalidated request `id` used as the MongoDB update selector. |
+| `noSqlReviewsChallenge_3_correct.ts:10-13` | NoSQL injection | FP | A terminating `typeof id !== 'string'` guard excludes operator objects; message remains a value under fixed `$set`. This does not prove authorization safety. |
+
+### Reviewed DVWA labels
+
+Paths are relative to `vulnerabilities`. SQL database branches and OS-specific
+shell branches are grouped into one source/rule case per security variant.
+
+| Source / lines | Category | Result | Label rationale |
+| --- | --- | --- | --- |
+| `sqli/source/low.php:8-52` | SQL injection | TP | Request `id` interpolated into SQL passed to MySQL/SQLite query APIs. |
+| `sqli/source/impossible.php:14-57` | SQL injection | TN | Numeric conversion plus prepared SQL and separately bound integer values. |
+| `exec/source/low.php:8-15` | Command injection | TP | Request IP appended to a shell command without validation. |
+| `exec/source/medium.php:17-24` | Command injection | TP | Removing `&&` and `;` leaves shell operators such as `\|` available. |
+| `exec/source/high.php:24-31` | Command injection | TP | Blacklist removes `\| ` but leaves a pipe without a following space available. |
+| `exec/source/impossible.php:20-27` | Command injection | TN | Exactly four individually numeric components are rejoined with dots; shell metacharacters are excluded. This is a command-injection control, not full IP validation. |
+| `open_redirect/source/low.php:4` | Open redirect | TP | Request value passed directly to the Location header. |
+| `open_redirect/source/medium.php:11` | Open redirect | TP | Rejecting `http://` and `https://` still permits a protocol-relative `//host` destination. |
+| `open_redirect/source/high.php:5` | Open redirect | TP | Checking for `info.php` anywhere in the value permits an external URL containing that substring. |
+| `open_redirect/source/impossible.php:18` | Open redirect | TN | Numeric selector maps only to fixed destination strings. |
+
+### Reproduce JS, TS and PHP
+
+Check out the sources outside the Securock repository, then run from its root:
+
+```sh
+git clone https://github.com/OWASP/NodeGoat /tmp/securock-nodegoat
+git -C /tmp/securock-nodegoat checkout c5cb68a7084e4ae7dcc60e6a98768720a81841e8
+git clone https://github.com/juice-shop/juice-shop /tmp/securock-juice-shop
+git -C /tmp/securock-juice-shop checkout 717f5efa886b0417eeecb52378b03cf10567b7e2
+git clone https://github.com/digininja/DVWA /tmp/securock-dvwa
+git -C /tmp/securock-dvwa checkout a1978a2fed195acd093010af6395f86a281537ca
+
+SECUROCK_NODEGOAT=/tmp/securock-nodegoat \
+SECUROCK_JUICE_SHOP=/tmp/securock-juice-shop \
+SECUROCK_DVWA=/tmp/securock-dvwa \
+go test ./internal/sast -run '^Test(NodeGoat|JuiceShop|DVWA)$' -count=1 -v -timeout 5m
+```
+
+Each test prints all case outcomes, per-category TP/FN/FP/TN and incomplete-analysis
+counts. Every currently detected vulnerable case is required individually; every
+currently unflagged safe control rejects a new false positive. The one known miss
+and two known false positives remain in the denominator. Improvements are allowed
+and should prompt updates to the required detections/known-FP flags and these
+tables, not removal of the cases.
+
+The existing SAST benchmark workflow fetches all three pinned revisions and runs
+these tests alongside OWASP Benchmark and PyGoat. Normal `go test ./...` skips
+external scans whose environment variable is unset, while the harness unit tests
+always run offline. No source is fetched from inside a Go test. Updating an input
+requires reviewing its revision, SHA-256, label rationale, line range, measurements
+and regression expectations together.

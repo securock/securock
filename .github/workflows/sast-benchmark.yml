@@ -59,10 +59,34 @@ jobs:
           ref: 46fef968f3f44d1191363baf936aaa3335dc5c6d
           path: .benchmarks/pygoat
           persist-credentials: false
+      - name: Fetch JavaScript cases
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: OWASP/NodeGoat
+          ref: c5cb68a7084e4ae7dcc60e6a98768720a81841e8
+          path: .benchmarks/nodegoat
+          persist-credentials: false
+      - name: Fetch TypeScript cases
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: juice-shop/juice-shop
+          ref: 717f5efa886b0417eeecb52378b03cf10567b7e2
+          path: .benchmarks/juice-shop
+          persist-credentials: false
+      - name: Fetch PHP cases
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: digininja/DVWA
+          ref: a1978a2fed195acd093010af6395f86a281537ca
+          path: .benchmarks/dvwa
+          persist-credentials: false
       - name: Measure recall and false positives by category
         env:
           SECUROCK_OWASP_BENCHMARK: ${{ github.workspace }}/.benchmarks/java
           SECUROCK_OWASP_BENCHMARK_PYTHON: ${{ github.workspace }}/.benchmarks/python
           SECUROCK_PYGOAT: ${{ github.workspace }}/.benchmarks/pygoat
+          SECUROCK_NODEGOAT: ${{ github.workspace }}/.benchmarks/nodegoat
+          SECUROCK_JUICE_SHOP: ${{ github.workspace }}/.benchmarks/juice-shop
+          SECUROCK_DVWA: ${{ github.workspace }}/.benchmarks/dvwa
           SECUROCK_BENCHMARK_DETAILS: "1"
-        run: go test ./internal/sast -run '^Test(OWASPBenchmark|PyGoat)' -count=1 -v -timeout 15m
+        run: go test ./internal/sast -run '^Test(OWASPBenchmark|PyGoat|NodeGoat|JuiceShop|DVWA)' -count=1 -v -timeout 15m

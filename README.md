@@ -76,6 +76,11 @@ Those changes are easy to miss in a language lockfile diff.
   1.0% false-positive rate on OWASP BenchmarkJava) and Python (98.9% and 1.0%); the other languages are
   experimental. A separate PyGoat regression detects 10 of 14 selected vulnerable cases,
   with no alerts on two category-specific safe controls; this is not an application-wide accuracy estimate.
+  Pinned source regressions also cover JavaScript (NodeGoat: 3/4 vulnerable cases detected,
+  0/1 safe controls flagged), TypeScript (Juice Shop: 4/4, 2/4), and PHP (DVWA: 7/7, 0/3).
+  These small selections are not language-wide accuracy estimates; see
+  [SAST benchmarks](docs/sast-benchmarks.md#javascript-typescript-and-php-source-regressions)
+  for the labels, known errors, and reproduction commands.
   See [how accurate is sast](https://securock.dev/guide/usage#how-accurate-is-sast)
 
 **Exports**
