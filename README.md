@@ -74,7 +74,9 @@ Those changes are easy to miss in a language lockfile diff.
   text file for committed credentials. A file it cannot parse is reported
   rather than skipped. Published development-benchmark measurements cover Java (99.7% detected,
   1.0% false-positive rate on OWASP BenchmarkJava) and Python (98.9% and 1.0%); the other languages are
-  experimental. See [how accurate is sast](https://securock.dev/guide/usage#how-accurate-is-sast)
+  experimental. A separate PyGoat regression detects 10 of 14 selected vulnerable cases,
+  with no alerts on two category-specific safe controls; this is not an application-wide accuracy estimate.
+  See [how accurate is sast](https://securock.dev/guide/usage#how-accurate-is-sast)
 
 **Exports**
 

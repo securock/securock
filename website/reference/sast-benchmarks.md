@@ -1,6 +1,6 @@
 ---
 title: SAST benchmarks
-description: Reproducible Java and Python SAST accuracy measurements, regression checks and their limits.
+description: Reproducible OWASP Benchmark and PyGoat SAST measurements, regression checks and their limits.
 ---
 
 <!--@include: ../../docs/sast-benchmarks.md-->

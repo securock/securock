@@ -1,8 +1,9 @@
 # SAST benchmarks
 
-OWASP Benchmark is a development and regression suite for Securock's SAST.
-Its labeled failures inform parser, dataflow and library-model improvements.
-It is **not a held-out evaluation**, and these scores do not establish parity
+OWASP Benchmark and selected PyGoat application cases are development and
+regression suites for Securock's SAST. Their labeled failures inform parser,
+dataflow and library-model improvements. They are **not a held-out evaluation**,
+and these scores do not establish parity
 with another scanner or predict accuracy on an arbitrary application.
 
 ## Revisions and method
@@ -165,6 +166,8 @@ real-application evaluation remains necessary before making broader accuracy cla
 
 ## Reproduce
 
+### OWASP Benchmark
+
 Run from the Securock repository root, using external directories for the suites:
 
 ```sh
@@ -197,3 +200,105 @@ requests, main-branch pushes, a weekly schedule and manual dispatch. Normal
 `go test ./...` skips the external suites unless their environment variables are
 set. Updating a suite revision requires reviewing the changed labels and counts,
 then updating the documented measurements and regression limits together.
+
+## PyGoat application regression
+
+[PyGoat](https://github.com/adeyosemanputra/pygoat) is an intentionally vulnerable
+application, not an upstream labeled benchmark. The regression test uses manually
+reviewed cases from **nine independent Python labs** in `dockerized_labs`, with
+14 vulnerable cases and two category-specific safe controls. It does not score
+every challenge, every finding, or the Django application that manages the labs.
+Authentication, authorization, business logic and dependency vulnerabilities are
+outside this selection.
+
+| Input | Revision |
+| --- | --- |
+| PyGoat | `46fef968f3f44d1191363baf936aaa3335dc5c6d` |
+| Securock analyzer used for this measurement | `a5b66a55525dc0253a43f7af45bfa549ad6d5ca8` |
+
+The measurement uses that analyzer with the added `TestPyGoat` harness, Go 1.27.1
+on darwin/arm64 and the test cache disabled. Each lab is scanned separately as a
+complete source directory, so unrelated `app.py` modules and same-named handlers
+are not combined into one project. No application, container or Python dependency
+is installed or executed.
+
+### Results
+
+| Category | TP | FN | FP | TN |
+| --- | ---: | ---: | ---: | ---: |
+| SQL injection | 1 | 0 | 0 | 1 |
+| Command injection | 1 | 0 | 0 | 0 |
+| Code/template injection | 1 | 1 | 0 | 0 |
+| Path traversal | 1 | 0 | 0 | 0 |
+| SSRF | 1 | 0 | 0 | 0 |
+| Insecure deserialization | 2 | 0 | 0 | 1 |
+| Weak crypto | 2 | 0 | 0 | 0 |
+| XSS | 0 | 3 | 0 | 0 |
+| XXE | 1 | 0 | 0 | 0 |
+| **Total** | **10** | **4** | **0** | **2** |
+
+Securock detects **10 of 14 selected vulnerable cases (71.43%)**. Neither safe
+control is flagged for its labeled rule, and all nine scans produce zero
+`analysis-incomplete` findings. Two controls are too few to support a meaningful
+application-wide false-positive-rate or TPR-minus-FPR score. The 2% FPR ceiling
+for OWASP Benchmark does not apply to this selection.
+
+### Reviewed labels
+
+Paths below are relative to `dockerized_labs`. A case is a function/rule pair:
+only a finding for the expected rule within that function counts as a hit.
+Other rule categories and findings outside the selected functions are not scored.
+For SHA-1, the case is the `custom_hash` helper where the weak API is called,
+rather than counting its caller again.
+
+| Source / function | Expected category | Result | Label rationale |
+| --- | --- | --- | --- |
+| `sql_injection_lab/app.py:lab` | SQL injection | TP | Request fields interpolated into the query passed to `execute`. |
+| `sql_injection_lab/app.py:init_db` | SQL injection | TN | Fixed schema statements and a parameterized insert. This control has no request input. |
+| `command_injection_lab/app.py:lab1` | Command injection | TP | Request domain interpolated into `Popen` with `shell=True`. |
+| `command_injection_lab/app.py:lab2` | Code injection | TP | Request expression passed to `eval`. |
+| `ssrf_lab/app.py:lab1` | Path traversal | TP | Request filename joined to a base path and passed to `open` without containment validation. This is a file-access case despite the lab's SSRF name. |
+| `ssrf_lab/app.py:lab2` | SSRF | TP | Request URL passed directly to `requests.get`. |
+| `insec_des_lab/main.py:deserialize_data` | Insecure deserialization | TP | Base64-decoded request data passed to `pickle.loads`. |
+| `insec_des_lab/main.py:serialize_data` | Insecure deserialization | TN | Request data is serialized with `pickle.dumps`, not deserialized. |
+| `software_integrity_lab/app.py:lab1` | Insecure deserialization | TP | Base64-decoded request cookie passed to `pickle.loads`. |
+| `crypto_failure_lab/app.py:lab1` | Weak crypto | TP | MD5 used for password verification. |
+| `crypto_failure_lab/app.py:custom_hash` | Weak crypto | TP | SHA-1 used by the password-verification helper. |
+| `xxe_lab/app.py:xxe_parse` | XXE | TP | External general entities explicitly enabled on the parser used for request XML. The hit is at `setFeature`, not proof of parser-input-sensitive flow analysis. |
+| `xss_lab/app.py:lab1` | XSS | FN | Request query rendered through the `safe` filter in `templates/lab1.html`. |
+| `xss_lab/app.py:lab2` | XSS | FN | Removing literal script tags does not neutralize other HTML; `templates/lab2.html` uses the `safe` filter on `username`. |
+| `xss_lab/app.py:lab3` | XSS | FN | Removing alphanumeric characters still permits JavaScript expressions; `templates/lab3.html` inserts the result as script code. |
+| `template_injection_lab/app.py:view_blog` | Code/template injection | FN | `create_blog_post` interpolates request title/content into a template file; `view_blog` later renders it as Jinja source. |
+
+The remaining four misses need template-context modeling and tracking through
+stored template files. The source comment in `software_integrity_lab:lab2`
+describes XSS, but that is not by itself a vulnerability label; that handler is
+not included in the scored XSS cases.
+
+### Reproduce PyGoat
+
+Run from the Securock repository root:
+
+```sh
+git clone https://github.com/adeyosemanputra/pygoat /tmp/securock-pygoat
+git -C /tmp/securock-pygoat checkout 46fef968f3f44d1191363baf936aaa3335dc5c6d
+
+SECUROCK_PYGOAT=/tmp/securock-pygoat \
+go test ./internal/sast -run '^TestPyGoat$' -count=1 -v -timeout 5m
+```
+
+The test always prints each case's outcome, category counts and incomplete-analysis
+count. It guards every currently detected vulnerable case individually, rejects a
+false positive on either safe control and fails on incomplete analysis. Known
+misses stay in the denominator; detecting one is allowed and should prompt an
+update to the required detections and this result table.
+
+SHA-256 checks pin all nine labeled Python files and the three XSS templates;
+missing or changed inputs fail before scoring. Updating the PyGoat revision
+requires reviewing the labels, checksums, measurements and required detections
+together. Function-boundary unit tests run without an external checkout and
+prevent a neighboring handler's finding from satisfying another case.
+
+The same SAST benchmark workflow fetches the pinned PyGoat revision and runs
+`TestPyGoat` alongside the two OWASP suites. Normal `go test ./...` skips the
+external PyGoat scan unless `SECUROCK_PYGOAT` is set.

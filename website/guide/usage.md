@@ -459,6 +459,17 @@ Python now includes the suite's imported helpers in the analysis root; earlier m
 scanned only `testcode`. The benchmark reference separates that measurement correction from
 the engine improvements.
 
+PyGoat also has a reproducible application regression test, using a pinned revision
+and manually reviewed cases from nine independent Python labs. It detects **10 of
+14 selected vulnerable cases (71.43%)**, with neither of two safe controls flagged
+for its labeled rule and zero incomplete-analysis findings. The four misses are
+three template-based XSS cases and one stored-template injection case. This small
+selection is not an application-wide accuracy or false-positive-rate estimate.
+Run it with
+`SECUROCK_PYGOAT=/path/to/pygoat go test ./internal/sast -run '^TestPyGoat$' -count=1 -v`.
+See [PyGoat application regression](/reference/sast-benchmarks#pygoat-application-regression)
+for the exact revision, labels, category counts and full reproduction steps.
+
 Read the numbers with their limits in mind. Both suites are synthetic and contain
 constructs real code rarely has. Constant Java `switch` and Python `match` selectors, and
 Python arithmetic and conditional expressions, are now evaluated when their values are known.
@@ -518,7 +529,7 @@ and `sast` should be treated as experimental there:
 | Language              | What it was checked against                                                                                                                                                                                                                    |
 | --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Java                  | OWASP BenchmarkJava (score above), WebGoat                                                                                                                                                                                                     |
-| Python                | OWASP BenchmarkPython (score above), pygoat, django.nV                                                                                                                                                                                         |
+| Python                | OWASP BenchmarkPython (score above), PyGoat (14 selected vulnerable cases and two safe controls; results above), django.nV                                                                                                                     |
 | JavaScript/TypeScript | Juice Shop's `codefixes` (flawed and fixed variants; the injection, XSS and redirect challenges are found, parameterized SQL variants are not reported), njsscan true negatives (1 of 65 files reported, a log-injection note), NodeGoat, dvna |
 | Go                    | gosec's samples (SQL injection, TLS and RSA key size covered; rules that need no tainted data are only partly matched), go-test-bench with `--assume-params`                                                                                   |
 | PHP, Ruby, C#, Kotlin | Intentionally vulnerable applications read by hand (DVWA, railsgoat, WebGoat.NET, ktor-samples, spring-petclinic-kotlin) and the cases in `internal/sast/testdata/bench.txt`; no labeled score                                                 |
