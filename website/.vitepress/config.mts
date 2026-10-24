@@ -71,6 +71,7 @@ export default defineConfig({
           { text: "Privacy", link: "/reference/privacy" },
           { text: "Trust model", link: "/reference/trust-model" },
           { text: "Threat model", link: "/reference/threat-model" },
+          { text: "SAST benchmarks", link: "/reference/sast-benchmarks" },
           {
             text: "Security policy",
             link: "https://github.com/securock/securock/blob/main/SECURITY.md",

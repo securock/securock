@@ -433,25 +433,59 @@ library code whose callers validate their input.
 
 ### How accurate is sast
 
-Accuracy is measured against the OWASP Benchmark, a labeled suite of small web handlers
-that the analyzer was not written around. The table records the last published
+Accuracy is measured against the OWASP Benchmark, a labeled suite of small web handlers.
+These are development and regression benchmarks: failures in these suites inform fixes,
+so they are not an independent, held-out evaluation. The table records the last published
 measurements; it is not a new measurement of every subsequent dataflow change.
 The score is the true-positive rate minus
 the false-positive rate; a tool that guesses scores 0.
 
-| Suite                       | True positives | False positives | Score |
-| --------------------------- | -------------- | --------------- | ----- |
-| BenchmarkJava 1.2 (2,740)   | 91%            | 15%             | +0.77 |
-| BenchmarkPython 0.1 (1,230) | 80%            | 22%             | +0.59 |
+| Suite                       | True positives | False positives | Score   |
+| --------------------------- | -------------- | --------------- | ------- |
+| BenchmarkJava 1.2 (2,740)   | 99.7%          | 1.0%            | +0.9874 |
+| BenchmarkPython 0.1 (1,230) | 98.9%          | 8.5%            | +0.9041 |
 
 The suites are not vendored. To reproduce, check one out and run
-`SECUROCK_OWASP_BENCHMARK=/path/to/BenchmarkJava go test ./internal/sast -run OWASPBenchmark -v`
+`SECUROCK_OWASP_BENCHMARK=/path/to/BenchmarkJava go test ./internal/sast -run OWASPBenchmark -count=1 -v`
 (or `SECUROCK_OWASP_BENCHMARK_PYTHON` for the Python suite). The test prints the rate for
-each category and fails if the score drops.
+each category and guards true positives and false positives separately in each category.
+Missing cases, unmapped categories and incomplete analysis also fail the test. Set
+`SECUROCK_BENCHMARK_DETAILS=1` to list misclassified cases. CI uses pinned suite revisions.
+See [SAST benchmarks](/reference/sast-benchmarks) for revisions, exact counts and reproduction.
+
+Python now includes the suite's imported helpers in the analysis root; earlier measurements
+scanned only `testcode`. The benchmark reference separates that measurement correction from
+the engine improvements.
 
 Read the numbers with their limits in mind. Both suites are synthetic and contain
-constructs real code rarely has: a switch on a constant string, a list whose first
-element is removed before the second is read. The remaining false positives are mostly those.
+constructs real code rarely has. Constant Java `switch` and Python `match` selectors, and
+Python arithmetic and conditional expressions, are now evaluated when their values are known.
+Java switch fallthrough is preserved; unknown patterns and guards keep all alternatives.
+Escaped strings and formatting that are not fully decoded stay unknown for constant folding.
+Local Python lists and Java ArrayList/LinkedList instances track up to 64 elements separately,
+including insertions and indexed removals. Aliases, unknown mutations, escaping calls and
+larger lists fall back to conservative whole-list taint.
+
+Python XPath checks include `elementpath.select`, `iter_select` and `Selector`.
+A quote-removal operation or a rejecting quote check only protects input embedded inside
+the matching XPath string literal. The same input used as a raw XPath expression, inside
+the opposite quote style, or in SQL remains untrusted. Unknown transformations discard
+the local XPath-context safety fact.
+
+Python `ConfigParser` round trips are tracked per section and key; `get()` of a
+known-safe key stays safe, while unknown keys and `read_dict` remain conservative.
+Python `subprocess` argument vectors are checked for explicit command modes
+(`sh -c`, `cmd.exe /c`, PowerShell `-Command`) even without `shell=True`. Java
+session keys and values are both checked, and `Random.nextBytes` follows the
+buffer it writes. A Python `make_response((body, headers))` checks only the body,
+and rejecting `..` validates only the path class. Python text buffers are
+followed through `write()` and `getvalue()` (for example `io.StringIO`).
+
+Remaining errors include more complex collections, library models and validation
+patterns. Python's path, code injection and redirect categories still have some
+false positives, mostly from request-path-derived values and project-specific
+escapers. They are retained conservatively because the analysis does not infer
+safety from function names.
 
 Only Java and Python have a labeled score. For the other languages the evidence is weaker,
 and `sast` should be treated as experimental there:
