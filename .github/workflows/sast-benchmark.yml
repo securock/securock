@@ -1,0 +1,60 @@
+name: SAST benchmark
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "internal/sast/**"
+      - "internal/finding/**"
+      - "go.mod"
+      - "go.sum"
+      - ".github/workflows/sast-benchmark.yml"
+  pull_request:
+    paths:
+      - "internal/sast/**"
+      - "internal/finding/**"
+      - "go.mod"
+      - "go.sum"
+      - ".github/workflows/sast-benchmark.yml"
+  workflow_dispatch:
+  schedule:
+    - cron: "43 5 * * 1"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sast-benchmark-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      - name: Fetch Java cases
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: OWASP-Benchmark/BenchmarkJava
+          ref: acc50f20ec449e2b977a7c409fa8175491657cba
+          path: .benchmarks/java
+          persist-credentials: false
+      - name: Fetch Python cases
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: OWASP-Benchmark/BenchmarkPython
+          ref: f1291485808b66e20ddb6b01b10dc71b3df8c8ba
+          path: .benchmarks/python
+          persist-credentials: false
+      - name: Measure recall and false positives by category
+        env:
+          SECUROCK_OWASP_BENCHMARK: ${{ github.workspace }}/.benchmarks/java
+          SECUROCK_OWASP_BENCHMARK_PYTHON: ${{ github.workspace }}/.benchmarks/python
+          SECUROCK_BENCHMARK_DETAILS: "1"
+        run: go test ./internal/sast -run '^TestOWASPBenchmark' -count=1 -v -timeout 15m
