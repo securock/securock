@@ -474,16 +474,19 @@ Pinned source regressions also cover **JavaScript, TypeScript and PHP**:
 
 | Language   | Source selection                                        | Vulnerable cases detected | Safe controls flagged | Analysis incomplete |
 | ---------- | ------------------------------------------------------- | ------------------------: | --------------------: | ------------------: |
-| JavaScript | NodeGoat handlers and DAOs                              |                       3/4 |                   0/1 |                   0 |
-| TypeScript | Juice Shop search route and SQL/NoSQL code-fix variants |                       4/4 |                   2/4 |                   0 |
-| PHP        | DVWA SQL, command and redirect source variants          |                       7/7 |                   0/3 |                   0 |
+| JavaScript | NodeGoat handlers and DAOs                              |                       4/4 |                   0/1 |                   0 |
+| TypeScript | Juice Shop search route and SQL/NoSQL code-fix variants |                       4/4 |                   0/4 |                   0 |
+| PHP        | DVWA SQL, command and redirect source variants          |                       8/8 |                   0/3 |                   0 |
 
-The NodeGoat miss is a nested MongoDB `$where` query builder. Juice Shop's two
-false positives are an unreachable SQL query and a string-validated NoSQL selector.
-These errors stay counted. The selections are small, manually reviewed source/rule
-cases, not full-application or language-wide accuracy measurements; the OWASP 2%
-FPR ceiling does not apply. No application or dependency is installed or executed.
-CI checks the pinned sources and guards individual detections and safe controls.
+The NodeGoat finding now points at the MongoDB database call; before the change
+the same flow was reported only at the nested `$where` builder. Juice Shop's two
+false positives, an unreachable SQL query and a string-validated NoSQL selector,
+are cleared. DVWA adds a reviewed case where quote escaping is used unquoted, so
+the denominator changed. No selected case is currently a known miss or known false
+positive, but these are small, manually reviewed source/rule cases, not
+full-application or language-wide accuracy measurements; the OWASP 2% FPR ceiling
+does not apply. No application or dependency is installed or executed. CI checks
+the pinned sources and guards individual detections and safe controls.
 See [JS, TS and PHP source regressions](/reference/sast-benchmarks#javascript-typescript-and-php-source-regressions)
 for revisions, all labels, counts and reproduction commands using
 `SECUROCK_NODEGOAT`, `SECUROCK_JUICE_SHOP` and `SECUROCK_DVWA`.
