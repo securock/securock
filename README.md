@@ -69,7 +69,10 @@ Those changes are easy to miss in a language lockfile diff.
   fully offline. It follows deep call chains and loop-carried data to convergence,
   distinguishes receiver fields, and tracks setters, constructors and direct local
   reference aliases. Validation clears only the vulnerability classes it prevents;
-  an exhausted analysis budget is reported as incomplete. It also checks Dockerfiles, Kubernetes and Compose manifests,
+  an exhausted analysis budget is reported as incomplete. Packages the repository
+  ships in `vendor/`, `node_modules/` or `site-packages/` are analyzed as well,
+  so a helper in an installed package is followed into the API it calls; the
+  package's own findings are not reported. It also checks Dockerfiles, Kubernetes and Compose manifests,
   Terraform, and GitHub Actions workflows for unsafe settings, and scans every
   text file for committed credentials. A file it cannot parse is reported
   rather than skipped. Published development-benchmark measurements cover Java (99.7% detected,

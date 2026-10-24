@@ -296,6 +296,15 @@ false, `Digest::MD5`) by its arguments. A call that states
 `sast:analysis-incomplete` (info) marks a file that could not be analyzed, including
 analysis that exhausted its convergence budget.
 
+The packages a repository ships are analyzed too: an import of `vendor/`,
+`node_modules/` or `site-packages/` is followed into the package's own code, so
+a helper that ends in `cursor.execute` or `os.system` is reported at the call in
+the project, and a helper that escapes or parameterizes its input is believed.
+The package's own findings are not reported, and code that could not be read is
+reported as `sast:analysis-incomplete` like any other file. Only the packages
+the project imports are read, and nothing is downloaded: the analysis stays
+offline.
+
 Three of these depend on what the data can be. `nosql-injection` fires when a
 request object reaches a query filter (`User.findOne({name: req.body.name})`,
 `users.find_one({"name": request.json["name"]})`), or when request text is parsed

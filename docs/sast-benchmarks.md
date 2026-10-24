@@ -309,6 +309,36 @@ The same SAST benchmark workflow fetches the pinned PyGoat revision and runs
 `TestPyGoat` alongside the two OWASP suites. Normal `go test ./...` skips the
 external PyGoat scan unless `SECUROCK_PYGOAT` is set.
 
+## Installed package regression
+
+The packages a repository ships are analyzed as well: an import of a vendored
+package is followed into the package's own code, so a helper that ends in a
+dangerous call is reported at the call in the project. `TestVendoredPackageCases`
+in `internal/sast/library_benchmarks_test.go` scores that capability on
+hand-reviewed cases: each case is a small project with one package it imports.
+
+| Category | TP | FP | TN |
+| --- | ---: | ---: | ---: |
+| Installed package | 4 | 0 | 3 |
+
+The four true positives are a package that executes a query, one that runs a
+command, one that opens a file, and one that re-exports the helper that
+executes a query. The three safe controls are a package that escapes its input,
+a package that parameterizes the query, and a package with a vulnerability of
+its own, which is not the project's code to fix. Every vulnerable case is
+required individually and every safe control rejects a new false positive.
+
+The cases are built in the test itself, so they run offline with no checkout and
+no network:
+
+```sh
+go test ./internal/sast -run '^TestVendoredPackageCases$' -count=1 -v
+```
+
+Only the packages the project imports are read, and the amount of third-party
+code is bounded: a package tree larger than the limit is reported as
+`analysis-incomplete` rather than trusted.
+
 ## JavaScript, TypeScript and PHP source regressions
 
 `TestNodeGoat`, `TestJuiceShop` and `TestDVWA` in
