@@ -460,10 +460,9 @@ scanned only `testcode`. The benchmark reference separates that measurement corr
 the engine improvements.
 
 PyGoat also has a reproducible application regression test, using a pinned revision
-and manually reviewed cases from nine independent Python labs. It detects **10 of
-14 selected vulnerable cases (71.43%)**, with neither of two safe controls flagged
-for its labeled rule and zero incomplete-analysis findings. The four misses are
-three template-based XSS cases and one stored-template injection case. This small
+and manually reviewed cases from nine independent Python labs. It detects **all 14
+selected vulnerable cases**, with neither of two safe controls flagged
+for its labeled rule and zero incomplete-analysis findings. This small
 selection is not an application-wide accuracy or false-positive-rate estimate.
 Run it with
 `SECUROCK_PYGOAT=/path/to/pygoat go test ./internal/sast -run '^TestPyGoat$' -count=1 -v`.

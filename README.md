@@ -74,7 +74,7 @@ Those changes are easy to miss in a language lockfile diff.
   text file for committed credentials. A file it cannot parse is reported
   rather than skipped. Published development-benchmark measurements cover Java (99.7% detected,
   1.0% false-positive rate on OWASP BenchmarkJava) and Python (98.9% and 1.0%); the other languages are
-  experimental. A separate PyGoat regression detects 10 of 14 selected vulnerable cases,
+  experimental. A separate PyGoat regression detects 14 of 14 selected vulnerable cases,
   with no alerts on two category-specific safe controls; this is not an application-wide accuracy estimate.
   Pinned source regressions also cover JavaScript (NodeGoat: 4/4 vulnerable cases detected,
   0/1 safe controls flagged), TypeScript (Juice Shop: 4/4, 0/4), and PHP (DVWA: 8/8, 0/3).

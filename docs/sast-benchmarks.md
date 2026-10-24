@@ -215,7 +215,7 @@ outside this selection.
 | Input | Revision |
 | --- | --- |
 | PyGoat | `46fef968f3f44d1191363baf936aaa3335dc5c6d` |
-| Securock analyzer used for this measurement | `a5b66a55525dc0253a43f7af45bfa549ad6d5ca8` |
+| Securock analyzer used for this measurement | `10456c8d93f671c21acfc52436d6c790ce4090a6` |
 
 The measurement uses that analyzer with the added `TestPyGoat` harness, Go 1.27.1
 on darwin/arm64 and the test cache disabled. Each lab is scanned separately as a
@@ -229,20 +229,27 @@ is installed or executed.
 | --- | ---: | ---: | ---: | ---: |
 | SQL injection | 1 | 0 | 0 | 1 |
 | Command injection | 1 | 0 | 0 | 0 |
-| Code/template injection | 1 | 1 | 0 | 0 |
+| Code/template injection | 2 | 0 | 0 | 0 |
 | Path traversal | 1 | 0 | 0 | 0 |
 | SSRF | 1 | 0 | 0 | 0 |
 | Insecure deserialization | 2 | 0 | 0 | 1 |
 | Weak crypto | 2 | 0 | 0 | 0 |
-| XSS | 0 | 3 | 0 | 0 |
+| XSS | 3 | 0 | 0 | 0 |
 | XXE | 1 | 0 | 0 | 0 |
-| **Total** | **10** | **4** | **0** | **2** |
+| **Total** | **14** | **0** | **0** | **2** |
 
-Securock detects **10 of 14 selected vulnerable cases (71.43%)**. Neither safe
+Securock detects **14 of 14 selected vulnerable cases (100%)**. Neither safe
 control is flagged for its labeled rule, and all nine scans produce zero
 `analysis-incomplete` findings. Two controls are too few to support a meaningful
 application-wide false-positive-rate or TPR-minus-FPR score. The 2% FPR ceiling
 for OWASP Benchmark does not apply to this selection.
+
+The four earlier misses are detected by reading the templates the handlers
+render: a request value is reported where the template prints that variable with
+the `safe`/`raw` filter or inside a script element, where HTML escaping is not
+enough to make the value safe JavaScript; a render whose template name is built
+from request data is reported as code injection, and `re.sub`-family results
+keep the subject's taint.
 
 ### Reviewed labels
 
@@ -266,13 +273,12 @@ rather than counting its caller again.
 | `crypto_failure_lab/app.py:lab1` | Weak crypto | TP | MD5 used for password verification. |
 | `crypto_failure_lab/app.py:custom_hash` | Weak crypto | TP | SHA-1 used by the password-verification helper. |
 | `xxe_lab/app.py:xxe_parse` | XXE | TP | External general entities explicitly enabled on the parser used for request XML. The hit is at `setFeature`, not proof of parser-input-sensitive flow analysis. |
-| `xss_lab/app.py:lab1` | XSS | FN | Request query rendered through the `safe` filter in `templates/lab1.html`. |
-| `xss_lab/app.py:lab2` | XSS | FN | Removing literal script tags does not neutralize other HTML; `templates/lab2.html` uses the `safe` filter on `username`. |
-| `xss_lab/app.py:lab3` | XSS | FN | Removing alphanumeric characters still permits JavaScript expressions; `templates/lab3.html` inserts the result as script code. |
-| `template_injection_lab/app.py:view_blog` | Code/template injection | FN | `create_blog_post` interpolates request title/content into a template file; `view_blog` later renders it as Jinja source. |
+| `xss_lab/app.py:lab1` | XSS | TP | Request query rendered through the `safe` filter in `templates/lab1.html`. |
+| `xss_lab/app.py:lab2` | XSS | TP | Removing literal script tags does not neutralize other HTML; `templates/lab2.html` uses the `safe` filter on `username`. |
+| `xss_lab/app.py:lab3` | XSS | TP | Removing alphanumeric characters still permits JavaScript expressions; `templates/lab3.html` inserts the result as script code. |
+| `template_injection_lab/app.py:view_blog` | Code/template injection | TP | `create_blog_post` interpolates request title/content into a template file; `view_blog` later renders it as Jinja source. The hit is the render of the request-derived template name. |
 
-The remaining four misses need template-context modeling and tracking through
-stored template files. The source comment in `software_integrity_lab:lab2`
+The source comment in `software_integrity_lab:lab2`
 describes XSS, but that is not by itself a vulnerability label; that handler is
 not included in the scored XSS cases.
 
@@ -290,9 +296,8 @@ go test ./internal/sast -run '^TestPyGoat$' -count=1 -v -timeout 5m
 
 The test always prints each case's outcome, category counts and incomplete-analysis
 count. It guards every currently detected vulnerable case individually, rejects a
-false positive on either safe control and fails on incomplete analysis. Known
-misses stay in the denominator; detecting one is allowed and should prompt an
-update to the required detections and this result table.
+false positive on either safe control and fails on incomplete analysis. A new
+detection should prompt an update to the required detections and this result table.
 
 SHA-256 checks pin all nine labeled Python files and the three XSS templates;
 missing or changed inputs fail before scoring. Updating the PyGoat revision
