@@ -23,6 +23,21 @@ securock verify   # fail CI on the same drift
 > claim that a package is safe. Unchecked vulnerabilities are `unknown`,
 > not trusted.
 
+## Contents
+
+- [Why](#why)
+- [Features](#features)
+- [Status](#status)
+- [Install](#install)
+- [Quick start](#quick-start)
+- [Usage](#usage)
+- [GitHub Action](#github-action)
+- [Supported ecosystems](#supported-ecosystems)
+- [Documentation](#documentation)
+- [Contributing](#contributing)
+- [Security](#security)
+- [License](#license)
+
 ## Why
 
 A dependency bump can change more than a version string: the artifact
@@ -40,14 +55,14 @@ Those changes are easy to miss in a language lockfile diff.
 
 **Evidence**
 
-- npm evidence for provenance, signatures, capabilities, granular
-  behavior, ownership, and source→build→artifact trust chain
-- PyPI Integrity API attestations (PEP 740) with local Sigstore
-  re-verification to provenance/signature `verified`
-- OpenSSF Malicious Packages (`MAL-*`) recorded separately from CVEs
+- npm: provenance, signatures, capabilities, granular behavior,
+  ownership, and the source→build→artifact trust chain
+- PyPI: Integrity API attestations (PEP 740), re-verified locally with
+  Sigstore to provenance/signature `verified`
+- OpenSSF Malicious Packages (`MAL-*`), recorded separately from CVEs
 - Vulnerabilities carry CVSS-derived severity and the version that fixes them
 - Release health (deprecated, release day, license) for npm and PyPI,
-  typosquat-suspect names, and optional `health` and `licenses` policy gates
+  typosquat-suspect names, optional `health` and `licenses` policy gates
 - `explain` prints a trust checklist for one package
 
 **Triage and policy**
@@ -59,32 +74,39 @@ Those changes are easy to miss in a language lockfile diff.
   (development-only), or unknown from the dependency graph, so `audit`
   stops failing on test tooling
 
-**Source code analysis**
+**Source code analysis** (`sast`)
 
-- `sast` follows untrusted data (HTTP input, command-line arguments, standard input) through
-  assignments, fields, closures, and calls across functions and files to SQL,
-  command, code, path, NoSQL, request, response, and deserialization sinks
-  (including zip slip and prototype pollution), and prints
-  the path it took. Go, JavaScript/TypeScript, Python, Java, Kotlin, C#, PHP, and Ruby,
-  fully offline. It follows deep call chains and loop-carried data to convergence,
-  distinguishes receiver fields, and tracks setters, constructors and direct local
-  reference aliases. Validation clears only the vulnerability classes it prevents;
-  an exhausted analysis budget is reported as incomplete. Packages the repository
-  ships in `vendor/`, `node_modules/` or `site-packages/` are analyzed as well,
-  so a helper in an installed package is followed into the API it calls; the
-  package's own findings are not reported. It also checks Dockerfiles, Kubernetes and Compose manifests,
-  Terraform, and GitHub Actions workflows for unsafe settings, and scans every
-  text file for committed credentials. A file it cannot parse is reported
-  rather than skipped. Published development-benchmark measurements cover Java (99.7% detected,
-  1.0% false-positive rate on OWASP BenchmarkJava) and Python (98.9% and 1.0%); the other languages are
-  experimental. A separate PyGoat regression detects 14 of 14 selected vulnerable cases,
-  with no alerts on two category-specific safe controls; this is not an application-wide accuracy estimate.
-  Pinned source regressions also cover JavaScript (NodeGoat: 4/4 vulnerable cases detected,
-  0/1 safe controls flagged), TypeScript (Juice Shop: 4/4, 0/4), and PHP (DVWA: 8/8, 0/3).
-  These small selections are not language-wide accuracy estimates; see
+- Tracks untrusted data (HTTP input, command-line arguments, standard
+  input) through assignments, fields, closures, and calls across
+  functions and files to SQL, command, code, path, NoSQL, request,
+  response, and deserialization sinks (including zip slip and prototype
+  pollution), and prints the path it took
+- Follows deep call chains and loop-carried data to convergence,
+  distinguishes receiver fields, and tracks setters, constructors, and
+  direct local reference aliases; validation clears only the
+  vulnerability classes it prevents, and an exhausted analysis budget
+  is reported as incomplete
+- Languages: Go, JavaScript/TypeScript, Python, Java, Kotlin, C#, PHP,
+  and Ruby — fully offline
+- Also analyzes packages vendored in `vendor/`, `node_modules/`, or
+  `site-packages/`: a helper in an installed package is followed into
+  the API it calls, but the package's own findings are not reported
+- Also checks Dockerfiles, Kubernetes and Compose manifests, Terraform,
+  and GitHub Actions workflows for unsafe settings, and scans every
+  text file for committed credentials; a file it cannot parse is
+  reported rather than skipped
+- Benchmarks (not language-wide accuracy estimates; see
   [SAST benchmarks](docs/sast-benchmarks.md#javascript-typescript-and-php-source-regressions)
-  for the labels, limitations, and reproduction commands.
-  See [how accurate is sast](https://securock.dev/guide/usage#how-accurate-is-sast)
+  and [how accurate is sast](https://securock.dev/guide/usage#how-accurate-is-sast)
+  for labels, limitations, and reproduction commands):
+  - Java on OWASP BenchmarkJava: 99.7% detected, 1.0% false positives
+  - Python: 98.9% detected, 1.0% false positives
+  - JavaScript on NodeGoat: 4/4 vulnerable cases, 0/1 safe controls flagged
+  - TypeScript on Juice Shop: 4/4, 0/4
+  - PHP on DVWA: 8/8, 0/3
+  - PyGoat regression: 14/14 selected vulnerable cases, no alerts on
+    two category-specific safe controls
+  - Other languages are experimental
 
 **Exports**
 
@@ -176,6 +198,8 @@ Cargo under [`examples/`](examples/).
 
 ## Usage
 
+### Commands
+
 | Command            | What it does                                                |
 | ------------------ | ----------------------------------------------------------- |
 | `securock scan`    | Inspect the tree (default if you pass no command)           |
@@ -192,25 +216,34 @@ Cargo under [`examples/`](examples/).
 | `securock vex`     | Export accepted vulnerabilities as OpenVEX or CycloneDX VEX |
 | `securock version` | Print the build version                                     |
 
-| Flag / exit             | Meaning                                                                                        |
-| ----------------------- | ---------------------------------------------------------------------------------------------- |
-| `--network public-only` | Default. Public registries only (`offline`, `allow-all` also valid)                            |
-| `--offline`             | Skip remote lookups; remote evidence stays `unknown`                                           |
-| `--policy`              | Path to a policy file                                                                          |
-| `--profile`             | Built-in policy profile: `default` or `strict` (not with `--policy`)                           |
-| `--lock`                | Path to `securock.lock` (for `lock` / `diff` / `update` / `verify`)                            |
-| `--format json`         | Stable JSON on `scan`, `diff`, `verify`, and `explain`                                         |
-| `--format sarif`        | SARIF 2.1.0 on every report command, for GitHub code scanning                                  |
-| `--output`              | Write the report to a file instead of stdout (also on exit `1`)                                |
-| `--min-release-age`     | `audit`. Report npm and PyPI releases newer than this, such as `7d`                            |
-| `--fail-on`             | `audit`, `sast` and `doctor`. Exit `1` at or above this severity (default `high`)                      |
-| `--assume-params`       | `sast`. Treat string parameters of Go functions nothing calls directly as untrusted (registry handlers)  |
-| `--exceptions`          | Accepted-findings file (default `.securock/exceptions.yaml`)                                   |
-| `--reachability`        | Record package scope and dependencies; mark vulnerabilities reachable, unreachable, or unknown |
-| `--no-fail`             | Always exit `0`                                                                                |
-| Exit `0`                | Success / no trust drift                                                                       |
-| `1`                     | Trust violation                                                                                |
-| `2`                     | Configuration or operational error                                                             |
+### Flags
+
+| Flag / exit             | Meaning                                                                                                 |
+| ----------------------- | ------------------------------------------------------------------------------------------------------- |
+| `--network public-only` | Default. Public registries only (`offline`, `allow-all` also valid)                                     |
+| `--offline`             | Skip remote lookups; remote evidence stays `unknown`                                                    |
+| `--policy`              | Path to a policy file                                                                                   |
+| `--profile`             | Built-in policy profile: `default` or `strict` (not with `--policy`)                                    |
+| `--lock`                | Path to `securock.lock` (for `lock` / `diff` / `update` / `verify`)                                     |
+| `--format json`         | Stable JSON on `scan`, `diff`, `verify`, and `explain`                                                  |
+| `--format sarif`        | SARIF 2.1.0 on every report command, for GitHub code scanning                                           |
+| `--output`              | Write the report to a file instead of stdout (also on exit `1`)                                         |
+| `--min-release-age`     | `audit`. Report npm and PyPI releases newer than this, such as `7d`                                     |
+| `--fail-on`             | `audit`, `sast` and `doctor`. Exit `1` at or above this severity (default `high`)                       |
+| `--assume-params`       | `sast`. Treat string parameters of Go functions nothing calls directly as untrusted (registry handlers) |
+| `--exceptions`          | Accepted-findings file (default `.securock/exceptions.yaml`)                                            |
+| `--reachability`        | Record package scope and dependencies; mark vulnerabilities reachable, unreachable, or unknown          |
+| `--no-fail`             | Always exit `0`                                                                                         |
+
+### Exit codes
+
+| Exit | Meaning                            |
+| ---- | ---------------------------------- |
+| `0`  | Success / no trust drift           |
+| `1`  | Trust violation                    |
+| `2`  | Configuration or operational error |
+
+### Example lockfile
 
 ```yaml
 # securock.lock (abridged)
@@ -310,12 +343,14 @@ it cannot comment on a fork PR.
 | hex       | mix      | `mix.lock`           |
 | maven     | gradle   | `gradle.lockfile`    |
 
-Deno `deno.lock` v5 is the stable target. v3/v4 are supported for
-compatibility. Deno npm packages use OSV and npm evidence. JSR and
-HTTPS URL artifacts are stable to parse; OSV does not cover them yet,
-so vulnerability state stays `unknown`. Gradle records Maven
-coordinates from `gradle.lockfile` but does not prove a registry, so
-OSV is not queried in `public-only`.
+Notes:
+
+- **Deno** — `deno.lock` v5 is the stable target; v3/v4 are supported
+  for compatibility. npm packages use OSV and npm evidence. JSR and
+  HTTPS URL artifacts are stable to parse; OSV does not cover them yet,
+  so vulnerability state stays `unknown`.
+- **Gradle** — records Maven coordinates from `gradle.lockfile` but
+  does not prove a registry, so OSV is not queried in `public-only`.
 
 ## Documentation
 
