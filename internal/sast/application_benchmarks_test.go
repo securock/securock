@@ -188,7 +188,7 @@ func TestNodeGoat(t *testing.T) {
 		},
 		cases: []applicationCase{
 			{"app/routes/contributions.js", "sast:js/code-injection", 32, 34, true, true, false},
-			{"app/data/allocations-dao.js", "sast:js/nosql-injection", 86, 86, true, false, false},
+			{"app/data/allocations-dao.js", "sast:js/nosql-injection", 86, 86, true, true, false},
 			{"app/routes/research.js", "sast:js/ssrf", 16, 16, true, true, false},
 			{"app/routes/index.js", "sast:js/open-redirect", 72, 72, true, true, false},
 			{"app/routes/session.js", "sast:js/open-redirect", 36, 42, false, false, false},
@@ -215,10 +215,10 @@ func TestJuiceShop(t *testing.T) {
 		{inputs[2].file, "sast:js/sql-injection", 5, 8, false, false, false},
 		// No string starts with both apple and orange: the rejecting OR always
 		// returns before the query. This is safe for SQL, not a working fix.
-		{inputs[3].file, "sast:js/sql-injection", 10, 10, false, false, true},
+		{inputs[3].file, "sast:js/sql-injection", 10, 10, false, false, false},
 		{inputs[4].file, "sast:js/nosql-injection", 10, 13, true, true, false},
 		{inputs[5].file, "sast:js/nosql-injection", 4, 7, true, true, false},
-		{inputs[6].file, "sast:js/nosql-injection", 10, 13, false, false, true},
+		{inputs[6].file, "sast:js/nosql-injection", 10, 13, false, false, false},
 	}
 	projects, err := singleFileApplications(inputs, cases)
 	if err != nil {
@@ -239,6 +239,7 @@ func TestDVWA(t *testing.T) {
 		{"vulnerabilities/open_redirect/source/medium.php", "634fdfb18bea35460f920bc4e22a5501975f61eb361886f093edf715895cbd17"},
 		{"vulnerabilities/open_redirect/source/high.php", "2d6d53feca779f9c93303a2e0a975882a033ab42ba545acd457555580fe05072"},
 		{"vulnerabilities/open_redirect/source/impossible.php", "82c04f35908168ad2d4f948006c89a5fd6586cf335b771963ed839a7d06dd22a"},
+		{"vulnerabilities/sqli/source/medium.php", "dd81afdddf5817294f2eea11ffaf21b2aad90cb768cc3d57ef9b6d0f96020db4"},
 	}
 	cases := []applicationCase{
 		{inputs[0].file, "sast:php/sql-injection", 8, 52, true, true, false},
@@ -251,6 +252,8 @@ func TestDVWA(t *testing.T) {
 		{inputs[7].file, "sast:php/open-redirect", 11, 11, true, true, false},
 		{inputs[8].file, "sast:php/open-redirect", 5, 5, true, true, false},
 		{inputs[9].file, "sast:php/open-redirect", 18, 18, false, false, false},
+		// Escaping quotes does not protect an unquoted SQL expression.
+		{inputs[10].file, "sast:php/sql-injection", 10, 49, true, true, false},
 	}
 	projects, err := singleFileApplications(inputs, cases)
 	if err != nil {

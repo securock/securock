@@ -752,7 +752,12 @@ func (j *jsLower) expr(n *node) *expr {
 			e.x = arg
 			return e
 		}
-		if op == "typeof" || op == "void" {
+		if op == "typeof" {
+			e := j.mk(exprTypeof, n)
+			e.x = arg
+			return e
+		}
+		if op == "void" {
 			return j.mk(exprNum, n)
 		}
 		return j.other(n, arg)

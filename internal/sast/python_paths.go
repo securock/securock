@@ -131,6 +131,9 @@ func (r *irRun) conditionBool(e *expr, st istate) (bool, bool) {
 	if value, known := r.constBool(e); known {
 		return value, true
 	}
+	if value, known := r.javascriptCondition(e); known {
+		return value, true
+	}
 	if r.spec.name == "py" && e != nil {
 		if e.kind == exprNot {
 			value, known := r.conditionBool(e.x, st)

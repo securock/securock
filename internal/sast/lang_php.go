@@ -67,8 +67,7 @@ var phpSpec = &langSpec{
 		"htmlspecialchars": kXSS, "htmlentities": kXSS, "strip_tags": kXSS, "e": kXSS,
 		"escapeshellarg": kCmd, "escapeshellcmd": kCmd, "basename": kPath,
 		"urlencode": kXSS | kPath | kRedirect | kSSRF, "rawurlencode": kXSS | kPath | kRedirect | kSSRF,
-		"mysqli_real_escape_string": kSQL, "mysql_real_escape_string": kSQL, "pg_escape_string": kSQL, "?.quote": kSQL,
-		"?.real_escape_string": kSQL, "md5": kAll, "sha1": kAll, "hash": kAll, "crc32": kAll,
+		"?.quote": kSQL, "md5": kAll, "sha1": kAll, "hash": kAll, "crc32": kAll,
 	},
 	sourceRoots: phpSuperglobal,
 	self:        map[string]bool{"this": true},
@@ -84,7 +83,8 @@ var phpSpec = &langSpec{
 		}
 		for k := range map[string]bool{"intval": true, "floatval": true, "htmlspecialchars": true, "htmlentities": true, "strip_tags": true,
 			"escapeshellarg": true, "escapeshellcmd": true, "basename": true, "urlencode": true, "rawurlencode": true,
-			"mysqli_real_escape_string": true, "md5": true, "sha1": true, "hash": true, "count": true, "strlen": true, "abs": true, "boolval": true} {
+			"mysqli_real_escape_string": true, "mysql_real_escape_string": true, "pg_escape_string": true,
+			"md5": true, "sha1": true, "hash": true, "count": true, "strlen": true, "abs": true, "boolval": true} {
 			m[k] = true
 		}
 		return m
@@ -406,6 +406,7 @@ func (p *phpLower) expr(n *node) *expr {
 		switch op {
 		case ".":
 			e := p.mk(exprConcat, n)
+			e.str = "."
 			e.args = []*expr{l, r}
 			return e
 		case "&&", "and":
@@ -549,26 +550,30 @@ func (p *phpLower) strValue(n *node) string {
 func (p *phpLower) str(n *node) *expr {
 	e := p.mk(exprStr, n)
 	e.str = p.strValue(n)
+	e.unknownText = strings.Contains(p.text(n), "\\") || p.kind(n) == "heredoc" || p.kind(n) == "nowdoc"
 	return e
 }
 
 // encapsed is a double-quoted string: plain text with embedded variables.
 func (p *phpLower) encapsed(n *node) *expr {
-	var subs []*expr
+	var parts []*expr
+	hasSub := false
 	for _, c := range p.named(n) {
 		switch p.kind(c) {
 		case "string_content", "escape_sequence", "string_value":
+			parts = append(parts, &expr{kind: exprStr, pos: p.pos(c), str: p.text(c), unknownText: strings.Contains(p.text(c), "\\")})
 		default:
 			if x := p.expr(c); x != nil {
-				subs = append(subs, x)
+				hasSub = true
+				parts = append(parts, x)
 			}
 		}
 	}
-	if len(subs) == 0 {
+	if !hasSub {
 		return p.str(n)
 	}
 	e := p.mk(exprConcat, n)
-	e.args = subs
+	e.str, e.args = "interpolate", parts
 	return e
 }
 

@@ -39,10 +39,10 @@ func init() {
 	for _, m := range []string{"extend"} {
 		js.sinks["?."+m] = sink{kind: kProto, args: []int{1}, rest: true, recv: []string{"$", "jQuery"}}
 	}
-	js.sanitizers["String"] = kNoSQL | kNoSQLStr | kProto
+	js.sanitizers["String"] = kNoSQL | kProto
 	js.sanitizers["mongo-sanitize"] = kNoSQL | kNoSQLStr
 	js.sanitizers["express-mongo-sanitize"] = kNoSQL | kNoSQLStr
-	js.sanitizers["?.toString"] = kNoSQL | kNoSQLStr | kProto
+	js.sanitizers["?.toString"] = kNoSQL | kProto
 	js.builtins["String"] = true
 	js.sourceRoots["entry"] = map[string]string{"fileName": arch, "path": arch, "entryName": arch, "name": arch}
 	js.sourceRoots["zipEntry"] = map[string]string{"entryName": arch, "name": arch, "fileName": arch}

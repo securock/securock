@@ -574,8 +574,10 @@ func (r *irRun) eval(e *expr, st istate) (result taintSet) {
 		}
 		return out.scalar()
 	case exprLambda:
-		r.walkFn(e.fn, st, nil)
+		return r.walkFn(e.fn, st, nil)
 	case exprNot:
+		r.eval(e.x, st)
+	case exprTypeof:
 		r.eval(e.x, st)
 	case exprBin:
 		// Arithmetic and comparisons yield numbers and booleans, which cannot carry a
@@ -711,6 +713,10 @@ func (r *irRun) evalCall(e *expr, st istate) taintSet {
 	}
 	fn := e.x
 	qname, recvExpr, field := r.resolve(fn, st)
+	var capturedReturn taintSet
+	if r.spec.name == "js" && fn.kind == exprName {
+		capturedReturn = st.read(fn.name, "")
+	}
 	if _, known := r.pythonRouteSplit(e, st); known {
 		return nil
 	}
@@ -779,6 +785,7 @@ func (r *irRun) evalCall(e *expr, st istate) taintSet {
 	if s, name, ok := r.lookupSink(qname, recvExpr, field); ok {
 		r.checkSink(e, name, s, checkArgs, recvT, st)
 	}
+	r.checkJavaScriptWhere(e, checkArgs, st)
 	r.checkMisuse(e, qname, field)
 	r.checkExtras(e, qname, field, fn, st)
 	if r.spec.name == "java" && len(e.args) == 1 {
@@ -837,6 +844,11 @@ func (r *irRun) evalCall(e *expr, st istate) taintSet {
 	if k, ok := r.spec.sanitizers["?."+field]; ok && field != "" && recvExpr != nil {
 		return all.clear(k)
 	}
+	if r.spec.name == "js" && qname == "mongoWhere" && len(args) == 1 {
+		// Retain the constructed query as a value too, so its use at the real
+		// database call can be reported through a captured query-builder return.
+		return args[0]
+	}
 	if s, _, ok := r.lookupSink(qname, recvExpr, field); ok && s.kind != kXSS {
 		// What a query or file read returns is not the payload that was passed in.
 		return nil
@@ -870,9 +882,9 @@ func (r *irRun) evalCall(e *expr, st istate) taintSet {
 				out = merge(out, r.applyIR(e, key, sum, args, recvT, st, recvExpr))
 			}
 		}
-		return forgetXPathContext(out)
+		return merge(forgetXPathContext(out), capturedReturn)
 	}
-	return all.scalar()
+	return merge(all.scalar(), capturedReturn)
 }
 
 // lookupSink finds the sink for a call: by qualified name, else by method name on any
@@ -1243,6 +1255,9 @@ func (r *irRun) checkSink(c *expr, name string, s sink, args []taintSet, recv ta
 				}
 			}
 		}
+		if r.spec.name == "php" && s.kind&kSQL != 0 && r.phpSQLQuerySafe(c.args[i], st) {
+			proven |= kSQL
+		}
 		for _, at := range args[i] {
 			hit := at.kinds & s.kind &^ proven
 			if at.xpathSafe {
@@ -1328,6 +1343,9 @@ func (r *irRun) validWhenTrue(c *expr, st istate) []validatedIR {
 	if facts := r.pythonGuards(c, true, st); len(facts) > 0 {
 		return facts
 	}
+	if facts := r.javascriptTypeGuard(c, true); len(facts) > 0 {
+		return facts
+	}
 	switch c.kind {
 	case exprNot:
 		return r.validWhenFalse(c.x, st)
@@ -1356,6 +1374,9 @@ func (r *irRun) validWhenFalse(c *expr, st istate) []validatedIR {
 		return nil
 	}
 	if facts := r.pythonGuards(c, false, st); len(facts) > 0 {
+		return facts
+	}
+	if facts := r.javascriptTypeGuard(c, false); len(facts) > 0 {
 		return facts
 	}
 	switch c.kind {
@@ -1418,7 +1439,7 @@ func (r *irRun) stmt(s *stmt, st istate) {
 				t = t.scalar()
 			}
 		}
-		quotes := r.quoteFacts(s.rhs, st)
+		quotes := r.quoteFacts(s.rhs, st) | r.phpSQLFacts(s.rhs, st)
 		pathValue := r.pythonPathValue(s.rhs, st)
 		r.lhsName = ""
 		for _, l := range s.lhs {
@@ -1731,17 +1752,30 @@ func (r *irRun) resolveType(t string) string {
 }
 
 // walkFn analyzes a function expression in place, sharing the enclosing state.
-func (r *irRun) walkFn(f *funcIR, st istate, args []taintSet) {
+func (r *irRun) walkFn(f *funcIR, st istate, args []taintSet) taintSet {
 	inner := st.clone()
 	for i, p := range f.params {
 		if i < len(args) && len(args[i]) > 0 {
 			inner.write(p.name, "", args[i], false)
 		}
 	}
-	r.ctx.litDeep++
+	if r.spec.name != "js" {
+		r.ctx.litDeep++
+		r.block(f.body, inner)
+		r.ctx.litDeep--
+		st.union(inner)
+		return nil
+	}
+	// A JavaScript lambda assigned to a variable can be called later through
+	// that name. Keep its returns separate from the enclosing function so they
+	// can be followed as the call's result.
+	outerReturn, depth := r.ctx.ret, r.ctx.litDeep
+	r.ctx.ret, r.ctx.litDeep = nil, 0
 	r.block(f.body, inner)
-	r.ctx.litDeep--
+	returned := r.ctx.ret
+	r.ctx.ret, r.ctx.litDeep = outerReturn, depth
 	st.union(inner)
+	return returned
 }
 
 func isNumericType(t string) bool {

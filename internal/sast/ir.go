@@ -30,6 +30,7 @@ const (
 	exprObject                   // object/dictionary literal: preserve children's fields
 	exprField                    // a named entry of an object; name is the property
 	exprSequence                 // list literal; exact positions only for unescaped local assignments
+	exprTypeof                   // JavaScript typeof; operand is evaluated but the result is inert
 )
 
 type expr struct {
