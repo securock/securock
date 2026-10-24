@@ -10,6 +10,7 @@ with another scanner or predict accuracy on an arbitrary application.
 | Input | Revision |
 | --- | --- |
 | Securock before this improvement | `60cd4f3a9713e8c4c9bc2ca78b86d2f68dc072bd` |
+| Securock before Python guard precision | `cd05878e471491519eaf2256f9bb6046cbfac00d` |
 | OWASP BenchmarkJava 1.2 | `acc50f20ec449e2b977a7c409fa8175491657cba` |
 | OWASP BenchmarkPython 0.1 | `f1291485808b66e20ddb6b01b10dc71b3df8c8ba` |
 
@@ -43,16 +44,28 @@ of vulnerable to safe cases also differs from a typical production repository.
 | Python, before, corrected scope | 389 | 63 | 202 | 576 | 86.06% | 25.96% | +0.6010 |
 | Python, first improvement, corrected scope | 395 | 57 | 131 | 647 | 87.39% | 16.84% | +0.7055 |
 | Python, after collection/XPath work | 405 | 47 | 87 | 691 | 89.60% | 11.18% | +0.7842 |
-| Python, current, corrected scope | 447 | 5 | 66 | 712 | 98.89% | 8.48% | +0.9041 |
+| Python, after dataflow/library work | 447 | 5 | 66 | 712 | 98.89% | 8.48% | +0.9041 |
+| Python, after guard precision | 447 | 5 | 46 | 732 | 98.89% | 5.91% | +0.9298 |
+| Python, current, corrected scope | 447 | 5 | 8 | 770 | 98.89% | 1.03% | +0.9787 |
 
 On identical analysis scopes, the first improvement gained 73 true positives and
 removed 67 false positives in Java; Python gained 6 true positives and removed 71
 false positives. The collection/XPath work removed another 113 Java false positives
 without losing detections, and gained 10 Python true positives while removing 44
-false positives. The current round adds 47 Java detections with no new false
+false positives. The dataflow/library round adds 47 Java detections with no new false
 positives, and 42 Python detections while removing 21 false positives. The
 additional change from Python's old scope is a measurement correction, not an
 engine improvement.
+
+The Python guard-precision round removes another 20 false positives (12 code
+injection and 8 redirect), reducing the false-positive count by 30.3% without
+losing a detection in any category. Java's counts remain unchanged. Both suites
+still produce zero `analysis-incomplete` findings.
+
+Route/path precision removes another 38 Python false positives while preserving
+all 447 true positives, bringing aggregate FPR below the 2% regression ceiling.
+This ceiling applies to each suite's aggregate FPR, not to every category:
+Python's remaining seven XXE false positives are among only 20 safe XXE cases.
 
 The improvements preserve Python comparison operators and chained comparisons,
 evaluate known arithmetic and conditional expressions, isolate constant facts
@@ -78,7 +91,7 @@ validation facts; unknown transformations and calls across function boundaries
 discard the local query-context safety fact. Unsupported formatting, XPath comments
 and URI-qualified names are handled conservatively.
 
-The current round adds:
+The dataflow/library round adds:
 - Python `ConfigParser` round trips with section/key precision, so `get()` of a
   known-safe key stays safe while the value stored under an untrusted key remains
   tainted. Unknown keys and `read_dict` stay conservative.
@@ -98,19 +111,52 @@ These models remain conservative: unknown keys, aliases, escaping calls and
 unsupported formatting keep the original taint. They do not infer from function
 names or silence a class the check does not neutralize.
 
+The Python guard-precision round recognizes two complete validations:
+- A value that starts and ends with the same single or double quote, with no
+  matching quote in its `[1:-1]` interior, is a plain Python string literal or
+  invalid syntax. This protects direct `eval` and `exec` calls only; template,
+  SQL and shell sinks still treat it as untrusted.
+- A `urllib.parse.urlparse` or `urlsplit` result with an exact literal `netloc`
+  allowlist and an HTTP/HTTPS scheme check validates the original URL for a direct
+  redirect. Parsing alone, host-prefix checks and request-controlled allowlists
+  do not validate it. The relationship is invalidated on reassignment, and an
+  unknown transformation of a validated URL remains untrusted.
+
+Validation in a Python `try` body survives when every exception handler returns
+or raises and there is no `else` or `finally` clause. A handler that can continue
+keeps the unvalidated alternative.
+
+The route/path round adds two narrow proofs:
+- Splitting Flask `request.path` on `/` yields fixed components when the handler
+  has a known static route on a known Flask application. Router ownership is
+  followed through project registration functions and `importlib` module calls.
+  Unknown or conflicting callers, blueprints, dynamic or conflicting routes,
+  escaping handler references and direct calls without the same route constraint
+  discard the proof. Writes to or escape of the request object, including writes
+  through project helpers, also discard it. Query input and unsupported path
+  transformations stay tainted;
+  mutation and escape of a split list retain the normal conservative list model.
+- A resolved absolute pathlib path cannot start with a known relative basename
+  such as `assets`. A rejecting check using that comparison always exits, so the
+  file operation after it is unreachable. This is not a containment sanitizer:
+  absolute directory prefixes without a separator boundary still report traversal.
+  One-letter and drive-relative prefixes remain unknown because Windows absolute
+  paths can begin with a drive letter. Reassignment, branch disagreement and writes
+  to imported constants invalidate these facts.
+
+Project-specific HTML encoders and parser-input-sensitive XXE configuration
+checks remain gaps.
+
 ## Remaining weak categories
 
 | Suite / category | TP | FN | FP | TN |
 | --- | ---: | ---: | ---: | ---: |
 | Java trust boundary | 79 | 4 | 0 | 43 |
 | Java weak random | 218 | 0 | 0 | 275 |
-| Python command injection | 13 | 0 | 1 | 6 |
-| Python code injection | 20 | 0 | 12 | 21 |
-| Python path traversal | 60 | 5 | 18 | 85 |
-| Python redirect | 13 | 0 | 8 | 13 |
+| Python path traversal | 60 | 5 | 0 | 103 |
 | Python SQL injection | 5 | 0 | 0 | 11 |
-| Python XPath injection | 51 | 0 | 5 | 130 |
-| Python XSS | 31 | 0 | 11 | 47 |
+| Python XSS | 31 | 0 | 1 | 57 |
+| Python XXE | 8 | 0 | 7 | 13 |
 
 The Python SQL category has only five vulnerable cases. High aggregate results
 must not conceal weak individual categories or missing real-world framework
@@ -139,6 +185,12 @@ It guards minimum true positives and maximum false positives **separately for ea
 category**. Missing source cases, invalid or duplicate labels, unmapped categories,
 unexpected suite sizes and incomplete analysis fail the test too. Improvements in
 one category cannot compensate for a regression in another.
+
+Both suites also enforce an aggregate FPR of **2% or less**, using exact integer
+counts rather than rounded percentages. Python has 778 safe cases, so 15 false
+positives pass that ceiling and 16 fail. Unit tests cover that boundary and reject
+an evaluation with no safe cases. The current per-category FP limits are tighter
+still: their Python maxima total eight, and the TP minimums remain unchanged.
 
 `.github/workflows/sast-benchmark.yml` uses the pinned revisions on relevant pull
 requests, main-branch pushes, a weekly schedule and manual dispatch. Normal

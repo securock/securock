@@ -33,7 +33,7 @@ func TestOWASPBenchmarkJava(t *testing.T) {
 		"sqli": "sql-injection", "cmdi": "command-injection", "pathtraver": "path-traversal", "xss": "xss",
 		"ldapi": "ldap-injection", "xpathi": "xpath-injection", "hash": "weak-crypto", "crypto": "weak-crypto",
 		"weakrand": "insecure-random", "securecookie": "insecure-cookie", "trustbound": "trust-boundary",
-	}, 2740, map[string]benchmarkLimit{
+	}, 2740, 2, map[string]benchmarkLimit{
 		"cmdi": {126, 0}, "crypto": {130, 0}, "hash": {129, 0}, "ldapi": {27, 0},
 		"pathtraver": {133, 0}, "securecookie": {36, 0}, "sqli": {272, 0},
 		"trustbound": {79, 0}, "weakrand": {218, 0}, "xpathi": {15, 0}, "xss": {246, 13},
@@ -52,11 +52,11 @@ func TestOWASPBenchmarkPython(t *testing.T) {
 		"ldapi": "ldap-injection", "xpathi": "xpath-injection", "hash": "weak-crypto", "crypto": "weak-crypto",
 		"weakrand": "insecure-random", "securecookie": "insecure-cookie", "trustbound": "trust-boundary",
 		"codeinj": "code-injection", "deserialization": "insecure-deserialization", "redirect": "open-redirect", "xxe": "xxe",
-	}, 1230, map[string]benchmarkLimit{
-		"cmdi": {13, 1}, "codeinj": {20, 12}, "deserialization": {18, 1}, "hash": {71, 0},
-		"ldapi": {16, 0}, "pathtraver": {60, 18}, "redirect": {13, 8}, "securecookie": {24, 0},
-		"sqli": {5, 0}, "trustbound": {18, 3}, "weakrand": {99, 0}, "xpathi": {51, 5},
-		"xss": {31, 11}, "xxe": {8, 7},
+	}, 1230, 2, map[string]benchmarkLimit{
+		"cmdi": {13, 0}, "codeinj": {20, 0}, "deserialization": {18, 0}, "hash": {71, 0},
+		"ldapi": {16, 0}, "pathtraver": {60, 0}, "redirect": {13, 0}, "securecookie": {24, 0},
+		"sqli": {5, 0}, "trustbound": {18, 0}, "weakrand": {99, 0}, "xpathi": {51, 0},
+		"xss": {31, 1}, "xxe": {8, 7},
 	})
 }
 
@@ -67,7 +67,7 @@ type benchmarkLimit struct{ minTP, maxFP int }
 // scoreBenchmark runs the analysis over root and scores it against the labels in csvPath.
 // rules maps a Benchmark category to the rule that answers it; the benchmark's own score is
 // the true-positive rate minus the false-positive rate, and a tool that guesses scores 0.
-func scoreBenchmark(t *testing.T, csvPath, root, prefix string, rules map[string]string, total int, limits map[string]benchmarkLimit) {
+func scoreBenchmark(t *testing.T, csvPath, root, prefix string, rules map[string]string, total, maxFPRPercent int, limits map[string]benchmarkLimit) {
 	t.Helper()
 	f, err := os.Open(csvPath)
 	if err != nil {
@@ -199,6 +199,9 @@ func scoreBenchmark(t *testing.T, csvPath, root, prefix string, rules map[string
 		}
 	}
 	tpr, fpr := rate(all.tp, all.fn), rate(all.fp, all.tn)
+	if benchmarkFPRExceeded(all.fp, all.tn, maxFPRPercent) {
+		t.Errorf("aggregate FPR %.4f%% exceeds %d%% (%d false positives among %d safe cases)", 100*fpr, maxFPRPercent, all.fp, all.fp+all.tn)
+	}
 	fmt.Fprintf(&out, "%-16s %5.1f%% %5.1f%%  %5d %5d %5d %5d   score %+.4f\n", "ALL", 100*tpr, 100*fpr, all.tp, all.fn, all.fp, all.tn, tpr-fpr)
 	fmt.Fprintf(&out, "analysis-incomplete findings: %d (cases remain in the score denominator)\n", len(incomplete))
 	t.Log(out.String())
@@ -207,5 +210,30 @@ func scoreBenchmark(t *testing.T, csvPath, root, prefix string, rules map[string
 		t.Log("misclassified cases:\n" + strings.Join(mismatches, "\n"))
 		sort.Strings(incomplete)
 		t.Log("incomplete analysis:\n" + strings.Join(incomplete, "\n"))
+	}
+}
+
+func benchmarkFPRExceeded(fp, tn, maxPercent int) bool {
+	return fp < 0 || tn < 0 || fp+tn == 0 || maxPercent < 0 || maxPercent > 100 || 100*fp > maxPercent*(fp+tn)
+}
+
+func TestBenchmarkFPRThreshold(t *testing.T) {
+	for _, tt := range []struct {
+		name   string
+		fp, tn int
+		fail   bool
+	}{
+		{"no false positives", 0, 778, false},
+		{"python maximum passing count", 15, 763, false},
+		{"python first failing count", 16, 762, true},
+		{"exactly two percent", 2, 98, false},
+		{"rounding cannot hide failure", 20, 979, true},
+		{"no safe cases is not evidence", 0, 0, true},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := benchmarkFPRExceeded(tt.fp, tt.tn, 2); got != tt.fail {
+				t.Fatalf("FPR threshold rejected=%t, want %t", got, tt.fail)
+			}
+		})
 	}
 }

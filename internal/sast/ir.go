@@ -75,6 +75,9 @@ type stmt struct {
 	// Unknown patterns retain an opaque expression, preventing constant selection.
 	labels           [][]*expr
 	fallthroughCases bool
+	// tryReturns means every exception handler terminates, with no else/finally.
+	// Only the successful try body can reach the statements after this branch.
+	tryReturns bool
 	// loop marks a break or continue: control leaves for the end of the loop, so the
 	// state at this point still reaches the code after it.
 	loop bool
@@ -101,6 +104,8 @@ type funcIR struct {
 	// htmlRoute marks a web handler whose returned string is sent as an HTML page
 	// (a Flask @app.route function), so what it returns is written to the browser.
 	htmlRoute bool
+	pyOuter   *funcIR
+	pyRoutes  []pythonRoute
 }
 
 // module is one lowered source file.

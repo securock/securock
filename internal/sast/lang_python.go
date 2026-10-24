@@ -101,7 +101,7 @@ var pySpec = &langSpec{
 	shells:   map[string]bool{},
 	builtins: map[string]bool{
 		"open": true, "eval": true, "exec": true, "compile": true, "int": true, "float": true, "bool": true,
-		"len": true, "ord": true, "hash": true, "input": true, "__import__": true,
+		"len": true, "ord": true, "hash": true, "input": true, "__import__": true, "str": true,
 	},
 }
 
@@ -130,7 +130,8 @@ func init() {
 
 type pyLower struct {
 	*lowering
-	class string
+	class   string
+	current *funcIR
 }
 
 func lowerPython(l *lowering) *module {
@@ -197,14 +198,20 @@ func (p *pyLower) stmt(n *node) []*stmt {
 		return []*stmt{{kind: stmtLoop, pos: p.pos(n), then: p.block(p.field(n, "body")), cond: p.expr(p.field(n, "condition"))}}
 	case "try_statement":
 		s := &stmt{kind: stmtBranch, pos: p.pos(n)}
+		s.tryReturns = true
 		for _, c := range p.named(n) {
 			switch p.kind(c) {
 			case "block":
 				s.arms = append(s.arms, p.block(c))
 			case "except_clause", "except_group_clause", "else_clause", "finally_clause":
+				if p.kind(c) != "except_clause" && p.kind(c) != "except_group_clause" {
+					s.tryReturns = false
+				}
 				for _, cc := range p.named(c) {
 					if p.kind(cc) == "block" {
-						s.arms = append(s.arms, p.block(cc))
+						body := p.block(cc)
+						s.arms = append(s.arms, body)
+						s.tryReturns = s.tryReturns && pyHandlerTerminates(body)
 					}
 				}
 			}
@@ -243,6 +250,9 @@ func (p *pyLower) stmt(n *node) []*stmt {
 		case "function_definition":
 			before := len(p.mod.funcs)
 			p.function(def, p.decorators(n), p.htmlRoute(n))
+			if len(p.mod.funcs) > before {
+				p.mod.funcs[len(p.mod.funcs)-1].pyRoutes = p.routePatterns(n)
+			}
 			if p.csrfExempt(n) && len(p.mod.funcs) > before {
 				f := p.mod.funcs[len(p.mod.funcs)-1]
 				f.body = append([]*stmt{synthCall(p.lowering, def, "csrfUnprotected")}, f.body...)
@@ -282,6 +292,22 @@ func (p *pyLower) stmt(n *node) []*stmt {
 		}
 	}
 	return nil
+}
+
+func pyHandlerTerminates(body []*stmt) bool {
+	for _, s := range body {
+		switch s.kind {
+		case stmtReturn:
+			return true
+		case stmtJump:
+			return !s.loop
+		case stmtIf:
+			if pyHandlerTerminates(s.then) && pyHandlerTerminates(s.els) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func (p *pyLower) matchLabels(n *node) []*expr {
@@ -451,7 +477,10 @@ func (p *pyLower) htmlRoute(def *node) bool {
 }
 
 func (p *pyLower) function(n *node, isRoute bool, html ...bool) {
-	f := &funcIR{name: p.text(p.field(n, "name")), class: p.class, pos: p.pos(n), htmlRoute: len(html) > 0 && html[0]}
+	f := &funcIR{name: p.text(p.field(n, "name")), class: p.class, pos: p.pos(n), htmlRoute: len(html) > 0 && html[0], pyOuter: p.current}
+	previous := p.current
+	p.current = f
+	defer func() { p.current = previous }()
 	if f.name == "__init__" {
 		f.name = "<init>"
 	}
@@ -563,6 +592,15 @@ func (p *pyLower) expr(n *node) *expr {
 			m := p.mk(exprMember, n)
 			m.x, m.name = e.x, p.stringConst(idx)
 			return m
+		}
+		return e
+	case "slice":
+		e := p.mk(exprOther, n)
+		if strings.Join(strings.Fields(p.text(n)), "") == "1:-1" {
+			e.str = "interior-slice"
+		}
+		for _, c := range p.named(n) {
+			e.args = append(e.args, p.expr(c))
 		}
 		return e
 	case "call":

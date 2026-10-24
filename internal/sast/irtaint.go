@@ -87,6 +87,14 @@ func (s istate) clone() istate {
 
 func (s istate) union(o istate) {
 	for k, v := range s {
+		if len(o) > 0 && isMarker(k.field) {
+			// Sink-specific Python proofs must hold on every incoming path,
+			// including a try arm that overwrote a previously validated value.
+			s[k] = v.clear((pythonLiteral | parsedRedirect) &^ markerKinds(o[k]))
+		}
+		if pythonExactMetadata(k.field) && taintSignature(v) != taintSignature(o[k]) {
+			delete(s, k)
+		}
 		if k.field == sequenceField && taintSignature(v) != taintSignature(o[k]) {
 			s[k] = taintSet{{key: "unknown"}}
 		}
@@ -98,7 +106,7 @@ func (s istate) union(o istate) {
 			}
 			continue
 		}
-		if isMarker(k.field) {
+		if isMarker(k.field) || pythonExactMetadata(k.field) {
 			continue
 		}
 		s[k] = merge(s[k], v)
@@ -117,6 +125,9 @@ func (s istate) replace(a, b istate) {
 	// A value is validated after the branches only if it was validated in both.
 	for k := range a {
 		if k.field == sequenceField && taintSignature(a[k]) == taintSignature(b[k]) {
+			s[k] = a[k]
+		}
+		if pythonExactMetadata(k.field) && taintSignature(a[k]) == taintSignature(b[k]) {
 			s[k] = a[k]
 		}
 		if isMarker(k.field) {
@@ -191,7 +202,9 @@ type project struct {
 	// props holds the key=value pairs of the project's .properties files.
 	props map[string]string
 	// globalCSRF is set when any file registers an antiforgery filter for every action.
-	globalCSRF bool
+	globalCSRF       bool
+	pyRouteParts     map[*funcIR][]string
+	pyConstantWrites map[string]bool
 }
 
 func funcKey(m *module, f *funcIR) string {
@@ -231,6 +244,7 @@ func newProject(mods []*module) *project {
 			}
 		}
 	}
+	p.pythonRoutes()
 	return p
 }
 
@@ -697,6 +711,9 @@ func (r *irRun) evalCall(e *expr, st istate) taintSet {
 	}
 	fn := e.x
 	qname, recvExpr, field := r.resolve(fn, st)
+	if _, known := r.pythonRouteSplit(e, st); known {
+		return nil
+	}
 	r.checkPythonProcess(e, qname, literals, st)
 	if value, ok := r.sequenceCall(e, args, st); ok {
 		return value
@@ -760,7 +777,7 @@ func (r *irRun) evalCall(e *expr, st istate) taintSet {
 		}
 	}
 	if s, name, ok := r.lookupSink(qname, recvExpr, field); ok {
-		r.checkSink(e, name, s, checkArgs, recvT)
+		r.checkSink(e, name, s, checkArgs, recvT, st)
 	}
 	r.checkMisuse(e, qname, field)
 	r.checkExtras(e, qname, field, fn, st)
@@ -1152,7 +1169,7 @@ func (r *irRun) funcByKey(key string) *funcIR {
 	return r.proj.functions[key]
 }
 
-func (r *irRun) checkSink(c *expr, name string, s sink, args []taintSet, recv taintSet) {
+func (r *irRun) checkSink(c *expr, name string, s sink, args []taintSet, recv taintSet, st istate) {
 	for i, want := range s.when {
 		if i >= len(c.args) {
 			return
@@ -1214,8 +1231,20 @@ func (r *irRun) checkSink(c *expr, name string, s sink, args []taintSet, recv ta
 			continue
 		}
 		isDirect := c.args[i].kind == exprName || c.args[i].kind == exprMember || c.args[i].kind == exprIndex
+		var proven kind
+		if r.spec.name == "py" {
+			if n, f, ok := r.pathOf(c.args[i]); ok {
+				facts := st.validated(n, f)
+				if (name == "eval" || name == "exec") && facts&pythonLiteral != 0 {
+					proven |= kCode
+				}
+				if s.kind == kRedirect && facts&parsedRedirect != 0 {
+					proven |= kRedirect
+				}
+			}
+		}
 		for _, at := range args[i] {
-			hit := at.kinds & s.kind
+			hit := at.kinds & s.kind &^ proven
 			if at.xpathSafe {
 				hit &^= kXPath
 			}
@@ -1256,8 +1285,18 @@ func (r *irRun) assign(lhs *expr, t taintSet, st istate) {
 
 func (r *irRun) block(list []*stmt, st istate) {
 	for _, s := range list {
+		ends := terminatesIR([]*stmt{s})
+		if !ends && s.kind == stmtIf {
+			if value, known := r.conditionBool(s.cond, st); known {
+				branch := s.els
+				if value {
+					branch = s.then
+				}
+				ends = terminatesIR(branch)
+			}
+		}
 		r.stmt(s, st)
-		if terminatesIR([]*stmt{s}) {
+		if ends {
 			break
 		}
 	}
@@ -1286,6 +1325,9 @@ func (r *irRun) validWhenTrue(c *expr, st istate) []validatedIR {
 	if c == nil {
 		return nil
 	}
+	if facts := r.pythonGuards(c, true, st); len(facts) > 0 {
+		return facts
+	}
 	switch c.kind {
 	case exprNot:
 		return r.validWhenFalse(c.x, st)
@@ -1312,6 +1354,9 @@ func (r *irRun) validWhenTrue(c *expr, st istate) []validatedIR {
 func (r *irRun) validWhenFalse(c *expr, st istate) []validatedIR {
 	if c == nil {
 		return nil
+	}
+	if facts := r.pythonGuards(c, false, st); len(facts) > 0 {
+		return facts
 	}
 	switch c.kind {
 	case exprIn:
@@ -1374,6 +1419,7 @@ func (r *irRun) stmt(s *stmt, st istate) {
 			}
 		}
 		quotes := r.quoteFacts(s.rhs, st)
+		pathValue := r.pythonPathValue(s.rhs, st)
 		r.lhsName = ""
 		for _, l := range s.lhs {
 			v := t
@@ -1398,6 +1444,10 @@ func (r *irRun) stmt(s *stmt, st istate) {
 			}
 			r.assign(l, v, st)
 			if !s.aug {
+				r.recordParsedURL(l, s.rhs, st)
+				if l.kind == exprName && len(s.lhs) == 1 && pathValue != "" {
+					st[ikey{l.name, pythonPathField}] = taintSet{{key: pathValue}}
+				}
 				r.assignSequenceText(l, s.rhs, st)
 			}
 			if facts != 0 {
@@ -1513,7 +1563,7 @@ func (r *irRun) stmt(s *stmt, st istate) {
 			r.devDepth++
 			defer func() { r.devDepth-- }()
 		}
-		if v, ok := r.constBool(s.cond); ok {
+		if v, ok := r.conditionBool(s.cond, st); ok {
 			// The condition cannot go the other way, so only one branch runs.
 			if v {
 				r.block(s.then, st)
@@ -1651,11 +1701,18 @@ func (r *irRun) stmt(s *stmt, st istate) {
 		prev := r.loopAcc
 		r.loopAcc = istate{}
 		entryConsts, entryStrs := cloneMap(r.consts), cloneMap(r.strs)
-		for _, arm := range s.arms {
+		var successful istate
+		for i, arm := range s.arms {
 			r.consts, r.strs = cloneMap(entryConsts), cloneMap(entryStrs)
 			b := entry.clone()
 			r.block(arm, b)
 			st.union(b)
+			if i == 0 {
+				successful = b
+			}
+		}
+		if s.tryReturns && successful != nil {
+			st.replace(successful, successful)
 		}
 		r.consts, r.strs = entryConsts, entryStrs
 		st.union(r.loopAcc)
@@ -1852,6 +1909,18 @@ func (r *irRun) strOf(e *expr) (string, bool) {
 		}
 		return b.String(), true
 	case exprMember:
+		if r.spec.name == "py" {
+			root := rootName(e)
+			if r.shadow[root] || r.localNames[root] {
+				return "", false
+			}
+			q := r.qualified(e, istate{})
+			if i := strings.LastIndexByte(q, '.'); i > 0 {
+				if m := r.proj.resolveModule(r.mod, q[:i]); m != nil && r.proj.pyConstantWrites[m.path+"#"+q[i+1:]] {
+					return "", false
+				}
+			}
+		}
 		// self::KEY, static::KEY: a constant of the class being analyzed, kept by name.
 		if e.x != nil && e.x.kind == exprName && (e.x.name == "self" || e.x.name == "static") && r.mod != nil {
 			v, ok := topStrs(r.mod)[e.name]
@@ -1902,6 +1971,9 @@ func (r *irRun) argText(e *expr) (string, bool) {
 func (r *irRun) moduleStrs() map[string]string {
 	out := map[string]string{}
 	for k, v := range topStrs(r.mod) {
+		if r.spec.name == "py" && r.proj.pyConstantWrites[r.mod.path+"#"+k] {
+			continue
+		}
 		out[k] = v
 	}
 	for alias, ref := range r.mod.locals {
@@ -1909,6 +1981,9 @@ func (r *irRun) moduleStrs() map[string]string {
 			continue
 		}
 		if m := r.proj.resolveModule(r.mod, ref.spec); m != nil && m != r.mod {
+			if r.spec.name == "py" && r.proj.pyConstantWrites[m.path+"#"+ref.name] {
+				continue
+			}
 			if v, ok := topStrs(m)[ref.name]; ok {
 				out[alias] = v
 			}

@@ -443,7 +443,7 @@ the false-positive rate; a tool that guesses scores 0.
 | Suite                       | True positives | False positives | Score   |
 | --------------------------- | -------------- | --------------- | ------- |
 | BenchmarkJava 1.2 (2,740)   | 99.7%          | 1.0%            | +0.9874 |
-| BenchmarkPython 0.1 (1,230) | 98.9%          | 8.5%            | +0.9041 |
+| BenchmarkPython 0.1 (1,230) | 98.9%          | 1.0%            | +0.9787 |
 
 The suites are not vendored. To reproduce, check one out and run
 `SECUROCK_OWASP_BENCHMARK=/path/to/BenchmarkJava go test ./internal/sast -run OWASPBenchmark -count=1 -v`
@@ -451,6 +451,8 @@ The suites are not vendored. To reproduce, check one out and run
 each category and guards true positives and false positives separately in each category.
 Missing cases, unmapped categories and incomplete analysis also fail the test. Set
 `SECUROCK_BENCHMARK_DETAILS=1` to list misclassified cases. CI uses pinned suite revisions.
+Each suite also rejects aggregate FPR above 2%, using exact counts. This aggregate
+ceiling does not imply that every individual category has FPR below 2%.
 See [SAST benchmarks](/reference/sast-benchmarks) for revisions, exact counts and reproduction.
 
 Python now includes the suite's imported helpers in the analysis root; earlier measurements
@@ -481,11 +483,34 @@ buffer it writes. A Python `make_response((body, headers))` checks only the body
 and rejecting `..` validates only the path class. Python text buffers are
 followed through `write()` and `getvalue()` (for example `io.StringIO`).
 
+Python recognizes a complete quoted-string guard before direct `eval` and `exec`
+calls: matching opening and closing quotes, with no matching quote in the
+`[1:-1]` interior. This does not validate template code, SQL or shell input.
+An exact literal `netloc` allowlist plus an HTTP/HTTPS scheme check on a
+`urllib.parse.urlparse` or `urlsplit` result validates the original URL for a
+direct redirect. Reassignment invalidates that relationship, and unknown
+transformations remain untrusted. Validation inside `try` survives only when
+all exception handlers terminate and there is no `else` or `finally` clause.
+
+Static Flask route-path splits now have fixed components when application ownership
+and the handler's route constraint are known. Unknown routers, blueprints, conflicting
+or dynamic routes and escaping handlers remain conservative. Registration functions
+can establish ownership through direct project calls or `importlib` module calls;
+unknown or conflicting callers discard it. Reassignments and list mutations still
+invalidate the relevant facts. Writes to or escape of the request object, including
+writes through project helpers, discard the route-path proof.
+
+Python also recognizes an always-rejecting comparison between an absolute resolved
+path and a known relative basename. This prunes unreachable file operations rather
+than trusting boundary-less prefix checks. Drive-relative and one-letter prefixes
+stay unknown for cross-platform correctness, and writes to imported constants
+invalidate constant-path proofs.
+
 Remaining errors include more complex collections, library models and validation
-patterns. Python's path, code injection and redirect categories still have some
-false positives, mostly from request-path-derived values and project-specific
-escapers. They are retained conservatively because the analysis does not infer
-safety from function names.
+patterns. Python retains five path-traversal misses, one XSS false positive from a
+project-specific escaper, and seven XXE false positives from parser configuration
+checks that do not inspect the parsed input. The XXE category has only 20 safe cases,
+so its category-specific FPR remains high despite the low aggregate rate.
 
 Only Java and Python have a labeled score. For the other languages the evidence is weaker,
 and `sast` should be treated as experimental there:

@@ -120,6 +120,13 @@ func (r *irRun) initSequence(s *stmt, st istate) {
 		return
 	}
 	delete(st, ikey{name, sequenceField})
+	if parts, known := r.pythonRouteSplit(s.rhs, st); known {
+		st[ikey{name, sequenceField}] = sequenceLength(len(parts))
+		for i, text := range parts {
+			st[ikey{name, sequenceTextField(i)}] = taintSet{{key: text}}
+		}
+		return
+	}
 	if s.rhs.kind == exprSequence && len(s.rhs.args) <= maxSequenceElements {
 		st[ikey{name, sequenceField}] = sequenceLength(len(s.rhs.args))
 		for i, value := range s.rhs.args {

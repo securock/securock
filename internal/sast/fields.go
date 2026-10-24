@@ -275,6 +275,17 @@ func (s state) invalidate(obj types.Object, field string) {
 
 func (s istate) invalidate(name, field string) {
 	for k := range s {
+		if k.field == parsedURLField {
+			for _, origin := range s[k] {
+				if k.name == name || origin.refName == name {
+					delete(s, k)
+					break
+				}
+			}
+		}
+		if k.name == name && k.field == pythonPathField {
+			delete(s, k)
+		}
 		if k.name == name && isMarker(k.field) && related(strings.TrimPrefix(k.field, markerPrefix), field) {
 			delete(s, k)
 		}

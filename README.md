@@ -73,7 +73,7 @@ Those changes are easy to miss in a language lockfile diff.
   Terraform, and GitHub Actions workflows for unsafe settings, and scans every
   text file for committed credentials. A file it cannot parse is reported
   rather than skipped. Published development-benchmark measurements cover Java (99.7% detected,
-  1.0% false-positive rate on OWASP BenchmarkJava) and Python (98.9% and 8.5%); the other languages are
+  1.0% false-positive rate on OWASP BenchmarkJava) and Python (98.9% and 1.0%); the other languages are
   experimental. See [how accurate is sast](https://securock.dev/guide/usage#how-accurate-is-sast)
 
 **Exports**
