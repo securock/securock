@@ -97,7 +97,7 @@ Those changes are easy to miss in a language lockfile diff.
   reported rather than skipped
 - Benchmarks (not language-wide accuracy estimates; see
   [SAST benchmarks](docs/sast-benchmarks.md#javascript-typescript-and-php-source-regressions)
-  and [how accurate is sast](https://securock.dev/guide/usage#how-accurate-is-sast)
+  and [how accurate is sast](https://securock.dev/guide/sast#how-accurate-is-sast)
   for labels, limitations, and reproduction commands):
   - Java on OWASP BenchmarkJava: 99.7% detected, 1.0% false positives
   - Python: 98.9% detected, 1.0% false positives
