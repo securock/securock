@@ -378,6 +378,15 @@ Known limits:
 
 Treat the results as a measured starting point, not a guarantee.
 
+## Attack chains
+
+`securock chain` runs this analysis and correlates the findings into attack chains: an
+entry where attacker-controlled data crosses a boundary, the injection sinks it reaches,
+and committed credentials an attacker could read on the way. A chain from one finding's
+trace is `confirmed`; findings that share a file form a `possible` chain unless both are
+proven inside the same function. Possible chains are reported but never fail a build.
+See [Usage](/guide/usage#chain) for the command and flags.
+
 ## Next steps
 
 - [SAST benchmarks](/reference/sast-benchmarks) — revisions, exact counts, reproduction

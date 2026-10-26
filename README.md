@@ -108,6 +108,16 @@ Those changes are easy to miss in a language lockfile diff.
     two category-specific safe controls
   - Other languages are experimental
 
+**Attack chains** (`chain`)
+
+- Correlates the `sast` findings into attack chains: where attacker-
+  controlled data enters, the dangerous operations it reaches, and the
+  committed credentials an attacker could read on the way
+- A chain from one dataflow finding's trace is `confirmed`; links that
+  rely on findings sharing a file are `possible` and never fail a build,
+  and a link is confirmed only when both findings are proven inside the
+  same function — nothing unproven is reported as verified
+
 **Exports**
 
 - CycloneDX 1.6 / SPDX 2.3 SBOM export with trust evidence, and
@@ -210,6 +220,7 @@ Cargo under [`examples/`](examples/).
 | `securock explain` | Explain why a package is trusted                            |
 | `securock audit`   | Report dependency findings by severity                      |
 | `securock sast`    | Find vulnerabilities in your own source code                |
+| `securock chain`   | Correlate source findings into attack chains                |
 | `securock doctor`  | Check the project setup for security problems               |
 | `securock sbom`    | Export `securock.lock` as CycloneDX or SPDX, or verify one  |
 | `securock accept`  | Accept a finding until a date, with a reason                |
@@ -218,22 +229,22 @@ Cargo under [`examples/`](examples/).
 
 ### Flags
 
-| Flag / exit             | Meaning                                                                                                 |
-| ----------------------- | ------------------------------------------------------------------------------------------------------- |
-| `--network public-only` | Default. Public registries only (`offline`, `allow-all` also valid)                                     |
-| `--offline`             | Skip remote lookups; remote evidence stays `unknown`                                                    |
-| `--policy`              | Path to a policy file                                                                                   |
-| `--profile`             | Built-in policy profile: `default` or `strict` (not with `--policy`)                                    |
-| `--lock`                | Path to `securock.lock` (for `lock` / `diff` / `update` / `verify`)                                     |
-| `--format json`         | Stable JSON on `scan`, `diff`, `verify`, and `explain`                                                  |
-| `--format sarif`        | SARIF 2.1.0 on every report command, for GitHub code scanning                                           |
-| `--output`              | Write the report to a file instead of stdout (also on exit `1`)                                         |
-| `--min-release-age`     | `audit`. Report npm and PyPI releases newer than this, such as `7d`                                     |
-| `--fail-on`             | `audit`, `sast` and `doctor`. Exit `1` at or above this severity (default `high`)                       |
-| `--assume-params`       | `sast`. Treat string parameters of Go functions nothing calls directly as untrusted (registry handlers) |
-| `--exceptions`          | Accepted-findings file (default `.securock/exceptions.yaml`)                                            |
-| `--reachability`        | Record package scope and dependencies; mark vulnerabilities reachable, unreachable, or unknown          |
-| `--no-fail`             | Always exit `0`                                                                                         |
+| Flag / exit             | Meaning                                                                                                             |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| `--network public-only` | Default. Public registries only (`offline`, `allow-all` also valid)                                                 |
+| `--offline`             | Skip remote lookups; remote evidence stays `unknown`                                                                |
+| `--policy`              | Path to a policy file                                                                                               |
+| `--profile`             | Built-in policy profile: `default` or `strict` (not with `--policy`)                                                |
+| `--lock`                | Path to `securock.lock` (for `lock` / `diff` / `update` / `verify`)                                                 |
+| `--format json`         | Stable JSON on `scan`, `diff`, `verify`, and `explain`                                                              |
+| `--format sarif`        | SARIF 2.1.0 on every report command, for GitHub code scanning                                                       |
+| `--output`              | Write the report to a file instead of stdout (also on exit `1`)                                                     |
+| `--min-release-age`     | `audit`. Report npm and PyPI releases newer than this, such as `7d`                                                 |
+| `--fail-on`             | `audit`, `sast`, `chain` and `doctor`. Exit `1` at or above this severity (default `high`)                          |
+| `--assume-params`       | `sast` and `chain`. Treat string parameters of Go functions nothing calls directly as untrusted (registry handlers) |
+| `--exceptions`          | Accepted-findings file (default `.securock/exceptions.yaml`)                                                        |
+| `--reachability`        | Record package scope and dependencies; mark vulnerabilities reachable, unreachable, or unknown                      |
+| `--no-fail`             | Always exit `0`                                                                                                     |
 
 ### Exit codes
 

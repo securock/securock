@@ -17,6 +17,7 @@ securock verify [path]
 securock explain PACKAGE [path]
 securock audit [path]
 securock sast [path]
+securock chain [path]
 securock doctor [path]
 securock sbom export [path]
 securock sbom verify SBOM [path]
@@ -43,6 +44,7 @@ securock version
 | `explain` | Print a trust checklist for one package                      | [explain](#explain)                                         |
 | `audit`   | Report dependency findings ranked by severity                | [audit](#audit)                                             |
 | `sast`    | Find vulnerabilities in your own source code                 | [Source code analysis](/guide/sast)                         |
+| `chain`   | Correlate source findings into attack chains                 | [Source code analysis](/guide/sast)                         |
 | `doctor`  | Check the project setup for security problems                | [doctor](#doctor)                                           |
 | `sbom`    | Export the lockfile as an SBOM, or verify an SBOM against it | [Triage and exports](/guide/reports#sbom-export-and-verify) |
 | `accept`  | Accept a finding until a date, with a reason                 | [Triage and exports](/guide/reports#accept-findings)        |
@@ -109,7 +111,8 @@ provenance or signatures rank lower. Evidence that was not checked is
 reported as `info`, so offline runs always have `info` findings.
 It accepts `--fail-on SEVERITY` (`critical`, `high`, `medium`, `low`
 or `info`; default `high`) and exits `1` when a finding is at or above
-it. `doctor` and `sast` use the same flag.
+it. `doctor`, `sast` and `chain` use the same flag; `chain` counts
+confirmed chains only.
 
 `audit` also takes `--min-release-age 7d`, which reports releases newer
 than that as high findings; see
@@ -183,7 +186,7 @@ exceptions with no approver. Its findings follow the same
 | `--lock`         | Path to `securock.lock` (for `lock` / `diff` / `update` / `verify`)                       |
 | `--format`       | `text` (default), `json`, or `sarif`                                                      |
 | `--output`       | Write the report to a file instead of stdout                                              |
-| `--exceptions`   | Path to the accepted-findings file (`accept`, `audit`, `sast`, `doctor`)                  |
+| `--exceptions`   | Path to the accepted-findings file (`accept`, `audit`, `sast`, `chain`, `doctor`)         |
 | `--reachability` | Record scope and dependencies and mark vulnerabilities reachable, unreachable, or unknown |
 | `--no-fail`      | Always exit `0`                                                                           |
 
@@ -194,7 +197,23 @@ ownership, provenance, signature, and chain evidence as `unknown`.
 [Policy](/guide/policy) for profiles and YAML rules.
 
 `sast` also takes `--assume-params`; see
-[Source code analysis](/guide/sast#taint-tracking).
+[Source code analysis](/guide/sast#taint-tracking). `chain` takes it
+too, since it reuses the sast analysis.
+
+### `chain`
+
+`chain` runs the sast analysis and correlates the findings into attack
+chains: an entry where attacker-controlled data crosses a boundary, the
+injection sinks it reaches, and committed credentials an attacker could
+read on the way. A single dataflow finding whose trace proves the whole
+path is a `confirmed` chain; findings that share a file form a
+`possible` chain unless both are proven inside the same function.
+Possible chains are reported but never fail a build — `--fail-on`
+counts confirmed chains only.
+
+```sh
+securock chain --format sarif --output chains.sarif
+```
 
 ## Exit codes
 
@@ -218,11 +237,13 @@ securock verify --format sarif --output securock.sarif
 - `scan --format json` emits the lock document shape.
 - `diff` and `verify` print a `schema_version: 1` report.
 - `explain --format json` emits the matched artifacts.
-- `--format sarif` works on `scan`, `diff`, `verify`, `audit`, `sast`, and `doctor`.
+- `--format sarif` works on `scan`, `diff`, `verify`, `audit`, `sast`,
+  `chain`, and `doctor`.
   Results point at `securock.lock` and name the package as a logical
   location. Each result has a stable `partialFingerprints` entry so code
   scanning can track it across runs. `sast` results point at the source
-  line and carry a `codeFlows` trace. `--output` writes the file even
+  line and carry a `codeFlows` trace. `chain` results carry the chain's
+  stages as the code flow. `--output` writes the file even
   when the command exits `1`, so a failing `verify` still produces a
   report.
 
@@ -239,7 +260,8 @@ Upload SARIF to GitHub code scanning:
 Machine-readable schemas live in the repository under
 [`schemas/`](https://github.com/securock/securock/tree/main/schemas)
 (`securock-lock`, `scan-report`, `diff-report`, `verify-report`,
-`audit-report`, `sast-report`, `doctor-report`, `sbom-verify-report`).
+`audit-report`, `sast-report`, `chain-report`, `doctor-report`,
+`sbom-verify-report`).
 
 ## Typical workflow
 
