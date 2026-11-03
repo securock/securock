@@ -9,7 +9,7 @@
   },
   "devDependencies": {
     "lucide-static": "^1.61.0",
-    "vitepress": "2.0.0-alpha.20",
+    "vitepress": "2.0.0-alpha.21",
     "wrangler": "^4.151.3"
   },
   "engines": {
