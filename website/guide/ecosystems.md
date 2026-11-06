@@ -15,34 +15,40 @@ resolver per family (for example pnpm over npm).
 
 ## Supported lockfiles
 
-| Ecosystem | Resolver | Lockfile             |
-| --------- | -------- | -------------------- |
-| npm       | npm      | `package-lock.json`  |
-| npm       | pnpm     | `pnpm-lock.yaml`     |
-| npm       | yarn     | `yarn.lock`          |
-| npm       | bun      | `bun.lock`           |
-| npm       | deno     | `deno.lock`          |
-| jsr       | deno     | `deno.lock`          |
-| url       | deno     | `deno.lock`          |
-| cargo     | cargo    | `Cargo.lock`         |
-| go        | go       | `go.mod` + `go.sum`  |
-| pypi      | uv       | `uv.lock`            |
-| pypi      | poetry   | `poetry.lock`        |
-| pypi      | pdm      | `pdm.lock`           |
-| packagist | composer | `composer.lock`      |
-| rubygems  | bundler  | `Gemfile.lock`       |
-| nuget     | nuget    | `packages.lock.json` |
-| swift     | swiftpm  | `Package.resolved`   |
-| pub       | pub      | `pubspec.lock`       |
-| hex       | mix      | `mix.lock`           |
-| maven     | gradle   | `gradle.lockfile`    |
+| Ecosystem | Resolver  | Lockfile               |
+| --------- | --------- | ---------------------- |
+| npm       | npm       | `package-lock.json`    |
+| npm       | pnpm      | `pnpm-lock.yaml`       |
+| npm       | yarn      | `yarn.lock`            |
+| npm       | bun       | `bun.lock`             |
+| npm       | deno      | `deno.lock`            |
+| jsr       | deno      | `deno.lock`            |
+| url       | deno      | `deno.lock`            |
+| cargo     | cargo     | `Cargo.lock`           |
+| go        | go        | `go.mod` + `go.sum`    |
+| pypi      | uv        | `uv.lock`              |
+| pypi      | poetry    | `poetry.lock`          |
+| pypi      | pdm       | `pdm.lock`             |
+| pypi      | pipenv    | `Pipfile.lock`         |
+| packagist | composer  | `composer.lock`        |
+| rubygems  | bundler   | `Gemfile.lock`         |
+| nuget     | nuget     | `packages.lock.json`   |
+| swift     | swiftpm   | `Package.resolved`     |
+| cocoapods | cocoapods | `Podfile.lock`         |
+| conan     | conan     | `conan.lock`           |
+| cran      | renv      | `renv.lock`            |
+| julia     | julia     | `Manifest.toml`        |
+| hackage   | cabal     | `cabal.project.freeze` |
+| pub       | pub       | `pubspec.lock`         |
+| hex       | mix       | `mix.lock`             |
+| maven     | gradle    | `gradle.lockfile`      |
 
 All resolvers above are stable. Deno `deno.lock` v5 is the preferred
 target; v3/v4 remain supported for compatibility.
 
 ## Evidence depth
 
-| Evidence        | npm family (npm / pnpm / yarn / bun / deno npm)             | PyPI (uv / Poetry / PDM)                                   | Other ecosystems                     |
+| Evidence        | npm family (npm / pnpm / yarn / bun / deno npm)             | PyPI (uv / Poetry / PDM / Pipenv)                          | Other ecosystems                     |
 | --------------- | ----------------------------------------------------------- | ---------------------------------------------------------- | ------------------------------------ |
 | digest          | from the language lockfile                                  | from the language lockfile                                 | from the language lockfile           |
 | vulnerabilities | OSV (non-`MAL-*`)                                           | OSV when the source is proven public                       | OSV when the source is proven public |
@@ -64,25 +70,31 @@ artifact before emitting `verified`.
 `--reachability` ([Usage](/guide/usage#reachability)) needs two things from the lockfile: how each
 package enters the project (its scope) and what each package depends on. What each resolver can read:
 
-| Resolver | Scope comes from                                                 | Dependency edges                              |
-| -------- | ---------------------------------------------------------------- | --------------------------------------------- |
-| npm      | `dev`, `optional` and `devOptional` flags                        | `dependencies` of each package                |
-| pnpm     | `importers` (direct dependencies), spread along the graph        | `snapshots`, or `packages` in older lockfiles |
-| yarn     | `package.json` of the project and workspaces, spread along edges | `dependencies` of each entry                  |
-| bun      | `workspaces` (direct dependencies), spread along the graph       | dependency map of each package                |
-| deno     | `workspace` imports, spread along the graph (all runtime)        | `dependencies` of each package                |
-| uv       | project and workspace member: dependencies, extras, dev groups   | `dependencies` of each package                |
-| poetry   | `groups`, or `category`, or `pyproject.toml` for older lockfiles | `[package.dependencies]`                      |
-| pdm      | `groups`, with `pyproject.toml` saying which are extras or dev   | `dependencies` requirement strings            |
-| cargo    | `Cargo.toml` of the project and workspace members                | `dependencies` of each package                |
-| composer | `packages` is runtime, `packages-dev` is dev                     | `require` of each package                     |
-| bundler  | `DEPENDENCIES`, with the `Gemfile` marking dev and test groups   | gems listed under each spec                   |
-| nuget    | `Direct` packages are runtime                                    | `dependencies` within each target framework   |
-| pub      | `direct main`, `direct dev`, `direct overridden`                 | not recorded                                  |
-| mix      | `mix.exs`, where `only: :dev` or `:test` marks dev               | dependency list of each hex entry             |
-| gradle   | the configurations a dependency is locked for                    | not recorded                                  |
-| go       | not recorded                                                     | not recorded                                  |
-| swiftpm  | not recorded                                                     | not recorded                                  |
+| Resolver  | Scope comes from                                                      | Dependency edges                              |
+| --------- | --------------------------------------------------------------------- | --------------------------------------------- |
+| npm       | `dev`, `optional` and `devOptional` flags                             | `dependencies` of each package                |
+| pnpm      | `importers` (direct dependencies), spread along the graph             | `snapshots`, or `packages` in older lockfiles |
+| yarn      | `package.json` of the project and workspaces, spread along edges      | `dependencies` of each entry                  |
+| bun       | `workspaces` (direct dependencies), spread along the graph            | dependency map of each package                |
+| deno      | `workspace` imports, spread along the graph (all runtime)             | `dependencies` of each package                |
+| uv        | project and workspace member: dependencies, extras, dev groups        | `dependencies` of each package                |
+| poetry    | `groups`, or `category`, or `pyproject.toml` for older lockfiles      | `[package.dependencies]`                      |
+| pdm       | `groups`, with `pyproject.toml` saying which are extras or dev        | `dependencies` requirement strings            |
+| pipenv    | `default` is runtime, `develop` is dev                                | not recorded                                  |
+| cargo     | `Cargo.toml` of the project and workspace members                     | `dependencies` of each package                |
+| composer  | `packages` is runtime, `packages-dev` is dev                          | `require` of each package                     |
+| bundler   | `DEPENDENCIES`, with the `Gemfile` marking dev and test groups        | gems listed under each spec                   |
+| nuget     | `Direct` packages are runtime                                         | `dependencies` within each target framework   |
+| pub       | `direct main`, `direct dev`, `direct overridden`                      | not recorded                                  |
+| mix       | `mix.exs`, where `only: :dev` or `:test` marks dev                    | dependency list of each hex entry             |
+| gradle    | the configurations a dependency is locked for                         | not recorded                                  |
+| go        | not recorded                                                          | not recorded                                  |
+| swiftpm   | not recorded                                                          | not recorded                                  |
+| cocoapods | not recorded                                                          | dependency list of each `PODS` entry          |
+| hackage   | not recorded                                                          | not recorded                                  |
+| julia     | `Project.toml`: `[deps]` is runtime, test-only `[extras]` are dev     | `deps` of each package                        |
+| cran      | not recorded                                                          | not recorded                                  |
+| conan     | `requires` is runtime, `build_requires` and `python_requires` are dev | not recorded                                  |
 
 Where a lockfile records neither, vulnerabilities stay `unknown`. Where the scope comes from a
 manifest (`package.json`, `Cargo.toml`, `pyproject.toml`, `Gemfile`, `mix.exs`) and the manifest is
@@ -113,6 +125,41 @@ modules a package actually imports, so reachability for Go needs call-graph anal
 - `gradle.lockfile` records coordinates but does not prove a registry URL.
 - OSV is **not** queried in `public-only`.
 
+### Pipenv
+
+- `Pipfile.lock` lists file hashes without file names. A digest is recorded only when an entry has exactly one hash; with several, the digest stays unknown.
+- An entry without `index` resolves to a registry only when the lockfile has a single source.
+- Entries that are not exact `==` pins (and have no git, path or file source) are skipped.
+
+### Cabal (Hackage)
+
+- Only `any.<name> ==<version>` constraints are read. Ranges, flags, `installed` packages and `setup.` constraints are skipped.
+- A freeze file carries no hashes, so no digest is recorded. OSV is queried in `public-only` only when `active-repositories` lists `hackage.haskell.org` alone and `cabal.project` has no `repository` stanza; otherwise state stays `unknown`.
+- Stack (`stack.yaml.lock`) is not supported.
+
+### Julia
+
+- `Manifest.toml` does not say which registry served a package, so none is recorded and nothing is sent to OSV in `public-only`. State stays `unknown`; `allow-all` queries OSV by package name.
+- `git-tree-sha1` is a git tree hash, not an archive digest, so it is kept as the resolved reference and not as a digest. Standard libraries are skipped.
+- Scopes come from `Project.toml` next to the manifest; without it they stay `unknown`.
+
+### renv (CRAN)
+
+- Only packages from the `CRAN` repository, when `renv.lock` lists it at `cloud.r-project.org` or `cran.r-project.org`, are sent to OSV in `public-only`. Bioconductor, Posit Package Manager and other repositories record no registry and stay `unknown`.
+- renv's `Hash` is an MD5 of the package `DESCRIPTION`, not an artifact digest, so it is not recorded. `renv.lock` has no scopes or dependency edges.
+
+### Conan
+
+- Only Conan 2 lockfiles (`conan.lock` version 0.5) are read; Conan 1 `graph_lock` files are rejected.
+- The lockfile does not say which remote served a recipe, so no registry is recorded and nothing is queried in `public-only`. OSV has no ConanCenter ecosystem either, so vulnerability state stays `unknown`.
+- The recipe revision is kept as the resolved reference, not as a digest. `config_requires` are not dependencies and are skipped.
+
+### CocoaPods
+
+- `Podfile.lock` is read for pod names, versions and sources. Subspecs collapse into their root pod.
+- OSV has no CocoaPods ecosystem, so vulnerability state stays `unknown`. `SPEC CHECKSUMS` are podspec hashes, not artifact digests, and are not recorded.
+- Only pods from the trunk CDN count as registry pods; private spec repos, `:git` and `:path` pods record no registry.
+
 ### Swift
 
 - Package URLs are recorded, but `public-only` does not treat Git hosts
@@ -137,16 +184,22 @@ See [Privacy](/reference/privacy).
 Offline walkthroughs for several resolvers live under
 [`examples/`](https://github.com/securock/securock/tree/main/examples):
 
-| Resolver | Directory                                                                           |
-| -------- | ----------------------------------------------------------------------------------- |
-| npm      | [`examples/npm`](https://github.com/securock/securock/tree/main/examples/npm)       |
-| pnpm     | [`examples/pnpm`](https://github.com/securock/securock/tree/main/examples/pnpm)     |
-| Yarn     | [`examples/yarn`](https://github.com/securock/securock/tree/main/examples/yarn)     |
-| Bun      | [`examples/bun`](https://github.com/securock/securock/tree/main/examples/bun)       |
-| uv       | [`examples/uv`](https://github.com/securock/securock/tree/main/examples/uv)         |
-| Poetry   | [`examples/poetry`](https://github.com/securock/securock/tree/main/examples/poetry) |
-| Go       | [`examples/go`](https://github.com/securock/securock/tree/main/examples/go)         |
-| Cargo    | [`examples/cargo`](https://github.com/securock/securock/tree/main/examples/cargo)   |
+| Resolver  | Directory                                                                                 |
+| --------- | ----------------------------------------------------------------------------------------- |
+| npm       | [`examples/npm`](https://github.com/securock/securock/tree/main/examples/npm)             |
+| pnpm      | [`examples/pnpm`](https://github.com/securock/securock/tree/main/examples/pnpm)           |
+| Yarn      | [`examples/yarn`](https://github.com/securock/securock/tree/main/examples/yarn)           |
+| Bun       | [`examples/bun`](https://github.com/securock/securock/tree/main/examples/bun)             |
+| uv        | [`examples/uv`](https://github.com/securock/securock/tree/main/examples/uv)               |
+| Poetry    | [`examples/poetry`](https://github.com/securock/securock/tree/main/examples/poetry)       |
+| Go        | [`examples/go`](https://github.com/securock/securock/tree/main/examples/go)               |
+| Cargo     | [`examples/cargo`](https://github.com/securock/securock/tree/main/examples/cargo)         |
+| CocoaPods | [`examples/cocoapods`](https://github.com/securock/securock/tree/main/examples/cocoapods) |
+| Pipenv    | [`examples/pipenv`](https://github.com/securock/securock/tree/main/examples/pipenv)       |
+| Conan     | [`examples/conan`](https://github.com/securock/securock/tree/main/examples/conan)         |
+| renv      | [`examples/renv`](https://github.com/securock/securock/tree/main/examples/renv)           |
+| Julia     | [`examples/julia`](https://github.com/securock/securock/tree/main/examples/julia)         |
+| Cabal     | [`examples/cabal`](https://github.com/securock/securock/tree/main/examples/cabal)         |
 
 ## Next steps
 

@@ -212,7 +212,13 @@ func QueryEcosystem(dep ecosystem.Dependency) string {
 	if dep.Ecosystem == "cargo" && !cratesIO(dep.Registry) {
 		return ""
 	}
-	if dep.Ecosystem == "jsr" || dep.Ecosystem == "url" {
+	// A cran or hackage artifact without a proven public registry may be Bioconductor, a
+	// private mirror or another repository.
+	if (dep.Ecosystem == "cran" || dep.Ecosystem == "hackage") && dep.Registry == "" {
+		return ""
+	}
+	// OSV has no CocoaPods or ConanCenter ecosystem, so these stay unknown instead of looking clean.
+	if dep.Ecosystem == "jsr" || dep.Ecosystem == "url" || dep.Ecosystem == "cocoapods" || dep.Ecosystem == "conan" {
 		return ""
 	}
 	return Ecosystem(dep.Ecosystem)
@@ -248,6 +254,12 @@ func Ecosystem(name string) string {
 		return "Pub"
 	case "hex":
 		return "Hex"
+	case "cran":
+		return "CRAN"
+	case "julia":
+		return "Julia"
+	case "hackage":
+		return "Hackage"
 	case "maven":
 		return "Maven"
 	default:

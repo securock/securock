@@ -276,6 +276,42 @@ url = "https://pypi.company.example/simple"
 			wantAll: lockfile.VulnUnknown,
 		},
 		{
+			name: "renv non-cran repository",
+			files: map[string]string{
+				"renv.lock": `{
+  "R": {"Repositories": [{"Name": "CRAN", "URL": "https://packagemanager.posit.co/cran/latest"}]},
+  "Packages": {
+    "secret": {"Package": "secret", "Version": "1.0.0", "Source": "Repository", "Repository": "CRAN"},
+    "bio": {"Package": "bio", "Version": "1.0.0", "Source": "Bioconductor", "Repository": "Bioconductor 3.18"}
+  }
+}`,
+			},
+			wantN:   0,
+			wantAll: lockfile.VulnUnknown,
+		},
+		{
+			name: "julia manifest without a proven registry",
+			files: map[string]string{
+				"Manifest.toml": `manifest_format = "2.0"
+
+[[deps.Secret]]
+git-tree-sha1 = "0123456789abcdef0123456789abcdef01234567"
+uuid = "11111111-2222-3333-4444-555555555555"
+version = "1.0.0"
+`,
+			},
+			wantN:   0,
+			wantAll: lockfile.VulnUnknown,
+		},
+		{
+			name: "cabal freeze with another repository",
+			files: map[string]string{
+				"cabal.project.freeze": "active-repositories: hackage.haskell.org:merge, corp:rest\nconstraints: any.secret ==1.0.0\n",
+			},
+			wantN:   0,
+			wantAll: lockfile.VulnUnknown,
+		},
+		{
 			name: "poetry private source",
 			files: map[string]string{
 				"poetry.lock": `[[package]]

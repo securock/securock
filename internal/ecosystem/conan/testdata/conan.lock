@@ -1,0 +1,20 @@
+{
+    "version": "0.5",
+    "requires": [
+        "zlib/1.3.1#f52e03ae3d251dec704634230cd806a2%1708593606.497",
+        "openssl/3.2.1#0123456789abcdef0123456789abcdef%1710000000.1",
+        "mylib/2.0@acme/stable#aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "norevision/1.0",
+        "versionless"
+    ],
+    "build_requires": [
+        "cmake/3.28.1#bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb%1700000000.0",
+        "zlib/1.3.1#f52e03ae3d251dec704634230cd806a2%1708593606.497"
+    ],
+    "python_requires": [
+        "mytools/1.0#cccccccccccccccccccccccccccccccc"
+    ],
+    "config_requires": [
+        "corp-config/1.0"
+    ]
+}

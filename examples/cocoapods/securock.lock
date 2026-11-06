@@ -1,0 +1,37 @@
+version: 3
+source:
+  ecosystems:
+    - cocoapods
+  resolvers:
+    - cocoapods
+policy:
+  digest: sha256:a7b760ed4719640b3b9c63f1441e3fda7a2d511fec8f731edbd4ac280367e5c1
+artifacts:
+  - subject:
+      ecosystem: cocoapods
+      name: Alamofire
+    version: 5.8.0
+    source:
+      resolver: cocoapods
+      kind: registry
+      registry: https://cdn.cocoapods.org
+    evidence:
+      provenance: unknown
+      signature: unknown
+      vulnerabilities:
+        state: unknown
+      malicious:
+        state: unknown
+      capabilities:
+        state: unknown
+      behavior:
+        state: unknown
+      ownership:
+        state: unknown
+      chain:
+        state: unknown
+    trust:
+      status: unknown
+      reasons:
+        - malicious reports not checked
+        - vulnerabilities not checked

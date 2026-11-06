@@ -1,0 +1,44 @@
+PODS:
+  - Alamofire (5.8.0)
+  - Firebase/Core (10.0.0):
+    - FirebaseAnalytics (~> 10.0.0)
+  - Firebase/Auth (10.0.0):
+    - Alamofire
+  - FirebaseAnalytics (10.0.1)
+  - GitPod (1.2.0)
+  - LocalPod (0.1.0)
+  - PrivatePod (2.0.0)
+
+DEPENDENCIES:
+  - Alamofire (~> 5.0)
+  - Firebase/Core
+  - GitPod (from `https://token@github.com/acme/GitPod.git`, tag `1.2.0`)
+  - LocalPod (from `../LocalPod`)
+  - PrivatePod
+
+SPEC REPOS:
+  https://github.com/acme/private-specs.git:
+    - PrivatePod
+  trunk:
+    - Alamofire
+    - Firebase
+    - FirebaseAnalytics
+
+EXTERNAL SOURCES:
+  GitPod:
+    :git: https://token@github.com/acme/GitPod.git
+    :tag: 1.2.0
+  LocalPod:
+    :path: "../LocalPod"
+
+CHECKOUT OPTIONS:
+  GitPod:
+    :commit: 0123456789abcdef0123456789abcdef01234567
+    :git: https://token@github.com/acme/GitPod.git
+
+SPEC CHECKSUMS:
+  Alamofire: 0123456789abcdef0123456789abcdef01234567
+
+PODFILE CHECKSUM: 0123456789abcdef0123456789abcdef01234567
+
+COCOAPODS: 1.15.2

@@ -58,6 +58,34 @@ func TestQueryEcosystemSkipsJSRAndURL(t *testing.T) {
 	if osv.Queryable(jsr) {
 		t.Fatal("jsr must not be sent to OSV yet")
 	}
+	pod := ecosystem.Dependency{Ecosystem: "cocoapods", Name: "Alamofire", Version: "5.8.0", Registry: "https://cdn.cocoapods.org"}
+	if osv.Queryable(pod) {
+		t.Fatal("cocoapods has no OSV ecosystem and must not be queried")
+	}
+	conanDep := ecosystem.Dependency{Ecosystem: "conan", Name: "zlib", Version: "1.3.1"}
+	if osv.Queryable(conanDep) {
+		t.Fatal("conan has no OSV ecosystem and must not be queried")
+	}
+	bio := ecosystem.Dependency{Ecosystem: "cran", Name: "BiocGenerics", Version: "0.48.1"}
+	if osv.Queryable(bio) {
+		t.Fatal("cran without a proven CRAN registry must not be queried")
+	}
+	cran := ecosystem.Dependency{Ecosystem: "cran", Name: "jsonlite", Version: "1.8.8", Registry: "https://cloud.r-project.org"}
+	if osv.QueryEcosystem(cran) != "CRAN" {
+		t.Fatal("proven CRAN packages must map to CRAN")
+	}
+	jl := ecosystem.Dependency{Ecosystem: "julia", Name: "HTTP", Version: "1.10.8"}
+	if osv.QueryEcosystem(jl) != "Julia" || osv.QueryName(jl) != "HTTP" {
+		t.Fatal("julia must map to the Julia ecosystem by package name")
+	}
+	hs := ecosystem.Dependency{Ecosystem: "hackage", Name: "aeson", Version: "2.2.1.0"}
+	if osv.Queryable(hs) {
+		t.Fatal("hackage without a proven registry must not be queried")
+	}
+	hs.Registry = "https://hackage.haskell.org"
+	if osv.QueryEcosystem(hs) != "Hackage" {
+		t.Fatal("proven hackage packages must map to Hackage")
+	}
 	remote := ecosystem.Dependency{Ecosystem: "url", Name: "https://example.com/mod.ts", Version: "abc"}
 	if osv.Queryable(remote) {
 		t.Fatal("url artifacts must not be sent to OSV")

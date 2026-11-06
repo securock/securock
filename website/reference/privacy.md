@@ -32,18 +32,20 @@ The default network mode is `public-only`. Securock only queries:
 and only for artifacts whose lockfile registry is a known public
 registry:
 
-| Ecosystem | Allowed registries                                                                                                                                                     |
-| --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| npm       | `https://registry.npmjs.org`, `https://registry.yarnpkg.com`                                                                                                           |
-| cargo     | crates.io index URLs                                                                                                                                                   |
-| go        | `https://proxy.golang.org` when the effective `GOPROXY` is that single public proxy (OS, then `go env -w` / `GOENV`, then Go's default). Multiple proxy URLs (`,` or ` | `) are unknown. `GONOPROXY`overrides`GOPRIVATE`for proxy use;`GOPRIVATE` still keeps names off OSV. |
-| pypi      | `https://pypi.org`                                                                                                                                                     |
-| packagist | `https://repo.packagist.org`                                                                                                                                           |
-| rubygems  | `https://rubygems.org`                                                                                                                                                 |
-| nuget     | `https://api.nuget.org`                                                                                                                                                |
-| pub       | `https://pub.dev`                                                                                                                                                      |
-| hex       | `https://repo.hex.pm`                                                                                                                                                  |
-| jsr       | `https://jsr.io` (names are not sent to OSV yet)                                                                                                                       |
+| Ecosystem | Allowed registries                                                                                                                                                            |
+| --------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| npm       | `https://registry.npmjs.org`, `https://registry.yarnpkg.com`                                                                                                                  |
+| cargo     | crates.io index URLs                                                                                                                                                          |
+| go        | `https://proxy.golang.org` when the effective `GOPROXY` is that single public proxy (OS, then `go env -w` / `GOENV`, then Go's default). Multiple proxy URLs (`,` or `        | `) are unknown. `GONOPROXY`overrides`GOPRIVATE`for proxy use;`GOPRIVATE` still keeps names off OSV. |
+| pypi      | `https://pypi.org`                                                                                                                                                            |
+| packagist | `https://repo.packagist.org`                                                                                                                                                  |
+| rubygems  | `https://rubygems.org`                                                                                                                                                        |
+| nuget     | `https://api.nuget.org`                                                                                                                                                       |
+| pub       | `https://pub.dev`                                                                                                                                                             |
+| hex       | `https://repo.hex.pm`                                                                                                                                                         |
+| hackage   | `https://hackage.haskell.org` (only when `cabal.project.freeze` lists `hackage.haskell.org` as its sole active repository and `cabal.project` declares no `repository`)       |
+| cran      | `https://cloud.r-project.org`, `https://cran.r-project.org` (only for packages from the `CRAN` repository; Bioconductor, Posit Package Manager and other mirrors are unknown) |
+| jsr       | `https://jsr.io` (names are not sent to OSV yet)                                                                                                                              |
 
 Private registries, missing `resolved` URLs, custom or ambiguous
 `GOPROXY` lists, and `GOPRIVATE` / `GONOPROXY` modules are recorded in

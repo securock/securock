@@ -136,7 +136,7 @@ Pre-1.0. All resolvers are stable.
 
 - **npm, pnpm, Yarn, Bun, Deno** collect provenance, signature, capability,
   behavior, ownership, and trust-chain evidence from the npm registry.
-- **PyPI (uv / Poetry / PDM)** collects Integrity API attestations and
+- **PyPI (uv / Poetry / PDM / Pipenv)** collects Integrity API attestations and
   locally re-verifies PEP 740 Sigstore envelopes to provenance/signature
   `verified` when the signer identity, filename, digest, signature, and
   transparency log check out.
@@ -332,27 +332,33 @@ it cannot comment on a fork PR.
 
 ### Stable
 
-| Ecosystem | Resolver | Lockfile             |
-| --------- | -------- | -------------------- |
-| npm       | npm      | `package-lock.json`  |
-| npm       | pnpm     | `pnpm-lock.yaml`     |
-| npm       | yarn     | `yarn.lock`          |
-| npm       | bun      | `bun.lock`           |
-| npm       | deno     | `deno.lock`          |
-| jsr       | deno     | `deno.lock`          |
-| url       | deno     | `deno.lock`          |
-| cargo     | cargo    | `Cargo.lock`         |
-| go        | go       | `go.mod` + `go.sum`  |
-| pypi      | uv       | `uv.lock`            |
-| pypi      | poetry   | `poetry.lock`        |
-| pypi      | pdm      | `pdm.lock`           |
-| packagist | composer | `composer.lock`      |
-| rubygems  | bundler  | `Gemfile.lock`       |
-| nuget     | nuget    | `packages.lock.json` |
-| swift     | swiftpm  | `Package.resolved`   |
-| pub       | pub      | `pubspec.lock`       |
-| hex       | mix      | `mix.lock`           |
-| maven     | gradle   | `gradle.lockfile`    |
+| Ecosystem | Resolver  | Lockfile               |
+| --------- | --------- | ---------------------- |
+| npm       | npm       | `package-lock.json`    |
+| npm       | pnpm      | `pnpm-lock.yaml`       |
+| npm       | yarn      | `yarn.lock`            |
+| npm       | bun       | `bun.lock`             |
+| npm       | deno      | `deno.lock`            |
+| jsr       | deno      | `deno.lock`            |
+| url       | deno      | `deno.lock`            |
+| cargo     | cargo     | `Cargo.lock`           |
+| go        | go        | `go.mod` + `go.sum`    |
+| pypi      | uv        | `uv.lock`              |
+| pypi      | poetry    | `poetry.lock`          |
+| pypi      | pdm       | `pdm.lock`             |
+| pypi      | pipenv    | `Pipfile.lock`         |
+| packagist | composer  | `composer.lock`        |
+| rubygems  | bundler   | `Gemfile.lock`         |
+| nuget     | nuget     | `packages.lock.json`   |
+| swift     | swiftpm   | `Package.resolved`     |
+| cocoapods | cocoapods | `Podfile.lock`         |
+| conan     | conan     | `conan.lock`           |
+| cran      | renv      | `renv.lock`            |
+| julia     | julia     | `Manifest.toml`        |
+| hackage   | cabal     | `cabal.project.freeze` |
+| pub       | pub       | `pubspec.lock`         |
+| hex       | mix       | `mix.lock`             |
+| maven     | gradle    | `gradle.lockfile`      |
 
 Notes:
 
@@ -362,6 +368,16 @@ Notes:
   so vulnerability state stays `unknown`.
 - **Gradle** — records Maven coordinates from `gradle.lockfile` but
   does not prove a registry, so OSV is not queried in `public-only`.
+- **Cabal** — reads `cabal.project.freeze`. OSV is queried in `public-only`
+  only when Hackage is the sole proven repository.
+- **Julia** — reads `Manifest.toml`. No registry is proven, so OSV is not
+  queried in `public-only`.
+- **renv** — reads `renv.lock`. Only `CRAN` packages from the public CRAN
+  hosts are sent to OSV; other repositories stay `unknown`.
+- **Conan** — reads Conan 2 `conan.lock`. No registry is proven and OSV has
+  no ConanCenter ecosystem, so vulnerability state stays `unknown`.
+- **CocoaPods** — reads `Podfile.lock`. OSV has no CocoaPods ecosystem, so
+  vulnerability state stays `unknown`.
 
 ## Documentation
 

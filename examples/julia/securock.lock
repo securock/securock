@@ -1,0 +1,37 @@
+version: 3
+source:
+  ecosystems:
+    - julia
+  resolvers:
+    - julia
+policy:
+  digest: sha256:a7b760ed4719640b3b9c63f1441e3fda7a2d511fec8f731edbd4ac280367e5c1
+artifacts:
+  - subject:
+      ecosystem: julia
+      name: URIs
+    version: 1.5.1
+    source:
+      resolver: julia
+      kind: registry
+      resolved: 67db6cc7b3821e19ebe75791a9dd19c9b1188f2b
+    evidence:
+      provenance: unknown
+      signature: unknown
+      vulnerabilities:
+        state: unknown
+      malicious:
+        state: unknown
+      capabilities:
+        state: unknown
+      behavior:
+        state: unknown
+      ownership:
+        state: unknown
+      chain:
+        state: unknown
+    trust:
+      status: unknown
+      reasons:
+        - malicious reports not checked
+        - vulnerabilities not checked

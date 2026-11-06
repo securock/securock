@@ -3,19 +3,25 @@ package ecosystem
 import (
 	"github.com/securock/securock/internal/ecosystem/bun"
 	"github.com/securock/securock/internal/ecosystem/bundler"
+	"github.com/securock/securock/internal/ecosystem/cabal"
 	"github.com/securock/securock/internal/ecosystem/cargo"
+	"github.com/securock/securock/internal/ecosystem/cocoapods"
 	"github.com/securock/securock/internal/ecosystem/composer"
+	"github.com/securock/securock/internal/ecosystem/conan"
 	"github.com/securock/securock/internal/ecosystem/deno"
 	"github.com/securock/securock/internal/ecosystem/golang"
 	"github.com/securock/securock/internal/ecosystem/gradle"
+	"github.com/securock/securock/internal/ecosystem/julia"
 	"github.com/securock/securock/internal/ecosystem/mix"
 	"github.com/securock/securock/internal/ecosystem/npm"
 	"github.com/securock/securock/internal/ecosystem/nuget"
 	"github.com/securock/securock/internal/ecosystem/pdm"
+	"github.com/securock/securock/internal/ecosystem/pipenv"
 	"github.com/securock/securock/internal/ecosystem/pnpm"
 	"github.com/securock/securock/internal/ecosystem/poetry"
 	"github.com/securock/securock/internal/ecosystem/pub"
 	"github.com/securock/securock/internal/ecosystem/pypi"
+	"github.com/securock/securock/internal/ecosystem/renv"
 	"github.com/securock/securock/internal/ecosystem/swiftpm"
 	"github.com/securock/securock/internal/ecosystem/yarn"
 )
@@ -32,10 +38,16 @@ func All() []Ecosystem {
 		pypi.New(),
 		poetry.New(),
 		pdm.New(),
+		pipenv.New(),
 		composer.New(),
 		bundler.New(),
 		nuget.New(),
 		swiftpm.New(),
+		cocoapods.New(),
+		conan.New(),
+		renv.New(),
+		julia.New(),
+		cabal.New(),
 		pub.New(),
 		mix.New(),
 		gradle.New(),
@@ -44,7 +56,7 @@ func All() []Ecosystem {
 
 func Prefer(found []Ecosystem) []Ecosystem {
 	found = preferFamily(found, []string{"pnpm", "yarn", "bun", "npm"})
-	found = preferFamily(found, []string{"pypi", "poetry", "pdm"})
+	found = preferFamily(found, []string{"pypi", "poetry", "pdm", "pipenv"})
 	return found
 }
 

@@ -1,0 +1,61 @@
+{
+    "_meta": {
+        "hash": {"sha256": "0000000000000000000000000000000000000000000000000000000000000000"},
+        "pipfile-spec": 6,
+        "requires": {"python_version": "3.12"},
+        "sources": [
+            {"name": "pypi", "url": "https://pypi.org/simple", "verify_ssl": true},
+            {"name": "internal", "url": "https://pypi.internal.example/simple", "verify_ssl": true}
+        ]
+    },
+    "default": {
+        "requests": {
+            "hashes": [
+                "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+                "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+            ],
+            "index": "pypi",
+            "version": "==2.31.0"
+        },
+        "Single_Hash": {
+            "hashes": ["sha256:3333333333333333333333333333333333333333333333333333333333333333"],
+            "index": "pypi",
+            "version": "==1.0.0"
+        },
+        "corp-lib": {
+            "hashes": ["sha256:4444444444444444444444444444444444444444444444444444444444444444"],
+            "index": "internal",
+            "version": "==0.5.0"
+        },
+        "noindex": {
+            "hashes": ["sha256:5555555555555555555555555555555555555555555555555555555555555555"],
+            "version": "==3.0.0"
+        },
+        "gitpkg": {
+            "git": "https://token@github.com/acme/gitpkg.git",
+            "ref": "0123456789abcdef0123456789abcdef01234567"
+        },
+        "localpkg": {
+            "editable": true,
+            "path": "./localpkg"
+        },
+        "unpinned": {
+            "version": "*"
+        }
+    },
+    "develop": {
+        "pytest": {
+            "hashes": ["sha256:6666666666666666666666666666666666666666666666666666666666666666"],
+            "index": "pypi",
+            "version": "==8.0.0"
+        },
+        "requests": {
+            "hashes": [
+                "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+                "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+            ],
+            "index": "pypi",
+            "version": "==2.31.0"
+        }
+    }
+}
