@@ -152,9 +152,11 @@ reported, anything else is. In PHP, a variable called `$html` or `$output` is tr
 a page buffer, so appending request data to it is reported as `xss`.
 
 `sast:secrets/*` reports credentials in any text file, not only source: provider
-tokens by their fixed shape (AWS, GitHub, GitLab, Slack, Stripe, Google, npm,
-PyPI, SendGrid, OpenAI, Anthropic, Twilio, and private key blocks, rated
-high), and `name = "literal"` for password, secret, token and key names in
+tokens by their fixed shape (AWS, GitHub, GitLab, Slack and Discord webhooks,
+Stripe, Google, npm, PyPI, SendGrid, OpenAI, Anthropic, Twilio, Hugging Face,
+DigitalOcean, Shopify, Databricks, Mailchimp, Mailgun, Square, Linear, New Relic,
+Grafana, Postman, Pulumi, Doppler, Terraform Cloud, Docker Hub, Telegram, Azure
+storage keys, age keys, and private key blocks, rated high), and `name = "literal"` for password, secret, token and key names in
 code and configuration files when the literal looks random (rated medium).
 Connection strings with a password (`Server=...;Password=...`) and URLs with credentials
 (`postgres://user:secret@host/db`) are reported as well. The value is never copied into the report. Lockfiles, Markdown, minified files,
@@ -167,12 +169,12 @@ passed between components as props are not followed yet.
 `sast` also checks infrastructure files for unsafe settings. These are
 configuration checks, not dataflow, and have the rule ids `sast:iac/RULE`:
 
-| Files                         | Rules                                                                                                                                             |
-| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `Dockerfile`, `Containerfile` | `docker-root-user`, `docker-unpinned-image`, `docker-add-remote`, `docker-pipe-to-shell`, `hardcoded-secret`                                      |
-| Kubernetes and Compose YAML   | `privileged-container`, `host-namespace`, `privilege-escalation`, `run-as-root`, `host-path-mount`, `docker-socket-mount`, `dangerous-capability` |
-| Terraform (`.tf`, AWS)        | `open-ingress`, `public-bucket`, `public-database`, `unencrypted-storage`, `iam-wildcard`, `hardcoded-secret`                                     |
-| `.github/workflows/*.yml`     | `actions-script-injection`, `actions-pwn-request`                                                                                                 |
+| Files                                       | Rules                                                                                                                                                                                                                                                                          |
+| ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `Dockerfile`, `Containerfile`               | `docker-root-user`, `docker-unpinned-image`, `docker-add-remote`, `docker-pipe-to-shell`, `docker-insecure-download`, `docker-chmod-777`, `docker-ssh-port`, `hardcoded-secret`                                                                                                |
+| Kubernetes and Compose YAML                 | `privileged-container`, `host-namespace`, `privilege-escalation`, `run-as-root`, `host-path-mount`, `docker-socket-mount`, `dangerous-capability`, `seccomp-unconfined`, `writable-root-filesystem`, `rbac-wildcard`, `cluster-admin-binding`, `hardcoded-secret` (env values) |
+| Terraform (`.tf`; AWS, Google Cloud, Azure) | `open-ingress`, `public-bucket`, `public-database`, `public-iam`, `unencrypted-storage`, `iam-wildcard`, `imds-v1`, `insecure-transport`, `hardcoded-secret`                                                                                                                   |
+| `.github/workflows/*.yml`                   | `actions-script-injection`, `actions-pwn-request`, `actions-unpinned`, `actions-write-all`, `actions-unsecure-commands`                                                                                                                                                        |
 
 Only the file itself is read: a Terraform module's inputs, Helm templates, and
 Kustomize overlays are not rendered, so a setting supplied that way is not seen.
