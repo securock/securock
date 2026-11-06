@@ -42,6 +42,10 @@ func DefaultRegistries() map[string][]string {
 		"hex": {
 			"https://repo.hex.pm",
 		},
+		"cran": {
+			"https://cloud.r-project.org",
+			"https://cran.r-project.org",
+		},
 		"jsr": {
 			"https://jsr.io",
 		},

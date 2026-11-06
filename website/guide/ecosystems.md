@@ -36,6 +36,7 @@ resolver per family (for example pnpm over npm).
 | swift     | swiftpm   | `Package.resolved`   |
 | cocoapods | cocoapods | `Podfile.lock`       |
 | conan     | conan     | `conan.lock`         |
+| cran      | renv      | `renv.lock`          |
 | pub       | pub       | `pubspec.lock`       |
 | hex       | mix       | `mix.lock`           |
 | maven     | gradle    | `gradle.lockfile`    |
@@ -88,6 +89,7 @@ package enters the project (its scope) and what each package depends on. What ea
 | go        | not recorded                                                          | not recorded                                  |
 | swiftpm   | not recorded                                                          | not recorded                                  |
 | cocoapods | not recorded                                                          | dependency list of each `PODS` entry          |
+| cran      | not recorded                                                          | not recorded                                  |
 | conan     | `requires` is runtime, `build_requires` and `python_requires` are dev | not recorded                                  |
 
 Where a lockfile records neither, vulnerabilities stay `unknown`. Where the scope comes from a
@@ -124,6 +126,11 @@ modules a package actually imports, so reachability for Go needs call-graph anal
 - `Pipfile.lock` lists file hashes without file names. A digest is recorded only when an entry has exactly one hash; with several, the digest stays unknown.
 - An entry without `index` resolves to a registry only when the lockfile has a single source.
 - Entries that are not exact `==` pins (and have no git, path or file source) are skipped.
+
+### renv (CRAN)
+
+- Only packages from the `CRAN` repository, when `renv.lock` lists it at `cloud.r-project.org` or `cran.r-project.org`, are sent to OSV in `public-only`. Bioconductor, Posit Package Manager and other repositories record no registry and stay `unknown`.
+- renv's `Hash` is an MD5 of the package `DESCRIPTION`, not an artifact digest, so it is not recorded. `renv.lock` has no scopes or dependency edges.
 
 ### Conan
 

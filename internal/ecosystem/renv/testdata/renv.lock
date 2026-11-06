@@ -1,0 +1,52 @@
+{
+  "R": {
+    "Version": "4.3.2",
+    "Repositories": [
+      { "Name": "CRAN", "URL": "https://cloud.r-project.org" }
+    ]
+  },
+  "Packages": {
+    "jsonlite": {
+      "Package": "jsonlite",
+      "Version": "1.8.8",
+      "Source": "Repository",
+      "Repository": "CRAN",
+      "Hash": "e1b9c55281c5adc4dd113652d9e26768"
+    },
+    "BiocGenerics": {
+      "Package": "BiocGenerics",
+      "Version": "0.48.1",
+      "Source": "Bioconductor",
+      "Repository": "Bioconductor 3.18",
+      "Hash": "11111111111111111111111111111111"
+    },
+    "internal": {
+      "Package": "internal",
+      "Version": "2.0.0",
+      "Source": "Repository",
+      "Repository": "Corp",
+      "Hash": "22222222222222222222222222222222"
+    },
+    "gh": {
+      "Package": "gh",
+      "Version": "1.4.0",
+      "Source": "GitHub",
+      "RemoteType": "github",
+      "RemoteHost": "api.github.com",
+      "RemoteUsername": "r-lib",
+      "RemoteRepo": "gh",
+      "RemoteSha": "0123456789abcdef0123456789abcdef01234567",
+      "Hash": "33333333333333333333333333333333"
+    },
+    "mine": {
+      "Package": "mine",
+      "Version": "0.1.0",
+      "Source": "Local"
+    },
+    "noversion": {
+      "Package": "noversion",
+      "Source": "Repository",
+      "Repository": "CRAN"
+    }
+  }
+}

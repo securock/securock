@@ -88,6 +88,7 @@ func TestPURL(t *testing.T) {
 		{"nuget", "Newtonsoft.Json", "13.0.3", "", "pkg:nuget/Newtonsoft.Json@13.0.3"},
 		{"pub", "http", "1.2.0", "", "pkg:pub/http@1.2.0"},
 		{"hex", "phoenix", "1.7.0", "", "pkg:hex/phoenix@1.7.0"},
+		{"cran", "jsonlite", "1.8.8", "", "pkg:cran/jsonlite@1.8.8"},
 		{"conan", "zlib", "1.3.1", "", "pkg:conan/zlib@1.3.1"},
 		{"cocoapods", "Alamofire", "5.8.0", "", "pkg:cocoapods/Alamofire@5.8.0"},
 		{"maven", "org.slf4j:slf4j-api", "2.0.9", "", "pkg:maven/org.slf4j/slf4j-api@2.0.9"},

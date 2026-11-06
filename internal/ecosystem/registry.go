@@ -19,6 +19,7 @@ import (
 	"github.com/securock/securock/internal/ecosystem/poetry"
 	"github.com/securock/securock/internal/ecosystem/pub"
 	"github.com/securock/securock/internal/ecosystem/pypi"
+	"github.com/securock/securock/internal/ecosystem/renv"
 	"github.com/securock/securock/internal/ecosystem/swiftpm"
 	"github.com/securock/securock/internal/ecosystem/yarn"
 )
@@ -42,6 +43,7 @@ func All() []Ecosystem {
 		swiftpm.New(),
 		cocoapods.New(),
 		conan.New(),
+		renv.New(),
 		pub.New(),
 		mix.New(),
 		gradle.New(),

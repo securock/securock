@@ -276,6 +276,20 @@ url = "https://pypi.company.example/simple"
 			wantAll: lockfile.VulnUnknown,
 		},
 		{
+			name: "renv non-cran repository",
+			files: map[string]string{
+				"renv.lock": `{
+  "R": {"Repositories": [{"Name": "CRAN", "URL": "https://packagemanager.posit.co/cran/latest"}]},
+  "Packages": {
+    "secret": {"Package": "secret", "Version": "1.0.0", "Source": "Repository", "Repository": "CRAN"},
+    "bio": {"Package": "bio", "Version": "1.0.0", "Source": "Bioconductor", "Repository": "Bioconductor 3.18"}
+  }
+}`,
+			},
+			wantN:   0,
+			wantAll: lockfile.VulnUnknown,
+		},
+		{
 			name: "poetry private source",
 			files: map[string]string{
 				"poetry.lock": `[[package]]
