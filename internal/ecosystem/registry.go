@@ -6,6 +6,7 @@ import (
 	"github.com/securock/securock/internal/ecosystem/cargo"
 	"github.com/securock/securock/internal/ecosystem/cocoapods"
 	"github.com/securock/securock/internal/ecosystem/composer"
+	"github.com/securock/securock/internal/ecosystem/conan"
 	"github.com/securock/securock/internal/ecosystem/deno"
 	"github.com/securock/securock/internal/ecosystem/golang"
 	"github.com/securock/securock/internal/ecosystem/gradle"
@@ -40,6 +41,7 @@ func All() []Ecosystem {
 		nuget.New(),
 		swiftpm.New(),
 		cocoapods.New(),
+		conan.New(),
 		pub.New(),
 		mix.New(),
 		gradle.New(),

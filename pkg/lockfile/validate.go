@@ -9,8 +9,8 @@ import (
 )
 
 var (
-	ecosystems  = []string{"npm", "jsr", "url", "cargo", "go", "pypi", "packagist", "rubygems", "nuget", "swift", "pub", "hex", "maven", "cocoapods"}
-	resolvers   = []string{"npm", "pnpm", "yarn", "bun", "deno", "cargo", "go", "uv", "poetry", "pdm", "composer", "bundler", "nuget", "swiftpm", "pub", "mix", "gradle", "cocoapods", "pipenv"}
+	ecosystems  = []string{"npm", "jsr", "url", "cargo", "go", "pypi", "packagist", "rubygems", "nuget", "swift", "pub", "hex", "maven", "cocoapods", "conan"}
+	resolvers   = []string{"npm", "pnpm", "yarn", "bun", "deno", "cargo", "go", "uv", "poetry", "pdm", "composer", "bundler", "nuget", "swiftpm", "pub", "mix", "gradle", "cocoapods", "pipenv", "conan"}
 	statuses    = []Status{StatusTrusted, StatusUntrusted, StatusUnknown}
 	evidence    = []EvidenceState{EvidenceUnknown, EvidenceMissing, EvidencePresent, EvidenceVerified}
 	vulnStates  = []VulnState{VulnUnknown, VulnChecked}

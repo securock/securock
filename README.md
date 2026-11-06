@@ -352,6 +352,7 @@ it cannot comment on a fork PR.
 | nuget     | nuget     | `packages.lock.json` |
 | swift     | swiftpm   | `Package.resolved`   |
 | cocoapods | cocoapods | `Podfile.lock`       |
+| conan     | conan     | `conan.lock`         |
 | pub       | pub       | `pubspec.lock`       |
 | hex       | mix       | `mix.lock`           |
 | maven     | gradle    | `gradle.lockfile`    |
@@ -364,6 +365,8 @@ Notes:
   so vulnerability state stays `unknown`.
 - **Gradle** — records Maven coordinates from `gradle.lockfile` but
   does not prove a registry, so OSV is not queried in `public-only`.
+- **Conan** — reads Conan 2 `conan.lock`. No registry is proven and OSV has
+  no ConanCenter ecosystem, so vulnerability state stays `unknown`.
 - **CocoaPods** — reads `Podfile.lock`. OSV has no CocoaPods ecosystem, so
   vulnerability state stays `unknown`.
 

@@ -35,6 +35,7 @@ resolver per family (for example pnpm over npm).
 | nuget     | nuget     | `packages.lock.json` |
 | swift     | swiftpm   | `Package.resolved`   |
 | cocoapods | cocoapods | `Podfile.lock`       |
+| conan     | conan     | `conan.lock`         |
 | pub       | pub       | `pubspec.lock`       |
 | hex       | mix       | `mix.lock`           |
 | maven     | gradle    | `gradle.lockfile`    |
@@ -66,27 +67,28 @@ artifact before emitting `verified`.
 `--reachability` ([Usage](/guide/usage#reachability)) needs two things from the lockfile: how each
 package enters the project (its scope) and what each package depends on. What each resolver can read:
 
-| Resolver  | Scope comes from                                                 | Dependency edges                              |
-| --------- | ---------------------------------------------------------------- | --------------------------------------------- |
-| npm       | `dev`, `optional` and `devOptional` flags                        | `dependencies` of each package                |
-| pnpm      | `importers` (direct dependencies), spread along the graph        | `snapshots`, or `packages` in older lockfiles |
-| yarn      | `package.json` of the project and workspaces, spread along edges | `dependencies` of each entry                  |
-| bun       | `workspaces` (direct dependencies), spread along the graph       | dependency map of each package                |
-| deno      | `workspace` imports, spread along the graph (all runtime)        | `dependencies` of each package                |
-| uv        | project and workspace member: dependencies, extras, dev groups   | `dependencies` of each package                |
-| poetry    | `groups`, or `category`, or `pyproject.toml` for older lockfiles | `[package.dependencies]`                      |
-| pdm       | `groups`, with `pyproject.toml` saying which are extras or dev   | `dependencies` requirement strings            |
-| pipenv    | `default` is runtime, `develop` is dev                           | not recorded                                  |
-| cargo     | `Cargo.toml` of the project and workspace members                | `dependencies` of each package                |
-| composer  | `packages` is runtime, `packages-dev` is dev                     | `require` of each package                     |
-| bundler   | `DEPENDENCIES`, with the `Gemfile` marking dev and test groups   | gems listed under each spec                   |
-| nuget     | `Direct` packages are runtime                                    | `dependencies` within each target framework   |
-| pub       | `direct main`, `direct dev`, `direct overridden`                 | not recorded                                  |
-| mix       | `mix.exs`, where `only: :dev` or `:test` marks dev               | dependency list of each hex entry             |
-| gradle    | the configurations a dependency is locked for                    | not recorded                                  |
-| go        | not recorded                                                     | not recorded                                  |
-| swiftpm   | not recorded                                                     | not recorded                                  |
-| cocoapods | not recorded                                                     | dependency list of each `PODS` entry          |
+| Resolver  | Scope comes from                                                      | Dependency edges                              |
+| --------- | --------------------------------------------------------------------- | --------------------------------------------- |
+| npm       | `dev`, `optional` and `devOptional` flags                             | `dependencies` of each package                |
+| pnpm      | `importers` (direct dependencies), spread along the graph             | `snapshots`, or `packages` in older lockfiles |
+| yarn      | `package.json` of the project and workspaces, spread along edges      | `dependencies` of each entry                  |
+| bun       | `workspaces` (direct dependencies), spread along the graph            | dependency map of each package                |
+| deno      | `workspace` imports, spread along the graph (all runtime)             | `dependencies` of each package                |
+| uv        | project and workspace member: dependencies, extras, dev groups        | `dependencies` of each package                |
+| poetry    | `groups`, or `category`, or `pyproject.toml` for older lockfiles      | `[package.dependencies]`                      |
+| pdm       | `groups`, with `pyproject.toml` saying which are extras or dev        | `dependencies` requirement strings            |
+| pipenv    | `default` is runtime, `develop` is dev                                | not recorded                                  |
+| cargo     | `Cargo.toml` of the project and workspace members                     | `dependencies` of each package                |
+| composer  | `packages` is runtime, `packages-dev` is dev                          | `require` of each package                     |
+| bundler   | `DEPENDENCIES`, with the `Gemfile` marking dev and test groups        | gems listed under each spec                   |
+| nuget     | `Direct` packages are runtime                                         | `dependencies` within each target framework   |
+| pub       | `direct main`, `direct dev`, `direct overridden`                      | not recorded                                  |
+| mix       | `mix.exs`, where `only: :dev` or `:test` marks dev                    | dependency list of each hex entry             |
+| gradle    | the configurations a dependency is locked for                         | not recorded                                  |
+| go        | not recorded                                                          | not recorded                                  |
+| swiftpm   | not recorded                                                          | not recorded                                  |
+| cocoapods | not recorded                                                          | dependency list of each `PODS` entry          |
+| conan     | `requires` is runtime, `build_requires` and `python_requires` are dev | not recorded                                  |
 
 Where a lockfile records neither, vulnerabilities stay `unknown`. Where the scope comes from a
 manifest (`package.json`, `Cargo.toml`, `pyproject.toml`, `Gemfile`, `mix.exs`) and the manifest is
@@ -122,6 +124,12 @@ modules a package actually imports, so reachability for Go needs call-graph anal
 - `Pipfile.lock` lists file hashes without file names. A digest is recorded only when an entry has exactly one hash; with several, the digest stays unknown.
 - An entry without `index` resolves to a registry only when the lockfile has a single source.
 - Entries that are not exact `==` pins (and have no git, path or file source) are skipped.
+
+### Conan
+
+- Only Conan 2 lockfiles (`conan.lock` version 0.5) are read; Conan 1 `graph_lock` files are rejected.
+- The lockfile does not say which remote served a recipe, so no registry is recorded and nothing is queried in `public-only`. OSV has no ConanCenter ecosystem either, so vulnerability state stays `unknown`.
+- The recipe revision is kept as the resolved reference, not as a digest. `config_requires` are not dependencies and are skipped.
 
 ### CocoaPods
 
