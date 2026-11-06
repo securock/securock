@@ -1,5 +1,5 @@
 {
-  "name": "release-tags",
+  "name": "Protect release tags: no delete or rewrite",
   "target": "tag",
   "enforcement": "active",
   "bypass_actors": [],

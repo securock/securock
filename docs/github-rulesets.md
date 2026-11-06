@@ -10,7 +10,7 @@ configuration — `scripts/check-rulesets.sh` fails CI when they drift.
 
 Enable **Require actions to be pinned to a full-length commit SHA**.
 
-## `main` ruleset
+## Protect main: PR review and required checks
 
 - Target: default branch
 - Block force pushes
@@ -34,7 +34,7 @@ Enable **Require actions to be pinned to a full-length commit SHA**.
 
 Example payload: `.github/rulesets/main.json`.
 
-## `v*` tag ruleset
+## Protect release tags: no delete or rewrite
 
 - Target: tags matching `v*`
 - Block tag deletions
@@ -47,6 +47,19 @@ point at current `main` HEAD. Prefer adding a release-bot-only
 `creation` restriction once that bot exists.
 
 Example payload: `.github/rulesets/tags.json`.
+
+## Require signed commits on all branches
+
+- Target: all branches (`~ALL`)
+- Require signed commits (`required_signatures`): a push is rejected when any
+  new commit is unsigned or its signature is not verified by GitHub
+- No bypass actors, so nobody is exempt
+
+The rule applies to commits pushed after it was created. Commits already on a
+branch are not rewritten; signing them would change their hashes and needs a
+force push, which the `main` ruleset blocks.
+
+Example payload: `.github/rulesets/signed-commits.json`.
 
 ## Immutable releases
 

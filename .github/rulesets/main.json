@@ -1,5 +1,5 @@
 {
-  "name": "main",
+  "name": "Protect main: PR review and required checks",
   "target": "branch",
   "enforcement": "active",
   "bypass_actors": [],
