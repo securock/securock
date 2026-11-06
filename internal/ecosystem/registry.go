@@ -10,6 +10,7 @@ import (
 	"github.com/securock/securock/internal/ecosystem/deno"
 	"github.com/securock/securock/internal/ecosystem/golang"
 	"github.com/securock/securock/internal/ecosystem/gradle"
+	"github.com/securock/securock/internal/ecosystem/julia"
 	"github.com/securock/securock/internal/ecosystem/mix"
 	"github.com/securock/securock/internal/ecosystem/npm"
 	"github.com/securock/securock/internal/ecosystem/nuget"
@@ -44,6 +45,7 @@ func All() []Ecosystem {
 		cocoapods.New(),
 		conan.New(),
 		renv.New(),
+		julia.New(),
 		pub.New(),
 		mix.New(),
 		gradle.New(),

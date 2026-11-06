@@ -290,6 +290,20 @@ url = "https://pypi.company.example/simple"
 			wantAll: lockfile.VulnUnknown,
 		},
 		{
+			name: "julia manifest without a proven registry",
+			files: map[string]string{
+				"Manifest.toml": `manifest_format = "2.0"
+
+[[deps.Secret]]
+git-tree-sha1 = "0123456789abcdef0123456789abcdef01234567"
+uuid = "11111111-2222-3333-4444-555555555555"
+version = "1.0.0"
+`,
+			},
+			wantN:   0,
+			wantAll: lockfile.VulnUnknown,
+		},
+		{
 			name: "poetry private source",
 			files: map[string]string{
 				"poetry.lock": `[[package]]

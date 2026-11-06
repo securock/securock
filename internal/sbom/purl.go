@@ -39,6 +39,8 @@ func PURL(a lockfile.Artifact) string {
 	case "maven":
 		typ = "maven"
 		path = strings.SplitN(name, ":", 2)
+	case "julia":
+		typ, path = "julia", []string{name}
 	case "cran":
 		typ, path = "cran", []string{name}
 	case "conan":

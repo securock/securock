@@ -255,6 +255,8 @@ func Ecosystem(name string) string {
 		return "Hex"
 	case "cran":
 		return "CRAN"
+	case "julia":
+		return "Julia"
 	case "maven":
 		return "Maven"
 	default:

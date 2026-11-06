@@ -74,6 +74,10 @@ func TestQueryEcosystemSkipsJSRAndURL(t *testing.T) {
 	if osv.QueryEcosystem(cran) != "CRAN" {
 		t.Fatal("proven CRAN packages must map to CRAN")
 	}
+	jl := ecosystem.Dependency{Ecosystem: "julia", Name: "HTTP", Version: "1.10.8"}
+	if osv.QueryEcosystem(jl) != "Julia" || osv.QueryName(jl) != "HTTP" {
+		t.Fatal("julia must map to the Julia ecosystem by package name")
+	}
 	remote := ecosystem.Dependency{Ecosystem: "url", Name: "https://example.com/mod.ts", Version: "abc"}
 	if osv.Queryable(remote) {
 		t.Fatal("url artifacts must not be sent to OSV")

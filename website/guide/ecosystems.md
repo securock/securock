@@ -37,6 +37,7 @@ resolver per family (for example pnpm over npm).
 | cocoapods | cocoapods | `Podfile.lock`       |
 | conan     | conan     | `conan.lock`         |
 | cran      | renv      | `renv.lock`          |
+| julia     | julia     | `Manifest.toml`      |
 | pub       | pub       | `pubspec.lock`       |
 | hex       | mix       | `mix.lock`           |
 | maven     | gradle    | `gradle.lockfile`    |
@@ -89,6 +90,7 @@ package enters the project (its scope) and what each package depends on. What ea
 | go        | not recorded                                                          | not recorded                                  |
 | swiftpm   | not recorded                                                          | not recorded                                  |
 | cocoapods | not recorded                                                          | dependency list of each `PODS` entry          |
+| julia     | `Project.toml`: `[deps]` is runtime, test-only `[extras]` are dev     | `deps` of each package                        |
 | cran      | not recorded                                                          | not recorded                                  |
 | conan     | `requires` is runtime, `build_requires` and `python_requires` are dev | not recorded                                  |
 
@@ -126,6 +128,12 @@ modules a package actually imports, so reachability for Go needs call-graph anal
 - `Pipfile.lock` lists file hashes without file names. A digest is recorded only when an entry has exactly one hash; with several, the digest stays unknown.
 - An entry without `index` resolves to a registry only when the lockfile has a single source.
 - Entries that are not exact `==` pins (and have no git, path or file source) are skipped.
+
+### Julia
+
+- `Manifest.toml` does not say which registry served a package, so none is recorded and nothing is sent to OSV in `public-only`. State stays `unknown`; `allow-all` queries OSV by package name.
+- `git-tree-sha1` is a git tree hash, not an archive digest, so it is kept as the resolved reference and not as a digest. Standard libraries are skipped.
+- Scopes come from `Project.toml` next to the manifest; without it they stay `unknown`.
 
 ### renv (CRAN)
 
