@@ -2,6 +2,7 @@ package sast_test
 
 import (
 	"slices"
+	"strings"
 	"testing"
 )
 
@@ -98,6 +99,58 @@ func TestSecretsScanner(t *testing.T) {
 			got := analyze(t, tt.files)
 			if !slices.Equal(got, tt.want) {
 				t.Fatalf("got %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestProviderSecretShapes(t *testing.T) {
+	rep := strings.Repeat
+	tests := []struct {
+		kind, line string
+	}{
+		{"slack-webhook", "URL = 'https://hooks." + "slack.com/services/T0123ABCDEF/B0123ABCDEF/abcdefghijklmnopqrstuvwx'"},
+		{"discord-webhook", "URL = 'https://discord." + "com/api/webhooks/" + rep("1", 18) + "/" + rep("aB3_", 15) + "'"},
+		{"telegram-bot-token", "BOT = '123456789:AA" + rep("aB3", 11) + "'"},
+		{"digitalocean-token", "T = 'dop_v1_" + rep("ab12", 16) + "'"},
+		{"shopify-token", "T = 'shpat_" + rep("ab12", 8) + "'"},
+		{"huggingface-token", "T = 'hf_" + rep("aB3", 11) + "a'"},
+		{"databricks-token", "T = 'dapi" + rep("ab12", 8) + "'"},
+		{"mailchimp-key", "K = '" + rep("ab12", 8) + "-us12'"},
+		{"mailgun-key", "K = 'key-" + rep("ab12", 8) + "'"},
+		{"square-token", "T = 'sq0atp-" + rep("aB3_", 6) + "'"},
+		{"linear-key", "K = 'lin_api_" + rep("aB3d", 10) + "'"},
+		{"newrelic-key", "K = 'NRAK-" + rep("AB3", 9) + "'"},
+		{"grafana-token", "T = 'glsa_" + rep("aB3d", 8) + "_ab12cd34'"},
+		{"postman-key", "K = 'PMAK-" + rep("ab12", 6) + "-" + rep("cd34", 8) + "ab'"},
+		{"pulumi-token", "T = 'pul-" + rep("ab12", 10) + "'"},
+		{"doppler-token", "T = 'dp.pt." + rep("aB3d", 10) + "'"},
+		{"terraform-cloud-token", "T = '" + rep("aB3d", 3) + "aB.atlasv1." + rep("aB3_", 16) + "'"},
+		{"dockerhub-token", "T = 'dckr_pat_" + rep("aB3_", 7) + "'"},
+		{"google-oauth-secret", "S = 'GOCSPX-" + rep("aB3_", 7) + "'"},
+		{"stripe-webhook-secret", "S = 'whsec_" + rep("aB3d", 8) + "'"},
+		{"azure-storage-key", "C = 'DefaultEndpointsProtocol=https;AccountKey=" + rep("aB3/", 21) + "aB==;'"},
+		{"age-secret-key", "K = 'AGE-SECRET-KEY-1" + rep("QPZRY9X8GF", 5) + "QPZRY9X8'"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.kind, func(t *testing.T) {
+			got := analyze(t, map[string]string{"settings.py": tt.line + "\n"})
+			want := []string{"sast:secrets/" + tt.kind}
+			if !slices.Equal(slices.Compact(got), want) {
+				t.Fatalf("got %v, want %v", got, want)
+			}
+		})
+	}
+
+	for name, line := range map[string]string{
+		"a sha256 hex digest":      "digest = '" + rep("ab12", 16) + "'",
+		"short key-like word":      "name = 'key-" + rep("ab", 8) + "'",
+		"hf prefix, too short":     "x = 'hf_abc123'",
+		"mailchimp-shaped, no -us": "x = '" + rep("ab12", 8) + "-eu'",
+	} {
+		t.Run("not "+name, func(t *testing.T) {
+			if got := analyze(t, map[string]string{"settings.py": line + "\n"}); len(got) != 0 {
+				t.Fatalf("got %v, want none", got)
 			}
 		})
 	}
