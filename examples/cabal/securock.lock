@@ -1,0 +1,37 @@
+version: 3
+source:
+  ecosystems:
+    - hackage
+  resolvers:
+    - cabal
+policy:
+  digest: sha256:a7b760ed4719640b3b9c63f1441e3fda7a2d511fec8f731edbd4ac280367e5c1
+artifacts:
+  - subject:
+      ecosystem: hackage
+      name: aeson
+    version: 2.2.1.0
+    source:
+      resolver: cabal
+      kind: registry
+      registry: https://hackage.haskell.org
+    evidence:
+      provenance: unknown
+      signature: unknown
+      vulnerabilities:
+        state: unknown
+      malicious:
+        state: unknown
+      capabilities:
+        state: unknown
+      behavior:
+        state: unknown
+      ownership:
+        state: unknown
+      chain:
+        state: unknown
+    trust:
+      status: unknown
+      reasons:
+        - malicious reports not checked
+        - vulnerabilities not checked

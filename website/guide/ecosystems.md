@@ -184,16 +184,22 @@ See [Privacy](/reference/privacy).
 Offline walkthroughs for several resolvers live under
 [`examples/`](https://github.com/securock/securock/tree/main/examples):
 
-| Resolver | Directory                                                                           |
-| -------- | ----------------------------------------------------------------------------------- |
-| npm      | [`examples/npm`](https://github.com/securock/securock/tree/main/examples/npm)       |
-| pnpm     | [`examples/pnpm`](https://github.com/securock/securock/tree/main/examples/pnpm)     |
-| Yarn     | [`examples/yarn`](https://github.com/securock/securock/tree/main/examples/yarn)     |
-| Bun      | [`examples/bun`](https://github.com/securock/securock/tree/main/examples/bun)       |
-| uv       | [`examples/uv`](https://github.com/securock/securock/tree/main/examples/uv)         |
-| Poetry   | [`examples/poetry`](https://github.com/securock/securock/tree/main/examples/poetry) |
-| Go       | [`examples/go`](https://github.com/securock/securock/tree/main/examples/go)         |
-| Cargo    | [`examples/cargo`](https://github.com/securock/securock/tree/main/examples/cargo)   |
+| Resolver  | Directory                                                                                 |
+| --------- | ----------------------------------------------------------------------------------------- |
+| npm       | [`examples/npm`](https://github.com/securock/securock/tree/main/examples/npm)             |
+| pnpm      | [`examples/pnpm`](https://github.com/securock/securock/tree/main/examples/pnpm)           |
+| Yarn      | [`examples/yarn`](https://github.com/securock/securock/tree/main/examples/yarn)           |
+| Bun       | [`examples/bun`](https://github.com/securock/securock/tree/main/examples/bun)             |
+| uv        | [`examples/uv`](https://github.com/securock/securock/tree/main/examples/uv)               |
+| Poetry    | [`examples/poetry`](https://github.com/securock/securock/tree/main/examples/poetry)       |
+| Go        | [`examples/go`](https://github.com/securock/securock/tree/main/examples/go)               |
+| Cargo     | [`examples/cargo`](https://github.com/securock/securock/tree/main/examples/cargo)         |
+| CocoaPods | [`examples/cocoapods`](https://github.com/securock/securock/tree/main/examples/cocoapods) |
+| Pipenv    | [`examples/pipenv`](https://github.com/securock/securock/tree/main/examples/pipenv)       |
+| Conan     | [`examples/conan`](https://github.com/securock/securock/tree/main/examples/conan)         |
+| renv      | [`examples/renv`](https://github.com/securock/securock/tree/main/examples/renv)           |
+| Julia     | [`examples/julia`](https://github.com/securock/securock/tree/main/examples/julia)         |
+| Cabal     | [`examples/cabal`](https://github.com/securock/securock/tree/main/examples/cabal)         |
 
 ## Next steps
 
