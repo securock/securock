@@ -16,12 +16,12 @@
       "properties": {
         "ecosystems": {
           "type": "array",
-          "items": { "type": "string", "enum": ["npm", "jsr", "url", "cargo", "go", "pypi", "packagist", "rubygems", "nuget", "swift", "pub", "hex", "maven"] },
+          "items": { "type": "string", "enum": ["npm", "jsr", "url", "cargo", "go", "pypi", "packagist", "rubygems", "nuget", "swift", "pub", "hex", "maven", "cocoapods"] },
           "uniqueItems": true
         },
         "resolvers": {
           "type": "array",
-          "items": { "type": "string", "enum": ["npm", "pnpm", "yarn", "bun", "deno", "cargo", "go", "uv", "poetry", "pdm", "composer", "bundler", "nuget", "swiftpm", "pub", "mix", "gradle"] },
+          "items": { "type": "string", "enum": ["npm", "pnpm", "yarn", "bun", "deno", "cargo", "go", "uv", "poetry", "pdm", "composer", "bundler", "nuget", "swiftpm", "pub", "mix", "gradle", "cocoapods"] },
           "uniqueItems": true
         }
       }
@@ -80,7 +80,7 @@
       "properties": {
         "ecosystem": {
           "type": "string",
-          "enum": ["npm", "jsr", "url", "cargo", "go", "pypi", "packagist", "rubygems", "nuget", "swift", "pub", "hex", "maven"]
+          "enum": ["npm", "jsr", "url", "cargo", "go", "pypi", "packagist", "rubygems", "nuget", "swift", "pub", "hex", "maven", "cocoapods"]
         },
         "name": { "type": "string", "minLength": 1 }
       }
@@ -91,7 +91,7 @@
       "properties": {
         "resolver": {
           "type": "string",
-          "enum": ["npm", "pnpm", "yarn", "bun", "deno", "cargo", "go", "uv", "poetry", "pdm", "composer", "bundler", "nuget", "swiftpm", "pub", "mix", "gradle"]
+          "enum": ["npm", "pnpm", "yarn", "bun", "deno", "cargo", "go", "uv", "poetry", "pdm", "composer", "bundler", "nuget", "swiftpm", "pub", "mix", "gradle", "cocoapods"]
         },
         "kind": {
           "type": "string",

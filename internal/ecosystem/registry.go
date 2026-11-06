@@ -4,6 +4,7 @@ import (
 	"github.com/securock/securock/internal/ecosystem/bun"
 	"github.com/securock/securock/internal/ecosystem/bundler"
 	"github.com/securock/securock/internal/ecosystem/cargo"
+	"github.com/securock/securock/internal/ecosystem/cocoapods"
 	"github.com/securock/securock/internal/ecosystem/composer"
 	"github.com/securock/securock/internal/ecosystem/deno"
 	"github.com/securock/securock/internal/ecosystem/golang"
@@ -36,6 +37,7 @@ func All() []Ecosystem {
 		bundler.New(),
 		nuget.New(),
 		swiftpm.New(),
+		cocoapods.New(),
 		pub.New(),
 		mix.New(),
 		gradle.New(),

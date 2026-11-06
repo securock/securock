@@ -58,6 +58,10 @@ func TestQueryEcosystemSkipsJSRAndURL(t *testing.T) {
 	if osv.Queryable(jsr) {
 		t.Fatal("jsr must not be sent to OSV yet")
 	}
+	pod := ecosystem.Dependency{Ecosystem: "cocoapods", Name: "Alamofire", Version: "5.8.0", Registry: "https://cdn.cocoapods.org"}
+	if osv.Queryable(pod) {
+		t.Fatal("cocoapods has no OSV ecosystem and must not be queried")
+	}
 	remote := ecosystem.Dependency{Ecosystem: "url", Name: "https://example.com/mod.ts", Version: "abc"}
 	if osv.Queryable(remote) {
 		t.Fatal("url artifacts must not be sent to OSV")

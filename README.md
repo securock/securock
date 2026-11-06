@@ -332,27 +332,28 @@ it cannot comment on a fork PR.
 
 ### Stable
 
-| Ecosystem | Resolver | Lockfile             |
-| --------- | -------- | -------------------- |
-| npm       | npm      | `package-lock.json`  |
-| npm       | pnpm     | `pnpm-lock.yaml`     |
-| npm       | yarn     | `yarn.lock`          |
-| npm       | bun      | `bun.lock`           |
-| npm       | deno     | `deno.lock`          |
-| jsr       | deno     | `deno.lock`          |
-| url       | deno     | `deno.lock`          |
-| cargo     | cargo    | `Cargo.lock`         |
-| go        | go       | `go.mod` + `go.sum`  |
-| pypi      | uv       | `uv.lock`            |
-| pypi      | poetry   | `poetry.lock`        |
-| pypi      | pdm      | `pdm.lock`           |
-| packagist | composer | `composer.lock`      |
-| rubygems  | bundler  | `Gemfile.lock`       |
-| nuget     | nuget    | `packages.lock.json` |
-| swift     | swiftpm  | `Package.resolved`   |
-| pub       | pub      | `pubspec.lock`       |
-| hex       | mix      | `mix.lock`           |
-| maven     | gradle   | `gradle.lockfile`    |
+| Ecosystem | Resolver  | Lockfile             |
+| --------- | --------- | -------------------- |
+| npm       | npm       | `package-lock.json`  |
+| npm       | pnpm      | `pnpm-lock.yaml`     |
+| npm       | yarn      | `yarn.lock`          |
+| npm       | bun       | `bun.lock`           |
+| npm       | deno      | `deno.lock`          |
+| jsr       | deno      | `deno.lock`          |
+| url       | deno      | `deno.lock`          |
+| cargo     | cargo     | `Cargo.lock`         |
+| go        | go        | `go.mod` + `go.sum`  |
+| pypi      | uv        | `uv.lock`            |
+| pypi      | poetry    | `poetry.lock`        |
+| pypi      | pdm       | `pdm.lock`           |
+| packagist | composer  | `composer.lock`      |
+| rubygems  | bundler   | `Gemfile.lock`       |
+| nuget     | nuget     | `packages.lock.json` |
+| swift     | swiftpm   | `Package.resolved`   |
+| cocoapods | cocoapods | `Podfile.lock`       |
+| pub       | pub       | `pubspec.lock`       |
+| hex       | mix       | `mix.lock`           |
+| maven     | gradle    | `gradle.lockfile`    |
 
 Notes:
 
@@ -362,6 +363,8 @@ Notes:
   so vulnerability state stays `unknown`.
 - **Gradle** — records Maven coordinates from `gradle.lockfile` but
   does not prove a registry, so OSV is not queried in `public-only`.
+- **CocoaPods** — reads `Podfile.lock`. OSV has no CocoaPods ecosystem, so
+  vulnerability state stays `unknown`.
 
 ## Documentation
 

@@ -212,7 +212,8 @@ func QueryEcosystem(dep ecosystem.Dependency) string {
 	if dep.Ecosystem == "cargo" && !cratesIO(dep.Registry) {
 		return ""
 	}
-	if dep.Ecosystem == "jsr" || dep.Ecosystem == "url" {
+	// OSV has no CocoaPods ecosystem, so these stay unknown instead of looking clean.
+	if dep.Ecosystem == "jsr" || dep.Ecosystem == "url" || dep.Ecosystem == "cocoapods" {
 		return ""
 	}
 	return Ecosystem(dep.Ecosystem)

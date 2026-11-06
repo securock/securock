@@ -88,6 +88,7 @@ func TestPURL(t *testing.T) {
 		{"nuget", "Newtonsoft.Json", "13.0.3", "", "pkg:nuget/Newtonsoft.Json@13.0.3"},
 		{"pub", "http", "1.2.0", "", "pkg:pub/http@1.2.0"},
 		{"hex", "phoenix", "1.7.0", "", "pkg:hex/phoenix@1.7.0"},
+		{"cocoapods", "Alamofire", "5.8.0", "", "pkg:cocoapods/Alamofire@5.8.0"},
 		{"maven", "org.slf4j:slf4j-api", "2.0.9", "", "pkg:maven/org.slf4j/slf4j-api@2.0.9"},
 		{"swift", "swift-log", "1.5.3", "https://github.com/apple/swift-log.git", "pkg:swift/github.com/apple/swift-log@1.5.3"},
 		{"swift", "swift-log", "1.5.3", "", "pkg:swift/swift-log@1.5.3"},
