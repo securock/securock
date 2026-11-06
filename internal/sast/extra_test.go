@@ -146,6 +146,7 @@ func TestProviderSecretShapes(t *testing.T) {
 		"a sha256 hex digest":      "digest = '" + rep("ab12", 16) + "'",
 		"short key-like word":      "name = 'key-" + rep("ab", 8) + "'",
 		"hf prefix, too short":     "x = 'hf_abc123'",
+		"url glued to a word":      "x = 'nothttps://hooks." + "slack.com/services/T0123ABCDEF/B0123ABCDEF/abcdefghijklmnopqrstuvwx'",
 		"mailchimp-shaped, no -us": "x = '" + rep("ab12", 8) + "-eu'",
 	} {
 		t.Run("not "+name, func(t *testing.T) {
