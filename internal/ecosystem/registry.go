@@ -13,6 +13,7 @@ import (
 	"github.com/securock/securock/internal/ecosystem/npm"
 	"github.com/securock/securock/internal/ecosystem/nuget"
 	"github.com/securock/securock/internal/ecosystem/pdm"
+	"github.com/securock/securock/internal/ecosystem/pipenv"
 	"github.com/securock/securock/internal/ecosystem/pnpm"
 	"github.com/securock/securock/internal/ecosystem/poetry"
 	"github.com/securock/securock/internal/ecosystem/pub"
@@ -33,6 +34,7 @@ func All() []Ecosystem {
 		pypi.New(),
 		poetry.New(),
 		pdm.New(),
+		pipenv.New(),
 		composer.New(),
 		bundler.New(),
 		nuget.New(),
@@ -46,7 +48,7 @@ func All() []Ecosystem {
 
 func Prefer(found []Ecosystem) []Ecosystem {
 	found = preferFamily(found, []string{"pnpm", "yarn", "bun", "npm"})
-	found = preferFamily(found, []string{"pypi", "poetry", "pdm"})
+	found = preferFamily(found, []string{"pypi", "poetry", "pdm", "pipenv"})
 	return found
 }
 

@@ -21,7 +21,7 @@
         },
         "resolvers": {
           "type": "array",
-          "items": { "type": "string", "enum": ["npm", "pnpm", "yarn", "bun", "deno", "cargo", "go", "uv", "poetry", "pdm", "composer", "bundler", "nuget", "swiftpm", "pub", "mix", "gradle", "cocoapods"] },
+          "items": { "type": "string", "enum": ["npm", "pnpm", "yarn", "bun", "deno", "cargo", "go", "uv", "poetry", "pdm", "composer", "bundler", "nuget", "swiftpm", "pub", "mix", "gradle", "cocoapods", "pipenv"] },
           "uniqueItems": true
         }
       }
@@ -91,7 +91,7 @@
       "properties": {
         "resolver": {
           "type": "string",
-          "enum": ["npm", "pnpm", "yarn", "bun", "deno", "cargo", "go", "uv", "poetry", "pdm", "composer", "bundler", "nuget", "swiftpm", "pub", "mix", "gradle", "cocoapods"]
+          "enum": ["npm", "pnpm", "yarn", "bun", "deno", "cargo", "go", "uv", "poetry", "pdm", "composer", "bundler", "nuget", "swiftpm", "pub", "mix", "gradle", "cocoapods", "pipenv"]
         },
         "kind": {
           "type": "string",

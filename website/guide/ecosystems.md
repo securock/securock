@@ -29,6 +29,7 @@ resolver per family (for example pnpm over npm).
 | pypi      | uv        | `uv.lock`            |
 | pypi      | poetry    | `poetry.lock`        |
 | pypi      | pdm       | `pdm.lock`           |
+| pypi      | pipenv    | `Pipfile.lock`       |
 | packagist | composer  | `composer.lock`      |
 | rubygems  | bundler   | `Gemfile.lock`       |
 | nuget     | nuget     | `packages.lock.json` |
@@ -43,7 +44,7 @@ target; v3/v4 remain supported for compatibility.
 
 ## Evidence depth
 
-| Evidence        | npm family (npm / pnpm / yarn / bun / deno npm)             | PyPI (uv / Poetry / PDM)                                   | Other ecosystems                     |
+| Evidence        | npm family (npm / pnpm / yarn / bun / deno npm)             | PyPI (uv / Poetry / PDM / Pipenv)                          | Other ecosystems                     |
 | --------------- | ----------------------------------------------------------- | ---------------------------------------------------------- | ------------------------------------ |
 | digest          | from the language lockfile                                  | from the language lockfile                                 | from the language lockfile           |
 | vulnerabilities | OSV (non-`MAL-*`)                                           | OSV when the source is proven public                       | OSV when the source is proven public |
@@ -75,6 +76,7 @@ package enters the project (its scope) and what each package depends on. What ea
 | uv        | project and workspace member: dependencies, extras, dev groups   | `dependencies` of each package                |
 | poetry    | `groups`, or `category`, or `pyproject.toml` for older lockfiles | `[package.dependencies]`                      |
 | pdm       | `groups`, with `pyproject.toml` saying which are extras or dev   | `dependencies` requirement strings            |
+| pipenv    | `default` is runtime, `develop` is dev                           | not recorded                                  |
 | cargo     | `Cargo.toml` of the project and workspace members                | `dependencies` of each package                |
 | composer  | `packages` is runtime, `packages-dev` is dev                     | `require` of each package                     |
 | bundler   | `DEPENDENCIES`, with the `Gemfile` marking dev and test groups   | gems listed under each spec                   |
@@ -114,6 +116,12 @@ modules a package actually imports, so reachability for Go needs call-graph anal
 
 - `gradle.lockfile` records coordinates but does not prove a registry URL.
 - OSV is **not** queried in `public-only`.
+
+### Pipenv
+
+- `Pipfile.lock` lists file hashes without file names. A digest is recorded only when an entry has exactly one hash; with several, the digest stays unknown.
+- An entry without `index` resolves to a registry only when the lockfile has a single source.
+- Entries that are not exact `==` pins (and have no git, path or file source) are skipped.
 
 ### CocoaPods
 

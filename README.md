@@ -136,7 +136,7 @@ Pre-1.0. All resolvers are stable.
 
 - **npm, pnpm, Yarn, Bun, Deno** collect provenance, signature, capability,
   behavior, ownership, and trust-chain evidence from the npm registry.
-- **PyPI (uv / Poetry / PDM)** collects Integrity API attestations and
+- **PyPI (uv / Poetry / PDM / Pipenv)** collects Integrity API attestations and
   locally re-verifies PEP 740 Sigstore envelopes to provenance/signature
   `verified` when the signer identity, filename, digest, signature, and
   transparency log check out.
@@ -346,6 +346,7 @@ it cannot comment on a fork PR.
 | pypi      | uv        | `uv.lock`            |
 | pypi      | poetry    | `poetry.lock`        |
 | pypi      | pdm       | `pdm.lock`           |
+| pypi      | pipenv    | `Pipfile.lock`       |
 | packagist | composer  | `composer.lock`      |
 | rubygems  | bundler   | `Gemfile.lock`       |
 | nuget     | nuget     | `packages.lock.json` |
