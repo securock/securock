@@ -78,6 +78,14 @@ func TestQueryEcosystemSkipsJSRAndURL(t *testing.T) {
 	if osv.QueryEcosystem(jl) != "Julia" || osv.QueryName(jl) != "HTTP" {
 		t.Fatal("julia must map to the Julia ecosystem by package name")
 	}
+	hs := ecosystem.Dependency{Ecosystem: "hackage", Name: "aeson", Version: "2.2.1.0"}
+	if osv.Queryable(hs) {
+		t.Fatal("hackage without a proven registry must not be queried")
+	}
+	hs.Registry = "https://hackage.haskell.org"
+	if osv.QueryEcosystem(hs) != "Hackage" {
+		t.Fatal("proven hackage packages must map to Hackage")
+	}
 	remote := ecosystem.Dependency{Ecosystem: "url", Name: "https://example.com/mod.ts", Version: "abc"}
 	if osv.Queryable(remote) {
 		t.Fatal("url artifacts must not be sent to OSV")

@@ -332,32 +332,33 @@ it cannot comment on a fork PR.
 
 ### Stable
 
-| Ecosystem | Resolver  | Lockfile             |
-| --------- | --------- | -------------------- |
-| npm       | npm       | `package-lock.json`  |
-| npm       | pnpm      | `pnpm-lock.yaml`     |
-| npm       | yarn      | `yarn.lock`          |
-| npm       | bun       | `bun.lock`           |
-| npm       | deno      | `deno.lock`          |
-| jsr       | deno      | `deno.lock`          |
-| url       | deno      | `deno.lock`          |
-| cargo     | cargo     | `Cargo.lock`         |
-| go        | go        | `go.mod` + `go.sum`  |
-| pypi      | uv        | `uv.lock`            |
-| pypi      | poetry    | `poetry.lock`        |
-| pypi      | pdm       | `pdm.lock`           |
-| pypi      | pipenv    | `Pipfile.lock`       |
-| packagist | composer  | `composer.lock`      |
-| rubygems  | bundler   | `Gemfile.lock`       |
-| nuget     | nuget     | `packages.lock.json` |
-| swift     | swiftpm   | `Package.resolved`   |
-| cocoapods | cocoapods | `Podfile.lock`       |
-| conan     | conan     | `conan.lock`         |
-| cran      | renv      | `renv.lock`          |
-| julia     | julia     | `Manifest.toml`      |
-| pub       | pub       | `pubspec.lock`       |
-| hex       | mix       | `mix.lock`           |
-| maven     | gradle    | `gradle.lockfile`    |
+| Ecosystem | Resolver  | Lockfile               |
+| --------- | --------- | ---------------------- |
+| npm       | npm       | `package-lock.json`    |
+| npm       | pnpm      | `pnpm-lock.yaml`       |
+| npm       | yarn      | `yarn.lock`            |
+| npm       | bun       | `bun.lock`             |
+| npm       | deno      | `deno.lock`            |
+| jsr       | deno      | `deno.lock`            |
+| url       | deno      | `deno.lock`            |
+| cargo     | cargo     | `Cargo.lock`           |
+| go        | go        | `go.mod` + `go.sum`    |
+| pypi      | uv        | `uv.lock`              |
+| pypi      | poetry    | `poetry.lock`          |
+| pypi      | pdm       | `pdm.lock`             |
+| pypi      | pipenv    | `Pipfile.lock`         |
+| packagist | composer  | `composer.lock`        |
+| rubygems  | bundler   | `Gemfile.lock`         |
+| nuget     | nuget     | `packages.lock.json`   |
+| swift     | swiftpm   | `Package.resolved`     |
+| cocoapods | cocoapods | `Podfile.lock`         |
+| conan     | conan     | `conan.lock`           |
+| cran      | renv      | `renv.lock`            |
+| julia     | julia     | `Manifest.toml`        |
+| hackage   | cabal     | `cabal.project.freeze` |
+| pub       | pub       | `pubspec.lock`         |
+| hex       | mix       | `mix.lock`             |
+| maven     | gradle    | `gradle.lockfile`      |
 
 Notes:
 
@@ -367,6 +368,8 @@ Notes:
   so vulnerability state stays `unknown`.
 - **Gradle** — records Maven coordinates from `gradle.lockfile` but
   does not prove a registry, so OSV is not queried in `public-only`.
+- **Cabal** — reads `cabal.project.freeze`. OSV is queried in `public-only`
+  only when Hackage is the sole proven repository.
 - **Julia** — reads `Manifest.toml`. No registry is proven, so OSV is not
   queried in `public-only`.
 - **renv** — reads `renv.lock`. Only `CRAN` packages from the public CRAN

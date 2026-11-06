@@ -15,32 +15,33 @@ resolver per family (for example pnpm over npm).
 
 ## Supported lockfiles
 
-| Ecosystem | Resolver  | Lockfile             |
-| --------- | --------- | -------------------- |
-| npm       | npm       | `package-lock.json`  |
-| npm       | pnpm      | `pnpm-lock.yaml`     |
-| npm       | yarn      | `yarn.lock`          |
-| npm       | bun       | `bun.lock`           |
-| npm       | deno      | `deno.lock`          |
-| jsr       | deno      | `deno.lock`          |
-| url       | deno      | `deno.lock`          |
-| cargo     | cargo     | `Cargo.lock`         |
-| go        | go        | `go.mod` + `go.sum`  |
-| pypi      | uv        | `uv.lock`            |
-| pypi      | poetry    | `poetry.lock`        |
-| pypi      | pdm       | `pdm.lock`           |
-| pypi      | pipenv    | `Pipfile.lock`       |
-| packagist | composer  | `composer.lock`      |
-| rubygems  | bundler   | `Gemfile.lock`       |
-| nuget     | nuget     | `packages.lock.json` |
-| swift     | swiftpm   | `Package.resolved`   |
-| cocoapods | cocoapods | `Podfile.lock`       |
-| conan     | conan     | `conan.lock`         |
-| cran      | renv      | `renv.lock`          |
-| julia     | julia     | `Manifest.toml`      |
-| pub       | pub       | `pubspec.lock`       |
-| hex       | mix       | `mix.lock`           |
-| maven     | gradle    | `gradle.lockfile`    |
+| Ecosystem | Resolver  | Lockfile               |
+| --------- | --------- | ---------------------- |
+| npm       | npm       | `package-lock.json`    |
+| npm       | pnpm      | `pnpm-lock.yaml`       |
+| npm       | yarn      | `yarn.lock`            |
+| npm       | bun       | `bun.lock`             |
+| npm       | deno      | `deno.lock`            |
+| jsr       | deno      | `deno.lock`            |
+| url       | deno      | `deno.lock`            |
+| cargo     | cargo     | `Cargo.lock`           |
+| go        | go        | `go.mod` + `go.sum`    |
+| pypi      | uv        | `uv.lock`              |
+| pypi      | poetry    | `poetry.lock`          |
+| pypi      | pdm       | `pdm.lock`             |
+| pypi      | pipenv    | `Pipfile.lock`         |
+| packagist | composer  | `composer.lock`        |
+| rubygems  | bundler   | `Gemfile.lock`         |
+| nuget     | nuget     | `packages.lock.json`   |
+| swift     | swiftpm   | `Package.resolved`     |
+| cocoapods | cocoapods | `Podfile.lock`         |
+| conan     | conan     | `conan.lock`           |
+| cran      | renv      | `renv.lock`            |
+| julia     | julia     | `Manifest.toml`        |
+| hackage   | cabal     | `cabal.project.freeze` |
+| pub       | pub       | `pubspec.lock`         |
+| hex       | mix       | `mix.lock`             |
+| maven     | gradle    | `gradle.lockfile`      |
 
 All resolvers above are stable. Deno `deno.lock` v5 is the preferred
 target; v3/v4 remain supported for compatibility.
@@ -90,6 +91,7 @@ package enters the project (its scope) and what each package depends on. What ea
 | go        | not recorded                                                          | not recorded                                  |
 | swiftpm   | not recorded                                                          | not recorded                                  |
 | cocoapods | not recorded                                                          | dependency list of each `PODS` entry          |
+| hackage   | not recorded                                                          | not recorded                                  |
 | julia     | `Project.toml`: `[deps]` is runtime, test-only `[extras]` are dev     | `deps` of each package                        |
 | cran      | not recorded                                                          | not recorded                                  |
 | conan     | `requires` is runtime, `build_requires` and `python_requires` are dev | not recorded                                  |
@@ -128,6 +130,12 @@ modules a package actually imports, so reachability for Go needs call-graph anal
 - `Pipfile.lock` lists file hashes without file names. A digest is recorded only when an entry has exactly one hash; with several, the digest stays unknown.
 - An entry without `index` resolves to a registry only when the lockfile has a single source.
 - Entries that are not exact `==` pins (and have no git, path or file source) are skipped.
+
+### Cabal (Hackage)
+
+- Only `any.<name> ==<version>` constraints are read. Ranges, flags, `installed` packages and `setup.` constraints are skipped.
+- A freeze file carries no hashes, so no digest is recorded. OSV is queried in `public-only` only when `active-repositories` lists `hackage.haskell.org` alone and `cabal.project` has no `repository` stanza; otherwise state stays `unknown`.
+- Stack (`stack.yaml.lock`) is not supported.
 
 ### Julia
 

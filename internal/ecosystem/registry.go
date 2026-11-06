@@ -3,6 +3,7 @@ package ecosystem
 import (
 	"github.com/securock/securock/internal/ecosystem/bun"
 	"github.com/securock/securock/internal/ecosystem/bundler"
+	"github.com/securock/securock/internal/ecosystem/cabal"
 	"github.com/securock/securock/internal/ecosystem/cargo"
 	"github.com/securock/securock/internal/ecosystem/cocoapods"
 	"github.com/securock/securock/internal/ecosystem/composer"
@@ -46,6 +47,7 @@ func All() []Ecosystem {
 		conan.New(),
 		renv.New(),
 		julia.New(),
+		cabal.New(),
 		pub.New(),
 		mix.New(),
 		gradle.New(),

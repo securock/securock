@@ -1,0 +1,12 @@
+active-repositories: hackage.haskell.org:merge
+constraints: any.Cabal ==3.10.1.0,
+             any.aeson ==2.2.1.0,
+             aeson +ordered-keymap,
+             any.base installed,
+             any.containers ==0.6.7,
+             any.text >=2.0 && <2.1,
+             -- a comment between entries
+             any.aeson ==2.2.1.0,
+             setup.Cabal ==3.10.1.0,
+             any.zlib ==0.6.3.0
+index-state: hackage.haskell.org 2024-01-01T00:00:00Z

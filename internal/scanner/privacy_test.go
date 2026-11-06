@@ -304,6 +304,14 @@ version = "1.0.0"
 			wantAll: lockfile.VulnUnknown,
 		},
 		{
+			name: "cabal freeze with another repository",
+			files: map[string]string{
+				"cabal.project.freeze": "active-repositories: hackage.haskell.org:merge, corp:rest\nconstraints: any.secret ==1.0.0\n",
+			},
+			wantN:   0,
+			wantAll: lockfile.VulnUnknown,
+		},
+		{
 			name: "poetry private source",
 			files: map[string]string{
 				"poetry.lock": `[[package]]

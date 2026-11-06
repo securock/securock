@@ -43,6 +43,7 @@ registry:
 | nuget     | `https://api.nuget.org`                                                                                                                                                       |
 | pub       | `https://pub.dev`                                                                                                                                                             |
 | hex       | `https://repo.hex.pm`                                                                                                                                                         |
+| hackage   | `https://hackage.haskell.org` (only when `cabal.project.freeze` lists `hackage.haskell.org` as its sole active repository and `cabal.project` declares no `repository`)       |
 | cran      | `https://cloud.r-project.org`, `https://cran.r-project.org` (only for packages from the `CRAN` repository; Bioconductor, Posit Package Manager and other mirrors are unknown) |
 | jsr       | `https://jsr.io` (names are not sent to OSV yet)                                                                                                                              |
 
