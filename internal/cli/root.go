@@ -6,7 +6,9 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
+	"github.com/securock/securock/internal/httpx"
 	"github.com/securock/securock/internal/lock"
 	"github.com/securock/securock/pkg/policy"
 	"github.com/spf13/cobra"
@@ -26,6 +28,8 @@ type options struct {
 
 	reachability bool
 	recursive    bool
+	noCache      bool
+	cacheTTL     time.Duration
 }
 
 func NewRoot(version, commit, date string) *cobra.Command {
@@ -38,6 +42,14 @@ func NewRoot(version, commit, date string) *cobra.Command {
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		Version:       formatVersion(version, commit, date),
+		// Set on every run, so a flag from one run never leaks into the next.
+		PersistentPreRunE: func(*cobra.Command, []string) error {
+			if opts.cacheTTL < 0 {
+				return opErr(fmt.Errorf("--cache-ttl must be positive: %s", opts.cacheTTL))
+			}
+			httpx.Configure(opts.noCache, opts.cacheTTL)
+			return nil
+		},
 	}
 	root.SetVersionTemplate("{{.Version}}\n")
 
@@ -50,6 +62,8 @@ func NewRoot(version, commit, date string) *cobra.Command {
 	root.PersistentFlags().StringVar(&opts.output, "output", "", "write the report to this file instead of stdout")
 	root.PersistentFlags().StringVar(&opts.exceptions, "exceptions", "", "path to the accepted-findings file (default .securock/exceptions.yaml in the project)")
 	root.PersistentFlags().BoolVar(&opts.reachability, "reachability", false, "record package scope and dependencies, and mark each vulnerability reachable, unreachable, or unknown")
+	root.PersistentFlags().BoolVar(&opts.noCache, "no-cache", false, "do not read or write the on-disk cache of registry and OSV responses")
+	root.PersistentFlags().DurationVar(&opts.cacheTTL, "cache-ttl", 0, "how long a cached response is used, such as 10m or 24h (default 1h)")
 	root.PersistentFlags().BoolVar(&opts.noFail, "no-fail", false, "always exit 0")
 
 	root.AddCommand(newScanCommand(opts))
@@ -67,6 +81,7 @@ func NewRoot(version, commit, date string) *cobra.Command {
 	root.AddCommand(newSBOMCommand(opts))
 	root.AddCommand(newAcceptCommand(opts))
 	root.AddCommand(newVEXCommand(opts))
+	root.AddCommand(newCacheCommand())
 	root.AddCommand(&cobra.Command{
 		Use:   "version",
 		Short: "Print the version",

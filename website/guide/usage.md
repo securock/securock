@@ -223,6 +223,23 @@ reports expired exceptions, those expiring within 14 days, and
 exceptions with no approver. Its findings follow the same
 `--fail-on` flow as `audit`.
 
+## Response cache
+
+Registry and OSV responses are cached on disk for one hour, so repeated runs (a
+[pre-commit hook](#git-hooks), `--recursive`, a CI retry) do not ask again.
+
+```sh
+securock verify --no-cache          # skip the cache for one run
+securock verify --cache-ttl 10m     # use responses for 10 minutes instead
+securock cache clear                # delete every cached response
+```
+
+The cache lives in your user cache directory (`securock/`), readable only by you.
+Requests that carry credentials (`Authorization`, `Cookie`) are never cached, and a
+response is stored whole or not at all, so a run that starts while another is writing
+never reads half of one. Only successful responses are kept. The cache saves time and
+does not change what is reported: an entry older than `--cache-ttl` is fetched again.
+
 ## Monorepos
 
 A repository with a lockfile per service keeps one `securock.lock` per project, next to
@@ -293,6 +310,8 @@ pre-commit:
 | `--lock`         | Path to `securock.lock` (for `lock` / `diff` / `update` / `verify`)                       |
 | `--format`       | `text` (default), `json`, `sarif`, `junit`, or `markdown` (`graph`: `mermaid`, `dot`)     |
 | `--recursive`    | `lock`, `scan`, `diff`, `verify`, `audit`: run for every project under the path           |
+| `--no-cache`     | Do not read or write the on-disk cache of registry and OSV responses                      |
+| `--cache-ttl`    | How long a cached response is used, such as `10m` or `24h` (default `1h`)                 |
 | `--output`       | Write the report to a file instead of stdout                                              |
 | `--exceptions`   | Path to the accepted-findings file (`accept`, `audit`, `sast`, `chain`, `doctor`)         |
 | `--reachability` | Record scope and dependencies and mark vulnerabilities reachable, unreachable, or unknown |

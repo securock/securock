@@ -63,6 +63,15 @@ and PDM config indexes; the default PyPI index is treated as public), Mix
 (`mix.lock` repository identity), and Gradle (`gradle.lockfile` has no
 repository URL). Mixed public and private sources are treated as unknown.
 
+## Local cache
+
+Responses from OSV and the registries are kept for one hour in your user cache
+directory (`securock/`), readable only by you, so repeated runs do not ask again. They
+hold the same public data that was already sent off-machine, never credentials: a
+request that carries `Authorization`, `Proxy-Authorization`, or `Cookie` is not
+cached. `--no-cache` skips the cache for one run, `--cache-ttl` changes its lifetime,
+and `securock cache clear` deletes it.
+
 ## Modes
 
 ```sh

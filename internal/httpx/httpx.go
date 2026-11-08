@@ -5,21 +5,65 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
+	"sync"
 	"time"
 )
 
 const (
-	maxBody   = 2 << 20
-	retries   = 3
-	cacheTTL  = time.Hour
-	cacheName = "securock"
+	maxBody    = 2 << 20
+	retries    = 3
+	defaultTTL = time.Hour
+	cacheName  = "securock"
 )
+
+var (
+	cacheMu       sync.RWMutex
+	cacheDisabled bool
+	cacheTTL      = defaultTTL
+)
+
+// Configure sets how responses are cached on disk for the rest of the process. Disabled
+// neither reads nor writes the cache. A ttl of zero or less means the default of one hour.
+func Configure(disabled bool, ttl time.Duration) {
+	if ttl <= 0 {
+		ttl = defaultTTL
+	}
+	cacheMu.Lock()
+	cacheDisabled, cacheTTL = disabled, ttl
+	cacheMu.Unlock()
+}
+
+func cacheSettings() (disabled bool, ttl time.Duration) {
+	cacheMu.RLock()
+	defer cacheMu.RUnlock()
+	return cacheDisabled, cacheTTL
+}
+
+// cacheable says whether a response to this request may be stored. The cache is shared by
+// every request the user makes, so anything that carries credentials stays out of it.
+func cacheable(req *http.Request) bool {
+	if disabled, _ := cacheSettings(); disabled {
+		return false
+	}
+	if req.Method != http.MethodGet && req.Method != http.MethodPost {
+		return false
+	}
+	for _, h := range []string{"Authorization", "Proxy-Authorization", "Cookie"} {
+		if req.Header.Get(h) != "" {
+			return false
+		}
+	}
+	return true
+}
 
 func CacheDir() string {
 	root, err := os.UserCacheDir()
@@ -49,7 +93,8 @@ func Do(ctx context.Context, client *http.Client, req *http.Request) (*http.Resp
 	}
 
 	key := cacheKey(req)
-	if req.Method == http.MethodGet || req.Method == http.MethodPost {
+	useCache := cacheable(req)
+	if useCache {
 		if raw, ok := readCache(key); ok {
 			return cachedResponse(req, raw), nil
 		}
@@ -90,10 +135,8 @@ func Do(ctx context.Context, client *http.Client, req *http.Request) (*http.Resp
 			last = fmt.Errorf("unexpected status %s", res.Status)
 			continue
 		}
-		if req.Method == http.MethodGet || req.Method == http.MethodPost {
-			if res.StatusCode == http.StatusOK {
-				writeCache(key, raw)
-			}
+		if useCache && res.StatusCode == http.StatusOK {
+			writeCache(key, raw)
 		}
 		res.Body = io.NopCloser(bytes.NewReader(raw))
 		res.ContentLength = int64(len(raw))
@@ -124,6 +167,8 @@ func cacheKey(req *http.Request) string {
 	buf.WriteString(req.Method)
 	buf.WriteByte(' ')
 	buf.WriteString(req.URL.String())
+	// The same URL can answer differently to a different Accept.
+	buf.WriteString(" accept=" + req.Header.Get("Accept"))
 	if req.GetBody != nil {
 		body, err := req.GetBody()
 		if err == nil {
@@ -140,9 +185,10 @@ func cachePath(key string) string {
 }
 
 func readCache(key string) ([]byte, bool) {
+	_, ttl := cacheSettings()
 	path := cachePath(key)
 	st, err := os.Stat(path)
-	if err != nil || time.Since(st.ModTime()) > cacheTTL {
+	if err != nil || time.Since(st.ModTime()) > ttl {
 		return nil, false
 	}
 	raw, err := os.ReadFile(path)
@@ -152,10 +198,54 @@ func readCache(key string) ([]byte, bool) {
 	return raw, true
 }
 
+// writeCache stores the response under a temporary name and renames it into place, so a
+// reader running at the same time, such as another goroutine or another securock process,
+// sees the whole response or none of it, never half of one. Failure is not an error: the
+// cache only saves time.
 func writeCache(key string, raw []byte) {
 	dir := CacheDir()
-	_ = os.MkdirAll(dir, 0o755)
-	_ = os.WriteFile(cachePath(key), raw, 0o644)
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		return
+	}
+	tmp, err := os.CreateTemp(dir, tempPrefix+"*")
+	if err != nil {
+		return
+	}
+	_, werr := tmp.Write(raw)
+	cerr := tmp.Close()
+	if werr != nil || cerr != nil || os.Rename(tmp.Name(), cachePath(key)) != nil {
+		_ = os.Remove(tmp.Name())
+	}
+}
+
+const tempPrefix = ".tmp-"
+
+var cacheEntry = regexp.MustCompile(`^[0-9a-f]{64}$`)
+
+// Clear deletes the cached responses and returns how many it removed. It only touches
+// files securock wrote, so a cache directory that is shared by mistake keeps its other files.
+func Clear() (int, error) {
+	entries, err := os.ReadDir(CacheDir())
+	if errors.Is(err, fs.ErrNotExist) {
+		return 0, nil
+	}
+	if err != nil {
+		return 0, err
+	}
+	removed := 0
+	for _, e := range entries {
+		name := e.Name()
+		if e.IsDir() || !(cacheEntry.MatchString(name) || strings.HasPrefix(name, tempPrefix)) {
+			continue
+		}
+		if err := os.Remove(filepath.Join(CacheDir(), name)); err != nil {
+			return removed, err
+		}
+		if cacheEntry.MatchString(name) {
+			removed++
+		}
+	}
+	return removed, nil
 }
 
 func cachedResponse(req *http.Request, raw []byte) *http.Response {

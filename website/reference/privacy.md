@@ -112,6 +112,15 @@ rules:
 
 Unknown policy fields are rejected.
 
+## Local cache
+
+Responses from OSV and the registries are kept for one hour in your user cache
+directory (`securock/`), readable only by you, so repeated runs do not ask again. They
+hold the same public data that was already sent off-machine, never credentials: a
+request that carries `Authorization`, `Proxy-Authorization`, or `Cookie` is not
+cached. `--no-cache` skips the cache for one run, `--cache-ttl` changes its lifetime,
+and `securock cache clear` deletes it.
+
 ## Next steps
 
 - [Ecosystems](/guide/ecosystems) — which collectors hit the network

@@ -234,25 +234,26 @@ Cargo under [`examples/`](examples/).
 
 ### Flags
 
-| Flag / exit             | Meaning                                                                                                             |
-| ----------------------- | ------------------------------------------------------------------------------------------------------------------- |
-| `--network public-only` | Default. Public registries only (`offline`, `allow-all` also valid)                                                 |
-| `--offline`             | Skip remote lookups; remote evidence stays `unknown`                                                                |
-| `--policy`              | Path to a policy file                                                                                               |
-| `--profile`             | Built-in policy profile: `default` or `strict` (not with `--policy`)                                                |
-| `--lock`                | Path to `securock.lock` (for `lock` / `diff` / `update` / `verify`)                                                 |
-| `--format json`         | Stable JSON on `scan`, `diff`, `verify`, and `explain`                                                              |
-| `--format sarif`        | SARIF 2.1.0 on every report command, for GitHub code scanning                                                       |
-| `--format junit`        | JUnit XML on `scan`, `diff`, `verify`, `audit`, `sast`, and `doctor`                                                |
-| `--format markdown`     | A pull request comment table on the same commands                                                                   |
-| `--recursive`, `-r`     | `lock`, `scan`, `diff`, `verify`, `audit`. Run for every project under the path                                     |
-| `--output`              | Write the report to a file instead of stdout (also on exit `1`)                                                     |
-| `--min-release-age`     | `audit`. Report npm and PyPI releases newer than this, such as `7d`                                                 |
-| `--fail-on`             | `audit`, `sast`, `chain` and `doctor`. Exit `1` at or above this severity (default `high`)                          |
-| `--assume-params`       | `sast` and `chain`. Treat string parameters of Go functions nothing calls directly as untrusted (registry handlers) |
-| `--exceptions`          | Accepted-findings file (default `.securock/exceptions.yaml`)                                                        |
-| `--reachability`        | Record package scope and dependencies; mark vulnerabilities reachable, unreachable, or unknown                      |
-| `--no-fail`             | Always exit `0`                                                                                                     |
+| Flag / exit             | Meaning                                                                                                                            |
+| ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| `--network public-only` | Default. Public registries only (`offline`, `allow-all` also valid)                                                                |
+| `--offline`             | Skip remote lookups; remote evidence stays `unknown`                                                                               |
+| `--policy`              | Path to a policy file                                                                                                              |
+| `--profile`             | Built-in policy profile: `default` or `strict` (not with `--policy`)                                                               |
+| `--lock`                | Path to `securock.lock` (for `lock` / `diff` / `update` / `verify`)                                                                |
+| `--format json`         | Stable JSON on `scan`, `diff`, `verify`, and `explain`                                                                             |
+| `--format sarif`        | SARIF 2.1.0 on every report command, for GitHub code scanning                                                                      |
+| `--format junit`        | JUnit XML on `scan`, `diff`, `verify`, `audit`, `sast`, and `doctor`                                                               |
+| `--format markdown`     | A pull request comment table on the same commands                                                                                  |
+| `--recursive`, `-r`     | `lock`, `scan`, `diff`, `verify`, `audit`. Run for every project under the path                                                    |
+| `--no-cache`            | Do not read or write the on-disk response cache; `--cache-ttl` sets its lifetime (default `1h`), `securock cache clear` empties it |
+| `--output`              | Write the report to a file instead of stdout (also on exit `1`)                                                                    |
+| `--min-release-age`     | `audit`. Report npm and PyPI releases newer than this, such as `7d`                                                                |
+| `--fail-on`             | `audit`, `sast`, `chain` and `doctor`. Exit `1` at or above this severity (default `high`)                                         |
+| `--assume-params`       | `sast` and `chain`. Treat string parameters of Go functions nothing calls directly as untrusted (registry handlers)                |
+| `--exceptions`          | Accepted-findings file (default `.securock/exceptions.yaml`)                                                                       |
+| `--reachability`        | Record package scope and dependencies; mark vulnerabilities reachable, unreachable, or unknown                                     |
+| `--no-fail`             | Always exit `0`                                                                                                                    |
 
 ### Exit codes
 
