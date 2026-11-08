@@ -15,7 +15,7 @@ policy treats unchecked vulnerabilities and malicious reports as
 recorded because the entry lists exactly one hash; with several hashes the
 digest would stay unknown.
 `securock.lock` in this directory is that unknown snapshot for
-`idna@3.19`.
+`idna@3.20`.
 
 Simulate a dependency change:
 
