@@ -10,6 +10,7 @@ reachability="${REACHABILITY:-false}"
 min_release_age="${MIN_RELEASE_AGE:-}"
 sarif_file="${SARIF_FILE:-}"
 sbom_file="${SBOM_FILE:-}"
+report_format="${REPORT_FORMAT:-text}"
 report="${SECUROCK_REPORT:?SECUROCK_REPORT is required}"
 
 origin="$PWD"
@@ -35,6 +36,18 @@ if [ "$reachability" = "true" ]; then
   flags+=(--reachability)
 fi
 
+# The SARIF and SBOM runs below pick their own format, so they only get the shared flags.
+common_flags=(${flags[@]+"${flags[@]}"})
+case "$report_format" in
+  text) ;;
+  markdown) flags+=(--format markdown) ;;
+  *)
+    echo "unknown report-format: $report_format" | tee "$report" >&2
+    echo "failed=true" >>"$GITHUB_OUTPUT"
+    exit 1
+    ;;
+esac
+
 # Flags only audit understands.
 audit_flags=()
 if [ -n "$min_release_age" ]; then
@@ -48,8 +61,11 @@ run_cmd() {
   local name="$1"
   shift
   {
-    echo "$name"
-    echo
+    # Markdown reports carry their own heading.
+    if [ "$report_format" = text ]; then
+      echo "$name"
+      echo
+    fi
     if [ "${#flags[@]}" -eq 0 ]; then
       "$@"
     else
@@ -110,7 +126,7 @@ if [ -n "$sarif_file" ]; then
   fi
   # --no-fail: the report is for code scanning; the step above decides pass or fail.
   if (cd "$origin" && securock "$sarif_cmd" "$workdir" --format sarif --output "$sarif_file" --no-fail \
-      ${flags[@]+"${flags[@]}"} ${sarif_flags[@]+"${sarif_flags[@]}"}) >>"$report" 2>&1; then
+      ${common_flags[@]+"${common_flags[@]}"} ${sarif_flags[@]+"${sarif_flags[@]}"}) >>"$report" 2>&1; then
     echo "sarif-file=$sarif_file" >>"$GITHUB_OUTPUT"
   else
     echo "securock $sarif_cmd --format sarif failed" >>"$report"
@@ -118,7 +134,7 @@ if [ -n "$sarif_file" ]; then
   fi
 fi
 if [ -n "$sbom_file" ]; then
-  if securock sbom export ${flags[@]+"${flags[@]}"} >"$sbom_file" 2>>"$report"; then
+  if securock sbom export ${common_flags[@]+"${common_flags[@]}"} >"$sbom_file" 2>>"$report"; then
     echo "sbom-file=$sbom_file" >>"$GITHUB_OUTPUT"
   else
     echo "securock sbom export failed" >>"$report"
@@ -132,9 +148,13 @@ if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
   {
     echo "## Securock Trust Report"
     echo
-    echo '```'
-    cat "$report"
-    echo '```'
+    if [ "$report_format" = markdown ]; then
+      cat "$report"
+    else
+      echo '```'
+      cat "$report"
+      echo '```'
+    fi
   } >> "$GITHUB_STEP_SUMMARY"
 fi
 

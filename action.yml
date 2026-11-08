@@ -32,6 +32,9 @@ inputs:
   sbom:
     description: Write the lockfile as a CycloneDX SBOM and return its path in the sbom-file output
     default: "false"
+  report-format:
+    description: "Format of the report in the job summary and pull request comment: text (a code block) or markdown (a findings table)"
+    default: text
   comment:
     description: Comment a trust report on pull requests
     default: "true"
@@ -120,6 +123,7 @@ runs:
         REACHABILITY: ${{ inputs.reachability }}
         MIN_RELEASE_AGE: ${{ inputs.min-release-age }}
         SARIF_FILE: ${{ inputs.sarif == 'true' && format('{0}/securock.sarif', runner.temp) || '' }}
+        REPORT_FORMAT: ${{ inputs.report-format }}
         SBOM_FILE: ${{ inputs.sbom == 'true' && format('{0}/securock.cdx.json', runner.temp) || '' }}
         SECUROCK_REPORT: ${{ runner.temp }}/securock-report.txt
       run: "${{ github.action_path }}/action/run.sh"
@@ -136,6 +140,7 @@ runs:
       uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
       env:
         SECUROCK_REPORT: ${{ runner.temp }}/securock-report.txt
+        REPORT_FORMAT: ${{ inputs.report-format }}
       with:
         github-token: ${{ inputs.token }}
         script: |
@@ -145,12 +150,13 @@ runs:
           if (path && fs.existsSync(path)) {
             report = fs.readFileSync(path, 'utf8').trim() || '(empty report)';
           }
+          const fence = process.env.REPORT_FORMAT === 'markdown' ? [] : ['```'];
           const body = [
             '## Securock Trust Report',
             '',
-            '```',
+            ...fence,
             report,
-            '```',
+            ...fence,
           ].join('\n');
           const { data: comments } = await github.rest.issues.listComments({
             owner: context.repo.owner,

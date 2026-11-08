@@ -35,20 +35,21 @@ branch and is not the security-first default.
 
 ## Inputs
 
-| Input             | Default                | Description                                                                   |
-| ----------------- | ---------------------- | ----------------------------------------------------------------------------- |
-| `path`            | `.`                    | Project directory to scan                                                     |
-| `command`         | `all`                  | `all`, `scan`, `diff`, `verify`, `audit`, `sast`, or `both`                   |
-| `policy`          | _(empty)_              | Path to a policy file (`--policy`; exclusive with `profile`)                  |
-| `profile`         | _(empty)_              | Built-in profile `default` or `strict` (`--profile`)                          |
-| `offline`         | `false`                | Pass `--offline` to the CLI                                                   |
-| `reachability`    | `false`                | Pass `--reachability` ([Usage](/guide/usage#reachability))                    |
-| `min-release-age` | _(empty)_              | `audit` only: report releases newer than this, such as `7d`                   |
-| `sarif`           | `false`                | Upload an audit report to code scanning (needs `security-events: write`)      |
-| `sbom`            | `false`                | Write a CycloneDX SBOM and return its path in the `sbom-file` output          |
-| `comment`         | `true`                 | Comment a trust report on pull requests                                       |
-| `token`           | Actions `github.token` | Token for PR comments and attested release downloads                          |
-| `version`         | _(empty)_              | Release tag to install; empty uses a `v*` action ref, else builds from source |
+| Input             | Default                | Description                                                                          |
+| ----------------- | ---------------------- | ------------------------------------------------------------------------------------ |
+| `path`            | `.`                    | Project directory to scan                                                            |
+| `command`         | `all`                  | `all`, `scan`, `diff`, `verify`, `audit`, `sast`, or `both`                          |
+| `policy`          | _(empty)_              | Path to a policy file (`--policy`; exclusive with `profile`)                         |
+| `profile`         | _(empty)_              | Built-in profile `default` or `strict` (`--profile`)                                 |
+| `offline`         | `false`                | Pass `--offline` to the CLI                                                          |
+| `reachability`    | `false`                | Pass `--reachability` ([Usage](/guide/usage#reachability))                           |
+| `min-release-age` | _(empty)_              | `audit` only: report releases newer than this, such as `7d`                          |
+| `sarif`           | `false`                | Upload an audit report to code scanning (needs `security-events: write`)             |
+| `sbom`            | `false`                | Write a CycloneDX SBOM and return its path in the `sbom-file` output                 |
+| `report-format`   | `text`                 | `text` (code block) or `markdown` (findings table) in the job summary and PR comment |
+| `comment`         | `true`                 | Comment a trust report on pull requests                                              |
+| `token`           | Actions `github.token` | Token for PR comments and attested release downloads                                 |
+| `version`         | _(empty)_              | Release tag to install; empty uses a `v*` action ref, else builds from source        |
 
 ### Code scanning, SBOM, and the cooldown
 
@@ -83,6 +84,13 @@ steps:
 - `sbom: "true"` runs `securock sbom export`, so `securock.lock` must exist.
 - `min-release-age` and `command: audit` are the only way to pass the audit-only flag; other
   commands ignore it.
+
+### Report format
+
+`report-format: markdown` runs every command with `--format markdown`, so the job
+summary and the pull request comment show a findings table instead of a code
+block. Pass or fail is unchanged, and the SARIF and SBOM files keep their own
+formats. Any other value than `text` or `markdown` fails the step.
 
 ### `command` modes
 

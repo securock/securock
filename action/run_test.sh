@@ -225,4 +225,29 @@ run_case sbom_fail env COMMAND=scan SBOM_FILE="$tmp/sbom_fail/bom.json" FAIL_SBO
 assert_contains "$tmp/sbom_fail/github_output" "failed=true"
 assert_not_contains "$tmp/sbom_fail/github_output" "sbom-file"
 
+# report-format markdown asks every command for a markdown report, and leaves the SARIF
+# and SBOM runs on their own formats.
+run_case md env COMMAND=scan REPORT_FORMAT=markdown SARIF_FILE="$tmp/md/out.sarif" SBOM_FILE="$tmp/md/bom.json" \
+  bash "$root/action/run.sh"
+assert_contains "$tmp/md/calls" "args:scan --format markdown"
+assert_contains "$tmp/md/calls" "args:audit . --format sarif --output $tmp/md/out.sarif --no-fail"
+assert_not_contains "$tmp/md/calls" "--no-fail --format markdown"
+assert_contains "$tmp/md/calls" "args:sbom export"
+assert_not_contains "$tmp/md/calls" "sbom export --format"
+assert_not_contains "$tmp/md/report" "securock scan"
+assert_contains "$tmp/md/github_output" "failed=false"
+run_case md_summary env COMMAND=scan REPORT_FORMAT=markdown GITHUB_STEP_SUMMARY="$tmp/md_summary/summary" \
+  bash "$root/action/run.sh"
+assert_not_contains "$tmp/md_summary/summary" '```'
+run_case text_summary env COMMAND=scan GITHUB_STEP_SUMMARY="$tmp/text_summary/summary" \
+  bash "$root/action/run.sh"
+assert_contains "$tmp/text_summary/summary" '```'
+run_case md_fail env COMMAND=scan REPORT_FORMAT=markdown FAIL_SCAN=1 \
+  bash "$root/action/run.sh"
+assert_contains "$tmp/md_fail/github_output" "failed=true"
+run_case bad_format env COMMAND=scan REPORT_FORMAT=html \
+  bash "$root/action/run.sh"
+assert_contains "$tmp/bad_format/stderr" "unknown report-format"
+assert_contains "$tmp/bad_format/github_output" "failed=true"
+
 echo "ok"
