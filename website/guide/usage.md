@@ -15,6 +15,7 @@ securock diff [path]
 securock update [path]
 securock verify [path]
 securock explain PACKAGE [path]
+securock graph [path]
 securock audit [path]
 securock sast [path]
 securock chain [path]
@@ -42,6 +43,7 @@ securock version
 | `update`  | Review trust changes, then refresh the lockfile              | [update](#update)                                           |
 | `verify`  | Fail on trust-relevant drift versus the lockfile             | [scan / verify](#scan-vs-verify)                            |
 | `explain` | Print a trust checklist for one package                      | [explain](#explain)                                         |
+| `graph`   | Draw the dependency graph colored by trust status            | [graph](#graph)                                             |
 | `audit`   | Report dependency findings ranked by severity                | [audit](#audit)                                             |
 | `sast`    | Find vulnerabilities in your own source code                 | [Source code analysis](/guide/sast)                         |
 | `chain`   | Correlate source findings into attack chains                 | [Source code analysis](/guide/sast)                         |
@@ -102,6 +104,29 @@ securock explain react
 securock explain react --format json
 securock explain lodash --reachability
 ```
+
+### `graph`
+
+`graph` draws the dependency graph read from your lockfiles, with the trust
+status of every package. The default is a tree; `--format mermaid` and
+`--format dot` print a diagram that GitHub, GitLab, and Graphviz render.
+
+```sh
+securock graph
+securock graph --problems
+securock graph --format mermaid >> "$GITHUB_STEP_SUMMARY"
+securock graph --format dot | dot -Tsvg > deps.svg
+```
+
+`--problems` keeps only the packages that are `untrusted` or `unknown`, and the
+packages that lead to them, so it shows why each one is in the project. A package
+met a second time in the tree is marked `(*)` and not expanded again.
+
+Edges come from the lockfile and not every resolver records them
+([Reachability](/guide/ecosystems#reachability)). When none are recorded, `graph`
+lists top-level packages only and says so, rather than drawing a flat graph that
+looks like a project with no transitive dependencies. `graph` always collects
+scope and edges, as `--reachability` does.
 
 ## Findings with `audit`
 
@@ -185,7 +210,7 @@ exceptions with no approver. Its findings follow the same
 | `--policy`       | Path to a policy file                                                                     |
 | `--profile`      | Built-in policy: `default` or `strict` (not with `--policy`)                              |
 | `--lock`         | Path to `securock.lock` (for `lock` / `diff` / `update` / `verify`)                       |
-| `--format`       | `text` (default), `json`, `sarif`, `junit`, or `markdown`                                 |
+| `--format`       | `text` (default), `json`, `sarif`, `junit`, or `markdown` (`graph`: `mermaid`, `dot`)     |
 | `--output`       | Write the report to a file instead of stdout                                              |
 | `--exceptions`   | Path to the accepted-findings file (`accept`, `audit`, `sast`, `chain`, `doctor`)         |
 | `--reachability` | Record scope and dependencies and mark vulnerabilities reachable, unreachable, or unknown |

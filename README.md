@@ -64,6 +64,7 @@ Those changes are easy to miss in a language lockfile diff.
 - Release health (deprecated, release day, license) for npm and PyPI,
   typosquat-suspect names, optional `health` and `licenses` policy gates
 - `explain` prints a trust checklist for one package
+- `graph` draws the dependency graph as a tree, Mermaid, or DOT, colored by trust status
 
 **Triage and policy**
 
@@ -218,6 +219,7 @@ Cargo under [`examples/`](examples/).
 | `securock update`  | Review trust changes, then refresh the lockfile             |
 | `securock verify`  | Fail on trust-relevant drift                                |
 | `securock explain` | Explain why a package is trusted                            |
+| `securock graph`   | Draw the dependency graph colored by trust status           |
 | `securock audit`   | Report dependency findings by severity                      |
 | `securock sast`    | Find vulnerabilities in your own source code                |
 | `securock chain`   | Correlate source findings into attack chains                |

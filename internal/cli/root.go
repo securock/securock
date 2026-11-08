@@ -42,7 +42,7 @@ func NewRoot(version, commit, date string) *cobra.Command {
 
 	root.PersistentFlags().BoolVar(&opts.offline, "offline", false, "skip remote lookups")
 	root.PersistentFlags().StringVar(&opts.network, "network", "", "network mode: public-only, offline, or allow-all")
-	root.PersistentFlags().StringVar(&opts.format, "format", "text", "output format: text, json, sarif (code scanning), junit (JUnit XML), or markdown (PR comment)")
+	root.PersistentFlags().StringVar(&opts.format, "format", "text", "output format: text, json, sarif (code scanning), junit (JUnit XML), or markdown (PR comment); graph also takes mermaid and dot")
 	root.PersistentFlags().StringVar(&opts.lockPath, "lock", "", "path to securock.lock")
 	root.PersistentFlags().StringVar(&opts.policy, "policy", "", "path to a policy file")
 	root.PersistentFlags().StringVar(&opts.profile, "profile", "", "built-in policy profile: default or strict")
@@ -57,6 +57,7 @@ func NewRoot(version, commit, date string) *cobra.Command {
 	root.AddCommand(newUpdateCommand(opts))
 	root.AddCommand(newVerifyCommand(opts))
 	root.AddCommand(newExplainCommand(opts))
+	root.AddCommand(newGraphCommand(opts))
 	root.AddCommand(newAuditCommand(opts))
 	root.AddCommand(newSASTCommand(opts))
 	root.AddCommand(newChainCommand(opts))
