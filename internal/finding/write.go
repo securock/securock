@@ -17,6 +17,10 @@ func Write(w io.Writer, r Report, format string) error {
 		return WriteJSON(w, r)
 	case "sarif":
 		return WriteSARIF(w, r)
+	case "junit":
+		return WriteJUnit(w, r)
+	case "markdown", "md":
+		return WriteMarkdown(w, r)
 	case "text", "":
 		WriteText(w, r)
 		return nil

@@ -184,7 +184,7 @@ exceptions with no approver. Its findings follow the same
 | `--policy`       | Path to a policy file                                                                     |
 | `--profile`      | Built-in policy: `default` or `strict` (not with `--policy`)                              |
 | `--lock`         | Path to `securock.lock` (for `lock` / `diff` / `update` / `verify`)                       |
-| `--format`       | `text` (default), `json`, or `sarif`                                                      |
+| `--format`       | `text` (default), `json`, `sarif`, `junit`, or `markdown`                                 |
 | `--output`       | Write the report to a file instead of stdout                                              |
 | `--exceptions`   | Path to the accepted-findings file (`accept`, `audit`, `sast`, `chain`, `doctor`)         |
 | `--reachability` | Record scope and dependencies and mark vulnerabilities reachable, unreachable, or unknown |
@@ -223,7 +223,7 @@ securock chain --format sarif --output chains.sarif
 | `1`  | Trust violation                         |
 | `2`  | Configuration or operational error      |
 
-## JSON and SARIF output
+## JSON, SARIF, JUnit and Markdown output
 
 ```sh
 securock scan --format json
@@ -246,6 +246,18 @@ securock verify --format sarif --output securock.sarif
   stages as the code flow. `--output` writes the file even
   when the command exits `1`, so a failing `verify` still produces a
   report.
+
+`--format junit` and `--format markdown` work on `scan`, `diff`, `verify`,
+`audit`, `sast`, and `doctor`. JUnit writes each unsuppressed finding as a
+failed test case (severity in `type`) and each accepted finding as a skipped
+one, for CI systems without SARIF support. Markdown writes a severity summary
+and one table row per finding, for a pull request comment or the GitHub step
+summary. Neither changes the exit code; use `--fail-on` for that.
+
+```sh
+securock audit --format junit --output securock.xml
+securock verify --format markdown >> "$GITHUB_STEP_SUMMARY"
+```
 
 Upload SARIF to GitHub code scanning:
 

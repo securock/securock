@@ -64,8 +64,8 @@ func writeDiff(cmd *cobra.Command, got diff.Result, format, location string) err
 	switch strings.ToLower(format) {
 	case "json":
 		return diff.WriteJSON(cmd.OutOrStdout(), got)
-	case "sarif":
-		return finding.WriteSARIF(cmd.OutOrStdout(), got.Findings("diff").WithLocation(location))
+	case "sarif", "junit", "markdown", "md":
+		return finding.Write(cmd.OutOrStdout(), got.Findings("diff").WithLocation(location), format)
 	case "text", "":
 		diff.Write(cmd.OutOrStdout(), got)
 		return nil

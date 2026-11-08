@@ -2,6 +2,7 @@ package cli
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/securock/securock/internal/diff"
@@ -54,8 +55,8 @@ func newVerifyCommand(opts *options) *cobra.Command {
 				if err := diff.WriteJSON(cmd.OutOrStdout(), got); err != nil {
 					return opErr(err)
 				}
-			case strings.ToLower(opts.format) == "sarif":
-				if err := finding.WriteSARIF(cmd.OutOrStdout(), got.Findings("verify").WithLocation(reportLocation(path, opts.lockPath))); err != nil {
+			case slices.Contains([]string{"sarif", "junit", "markdown", "md"}, strings.ToLower(opts.format)):
+				if err := finding.Write(cmd.OutOrStdout(), got.Findings("verify").WithLocation(reportLocation(path, opts.lockPath)), opts.format); err != nil {
 					return opErr(err)
 				}
 			case !got.TrustDrift():

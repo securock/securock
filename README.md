@@ -238,6 +238,8 @@ Cargo under [`examples/`](examples/).
 | `--lock`                | Path to `securock.lock` (for `lock` / `diff` / `update` / `verify`)                                                 |
 | `--format json`         | Stable JSON on `scan`, `diff`, `verify`, and `explain`                                                              |
 | `--format sarif`        | SARIF 2.1.0 on every report command, for GitHub code scanning                                                       |
+| `--format junit`        | JUnit XML on `scan`, `diff`, `verify`, `audit`, `sast`, and `doctor`                                                |
+| `--format markdown`     | A pull request comment table on the same commands                                                                   |
 | `--output`              | Write the report to a file instead of stdout (also on exit `1`)                                                     |
 | `--min-release-age`     | `audit`. Report npm and PyPI releases newer than this, such as `7d`                                                 |
 | `--fail-on`             | `audit`, `sast`, `chain` and `doctor`. Exit `1` at or above this severity (default `high`)                          |

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/securock/securock/internal/cli"
@@ -121,5 +122,25 @@ func TestReachabilityJSONSchema(t *testing.T) {
 	out := runCLI(t, "verify", dir, "--offline", "--no-fail")
 	if !bytes.Contains(out, []byte("ok")) {
 		t.Fatalf("verify:\n%s", out)
+	}
+}
+
+func TestScanJUnitAndMarkdown(t *testing.T) {
+	isolateHome(t)
+	dir := t.TempDir()
+	lock := `{"version": "5", "redirects": {"https://esm.sh/preact": "https://esm.sh/preact@10.26.8"}}`
+	if err := os.WriteFile(filepath.Join(dir, "deno.lock"), []byte(lock), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	for format, want := range map[string]string{"junit": "<testsuites>", "markdown": "## securock scan"} {
+		for _, cmd := range []string{"scan", "verify", "diff"} {
+			args := []string{cmd, dir, "--offline", "--no-fail", "--format", format}
+			if cmd != "scan" {
+				runCLI(t, "lock", dir, "--offline", "--no-fail")
+			}
+			if out := runCLI(t, args...); !strings.Contains(string(out), strings.Replace(want, "scan", cmd, 1)) {
+				t.Errorf("%s --format %s: unexpected output:\n%s", cmd, format, out)
+			}
+		}
 	}
 }

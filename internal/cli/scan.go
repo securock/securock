@@ -69,8 +69,8 @@ func writeScan(w io.Writer, doc lockfile.Document, format, location string) erro
 		enc := json.NewEncoder(w)
 		enc.SetIndent("", "  ")
 		return enc.Encode(doc)
-	case "sarif":
-		return finding.WriteSARIF(w, scanner.Findings("scan", doc).WithLocation(location))
+	case "sarif", "junit", "markdown", "md":
+		return finding.Write(w, scanner.Findings("scan", doc).WithLocation(location), format)
 	case "text", "":
 		return writeScanText(w, doc)
 	default:
