@@ -115,7 +115,8 @@ it. `doctor`, `sast` and `chain` use the same flag; `chain` counts
 confirmed chains only.
 
 `audit` also takes `--min-release-age 7d`, which reports releases newer
-than that as high findings; see
+than that as high findings (the default comes from `rules.health.min_release_age`
+in the policy, if set); see
 [Release cooldown](/guide/evidence#release-cooldown).
 
 ### Severity and fixed versions

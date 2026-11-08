@@ -5,6 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"slices"
+	"strconv"
+	"strings"
+	"time"
 )
 
 const SchemaVersion = 1
@@ -128,6 +131,32 @@ type HealthRule struct {
 	// package whose name happens to be close to a popular one is not denied. Names are
 	// written as the registry spells them, without the ecosystem.
 	TyposquatAllow []string `json:"typosquat_allow,omitempty" yaml:"typosquat_allow,omitempty"`
+	// MinReleaseAge is the release cooldown `securock audit` applies when --min-release-age
+	// is not given: a number of days such as "7d", or a duration such as "72h". It is read
+	// by audit only. Trust status must not change because time passed, so it is not part of
+	// the fingerprint and Configured ignores it.
+	MinReleaseAge string `json:"min_release_age,omitempty" yaml:"min_release_age,omitempty"`
+}
+
+// ParseAge reads a minimum release age: empty (off), a day count such as 7d, or a Go
+// duration such as 72h.
+func ParseAge(s string) (time.Duration, error) {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return 0, nil
+	}
+	if days, ok := strings.CutSuffix(s, "d"); ok {
+		n, err := strconv.Atoi(days)
+		if err != nil || n < 0 {
+			return 0, fmt.Errorf("%q: use a number of days such as 7d, or a duration such as 72h", s)
+		}
+		return time.Duration(n) * 24 * time.Hour, nil
+	}
+	d, err := time.ParseDuration(s)
+	if err != nil || d < 0 {
+		return 0, fmt.Errorf("%q: use a number of days such as 7d, or a duration such as 72h", s)
+	}
+	return d, nil
 }
 
 func (r HealthRule) DenyDeprecated() bool { return r.Deprecated == "deny" }

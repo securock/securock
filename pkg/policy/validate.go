@@ -81,6 +81,9 @@ func validateLicenseRule(rule LicenseRule) error {
 }
 
 func validateHealthRule(rule HealthRule) error {
+	if _, err := ParseAge(rule.MinReleaseAge); err != nil {
+		return fmt.Errorf("health min_release_age %w", err)
+	}
 	for _, name := range rule.TyposquatAllow {
 		if strings.TrimSpace(name) == "" {
 			return fmt.Errorf("health typosquat_allow entry must not be empty")

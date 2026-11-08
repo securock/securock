@@ -119,12 +119,12 @@ trust drift. It affects trust only through the policy rule
 `securock audit` turns health into findings, and adds a name check that
 needs no registry:
 
-| Finding              | Severity | When                                                   |
-| -------------------- | -------- | ------------------------------------------------------ |
-| `deprecated-package` | medium   | The release is deprecated or yanked                    |
-| `stale-release`      | low      | The release is more than two years old                 |
-| `typosquat-suspect`  | low      | npm or PyPI name within one edit of a popular package  |
-| `recent-release`     | high     | Newer than `--min-release-age` (off unless you set it) |
+| Finding              | Severity | When                                                    |
+| -------------------- | -------- | ------------------------------------------------------- |
+| `deprecated-package` | medium   | The release is deprecated or yanked                     |
+| `stale-release`      | low      | The release is more than two years old                  |
+| `typosquat-suspect`  | low      | npm or PyPI name within one edit of a popular package   |
+| `recent-release`     | high     | Newer than the release cooldown (off unless you set it) |
 
 `typosquat-suspect` compares each name against a built-in list of popular
 packages (separator variants such as `lo-dash`, or one typo, swap, or
@@ -142,7 +142,11 @@ reports every npm and PyPI release published more recently than that as a high f
 (`recent-release`), so it fails `--fail-on high` by default. The age is a day count (`7d`)
 or a duration (`72h`).
 
-It is a report-time check, not a policy rule, on purpose: whether a release is "too new"
+To make the cooldown part of the repository instead of a flag everyone must remember, set
+`rules.health.min_release_age` in the [policy](/guide/policy#release-cooldown). The flag
+overrides it, so `--min-release-age 0d` turns it off for one run.
+
+It is a report-time check, not a trust rule, on purpose: whether a release is "too new"
 changes as time passes, and trust status in the lockfile must not. The registry gives only
 the release day, so a release counts from the start of that day. A release whose date is
 unknown (offline, or a registry that does not answer) cannot be judged: it is not flagged as

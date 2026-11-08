@@ -43,7 +43,7 @@ branch and is not the security-first default.
 | `profile`         | _(empty)_              | Built-in profile `default` or `strict` (`--profile`)                                 |
 | `offline`         | `false`                | Pass `--offline` to the CLI                                                          |
 | `reachability`    | `false`                | Pass `--reachability` ([Usage](/guide/usage#reachability))                           |
-| `min-release-age` | _(empty)_              | `audit` only: report releases newer than this, such as `7d`                          |
+| `min-release-age` | _(empty)_              | `audit` only: report releases newer than this, such as `7d` (empty uses the policy)  |
 | `sarif`           | `false`                | Upload an audit report to code scanning (needs `security-events: write`)             |
 | `sbom`            | `false`                | Write a CycloneDX SBOM and return its path in the `sbom-file` output                 |
 | `report-format`   | `text`                 | `text` (code block) or `markdown` (findings table) in the job summary and PR comment |

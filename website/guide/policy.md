@@ -130,6 +130,22 @@ status must not change just because time passed, so `securock audit`
 reports `stale-release` instead. See
 [Release health](/guide/evidence#release-health).
 
+### Release cooldown
+
+```yaml
+version: 1
+rules:
+  health:
+    min_release_age: 7d
+```
+
+`securock audit` reports npm and PyPI releases published more recently than this as high
+`recent-release` findings. The value is a day count (`7d`) or a duration (`72h`);
+`--min-release-age` on the command line overrides it. Unlike the rules above, it only
+affects `audit`: trust status in `securock.lock` must not change because time passed, so
+`min_release_age` is not part of the policy fingerprint, and `scan`, `lock`, and `verify`
+ignore it. See [Release cooldown](/guide/evidence#release-cooldown).
+
 ### License gates
 
 ```yaml

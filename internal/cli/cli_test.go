@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/securock/securock/internal/cli"
@@ -172,5 +173,37 @@ func TestExamplesExportAndVerifyAnSBOM(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestAuditMinReleaseAgeFromPolicy(t *testing.T) {
+	isolateHome(t)
+	dir := filepath.Join("..", "ecosystem", "npm", "testdata")
+	policyFile := func(age string) string {
+		path := filepath.Join(t.TempDir(), "policy.yaml")
+		if err := os.WriteFile(path, []byte("version: 1\nrules:\n  health:\n    min_release_age: "+age+"\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		return path
+	}
+	// Offline there is no release date, so an active cooldown shows up as this finding.
+	const marker = "release-date-unknown"
+	off := string(runCLI(t, "audit", dir, "--offline", "--no-fail"))
+	if strings.Contains(off, marker) {
+		t.Fatalf("no cooldown is set, but audit checked release age:\n%s", off)
+	}
+	if on := string(runCLI(t, "audit", dir, "--offline", "--no-fail", "--policy", policyFile("7d"))); !strings.Contains(on, marker) {
+		t.Fatalf("policy cooldown was not applied:\n%s", on)
+	}
+	// The flag wins over the policy, so --min-release-age 0d turns the cooldown off.
+	if flagged := string(runCLI(t, "audit", dir, "--offline", "--no-fail", "--policy", policyFile("7d"), "--min-release-age", "0d")); strings.Contains(flagged, marker) {
+		t.Fatalf("flag did not override the policy:\n%s", flagged)
+	}
+	root := cli.NewRoot("test", "none", "unknown")
+	root.SetOut(&bytes.Buffer{})
+	root.SetErr(&bytes.Buffer{})
+	root.SetArgs([]string{"audit", dir, "--offline", "--no-fail", "--policy", policyFile("soon")})
+	if err := root.Execute(); err == nil {
+		t.Fatal("an invalid min_release_age should be rejected")
 	}
 }

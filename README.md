@@ -69,7 +69,7 @@ Those changes are easy to miss in a language lockfile diff.
 
 - `accept` records reviewed findings with a reason and expiry in
   `.securock/exceptions.yaml`; `audit` suppresses them until they lapse
-- `audit --min-release-age` holds back releases that are too new
+- `audit --min-release-age` (or `rules.health.min_release_age` in the policy) holds back releases that are too new
 - `--reachability` marks each vulnerability reachable, unreachable
   (development-only), or unknown from the dependency graph, so `audit`
   stops failing on test tooling
