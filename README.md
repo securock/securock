@@ -220,6 +220,7 @@ Cargo under [`examples/`](examples/).
 | `securock diff`    | Show trust drift vs the lockfile                            |
 | `securock update`  | Review trust changes, then refresh the lockfile             |
 | `securock verify`  | Fail on trust-relevant drift                                |
+| `securock init`    | Detect lockfiles and write the first `securock.lock`        |
 | `securock explain` | Explain why a package is trusted                            |
 | `securock graph`   | Draw the dependency graph colored by trust status           |
 | `securock audit`   | Report dependency findings by severity                      |

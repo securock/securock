@@ -53,6 +53,7 @@ func NewRoot(version, commit, date string) *cobra.Command {
 	root.PersistentFlags().BoolVar(&opts.noFail, "no-fail", false, "always exit 0")
 
 	root.AddCommand(newScanCommand(opts))
+	root.AddCommand(newInitCommand(opts))
 	root.AddCommand(newLockCommand(opts))
 	root.AddCommand(newDiffCommand(opts))
 	root.AddCommand(newUpdateCommand(opts))

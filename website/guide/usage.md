@@ -10,6 +10,7 @@ or compares against `securock.lock`.
 
 ```sh
 securock scan [path]
+securock init [path]
 securock lock [path]
 securock diff [path]
 securock update [path]
@@ -38,6 +39,7 @@ securock version
 | Command   | What it does                                                 | More                                                        |
 | --------- | ------------------------------------------------------------ | ----------------------------------------------------------- |
 | `scan`    | Inspect the current tree under the active policy (default)   | [scan / verify](#scan-vs-verify)                            |
+| `init`    | Detect lockfiles and write the first `securock.lock`         | [init](#init)                                               |
 | `lock`    | Write a deterministic `securock.lock`                        | [Lockfile](/reference/lockfile)                             |
 | `diff`    | Show trust drift versus the lockfile                         | [scan / verify](#scan-vs-verify)                            |
 | `update`  | Review trust changes, then refresh the lockfile              | [update](#update)                                           |
@@ -76,6 +78,26 @@ securock update --write      # record the new state
 - It needs an existing `securock.lock`; run `securock lock` once to create it.
 - `--format json` prints the `diff` report (`diff-report` schema) on stdout and
   moves the status lines to stderr. `--format sarif` is not supported.
+
+### `init`
+
+`init` sets a project up: it detects the lockfiles, records the current trust state
+in `securock.lock`, prints a summary, and says what to run next. It is the first run of
+`lock` plus that summary, so it refuses to overwrite an existing `securock.lock`; use
+`lock` to refresh one.
+
+```sh
+securock init
+securock init --profile strict --write-policy
+```
+
+`--write-policy` also writes the profile in use (`default` or `strict`) to
+`.securock/policy.yaml`, as a starting point to edit. It never overwrites an existing
+file. Pass the file with `--policy` afterwards.
+
+Like `lock`, `init` exits `1` when the snapshot has untrusted or unknown artifacts,
+which is normal for a first `--offline` run; the files are written either way. Use
+`--no-fail` to exit `0`.
 
 ### `scan` vs `verify`
 
