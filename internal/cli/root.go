@@ -25,6 +25,7 @@ type options struct {
 	exceptions string
 
 	reachability bool
+	recursive    bool
 }
 
 func NewRoot(version, commit, date string) *cobra.Command {
@@ -75,6 +76,7 @@ func NewRoot(version, commit, date string) *cobra.Command {
 	})
 
 	root.RunE = newScanCommand(opts).RunE
+	withRecursive(opts, root)
 	redirectOutput(opts, root)
 
 	return root

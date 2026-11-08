@@ -201,6 +201,31 @@ reports expired exceptions, those expiring within 14 days, and
 exceptions with no approver. Its findings follow the same
 `--fail-on` flow as `audit`.
 
+## Monorepos
+
+A repository with a lockfile per service keeps one `securock.lock` per project, next to
+its lockfile. `--recursive` (`-r`) runs `lock`, `scan`, `diff`, `verify`, or `audit` for
+every project under the path:
+
+```sh
+securock lock --recursive
+securock verify --recursive
+securock audit -r services/
+```
+
+Each project's report follows a `== path ==` heading (`# path` with `--format markdown`).
+A project is a directory that holds a lockfile securock reads. Hidden directories and
+`node_modules`, `vendor`, `target`, `dist`, `build`, `out`, `venv`, `site-packages`,
+`__pycache__`, `testdata`, and `Pods` are not searched, and symbolic links are not
+followed.
+
+- Every project runs even after one fails, so one run shows all of them. The exit code is
+  the worst result: `2` for an error, else `1` for a trust failure, else `0`.
+- Finding no project is an error, not a pass.
+- `--format json`, `sarif`, and `junit` are refused, since several reports in one stream
+  are not one valid document. Run once per project for those.
+- A relative `--lock` path is resolved inside each project.
+
 ## Git hooks
 
 Catch drift before it reaches CI. With [pre-commit](https://pre-commit.com), add the
@@ -245,6 +270,7 @@ pre-commit:
 | `--profile`      | Built-in policy: `default` or `strict` (not with `--policy`)                              |
 | `--lock`         | Path to `securock.lock` (for `lock` / `diff` / `update` / `verify`)                       |
 | `--format`       | `text` (default), `json`, `sarif`, `junit`, or `markdown` (`graph`: `mermaid`, `dot`)     |
+| `--recursive`    | `lock`, `scan`, `diff`, `verify`, `audit`: run for every project under the path           |
 | `--output`       | Write the report to a file instead of stdout                                              |
 | `--exceptions`   | Path to the accepted-findings file (`accept`, `audit`, `sast`, `chain`, `doctor`)         |
 | `--reachability` | Record scope and dependencies and mark vulnerabilities reachable, unreachable, or unknown |

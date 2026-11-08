@@ -65,6 +65,7 @@ Those changes are easy to miss in a language lockfile diff.
   typosquat-suspect names, optional `health` and `licenses` policy gates
 - `explain` prints a trust checklist for one package
 - `.pre-commit-hooks.yaml` provides `securock-verify` and `securock-audit` hooks for pre-commit
+- `--recursive` runs `lock`, `scan`, `diff`, `verify`, and `audit` for every project in a monorepo, each with its own `securock.lock`
 - `graph` draws the dependency graph as a tree, Mermaid, or DOT, colored by trust status
 
 **Triage and policy**
@@ -243,6 +244,7 @@ Cargo under [`examples/`](examples/).
 | `--format sarif`        | SARIF 2.1.0 on every report command, for GitHub code scanning                                                       |
 | `--format junit`        | JUnit XML on `scan`, `diff`, `verify`, `audit`, `sast`, and `doctor`                                                |
 | `--format markdown`     | A pull request comment table on the same commands                                                                   |
+| `--recursive`, `-r`     | `lock`, `scan`, `diff`, `verify`, `audit`. Run for every project under the path                                     |
 | `--output`              | Write the report to a file instead of stdout (also on exit `1`)                                                     |
 | `--min-release-age`     | `audit`. Report npm and PyPI releases newer than this, such as `7d`                                                 |
 | `--fail-on`             | `audit`, `sast`, `chain` and `doctor`. Exit `1` at or above this severity (default `high`)                          |
