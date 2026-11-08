@@ -64,6 +64,7 @@ Those changes are easy to miss in a language lockfile diff.
 - Release health (deprecated, release day, license) for npm and PyPI,
   typosquat-suspect names, optional `health` and `licenses` policy gates
 - `explain` prints a trust checklist for one package
+- `.pre-commit-hooks.yaml` provides `securock-verify` and `securock-audit` hooks for pre-commit
 - `graph` draws the dependency graph as a tree, Mermaid, or DOT, colored by trust status
 
 **Triage and policy**

@@ -201,6 +201,40 @@ reports expired exceptions, those expiring within 14 days, and
 exceptions with no approver. Its findings follow the same
 `--fail-on` flow as `audit`.
 
+## Git hooks
+
+Catch drift before it reaches CI. With [pre-commit](https://pre-commit.com), add the
+hooks to `.pre-commit-config.yaml`:
+
+```yaml
+repos:
+  - repo: https://github.com/securock/securock
+    rev: v0.3.0 # use the latest release tag
+    hooks:
+      - id: securock-verify
+      - id: securock-audit
+```
+
+`securock-verify` runs `securock verify` and `securock-audit` runs `securock audit`.
+Each runs only when a lockfile, `securock.lock`, or `.securock/exceptions.yaml` is
+staged, and checks the whole project. pre-commit builds the CLI from the tagged
+release, so Go must be installed. Pass options with `args`, for example
+`args: [--policy, policy.yaml]`.
+
+The hooks look packages up online, like the CLI. `args: [--offline]` skips that, but
+remote evidence stays `unknown`, so `verify` reports drift against a lockfile that
+recorded it. Lock and hook should use the same mode.
+
+With [lefthook](https://lefthook.dev), or any runner that calls commands:
+
+```yaml
+pre-commit:
+  commands:
+    securock:
+      glob: "{securock.lock,*.lock,package-lock.json,pnpm-lock.yaml,go.sum}"
+      run: securock verify
+```
+
 ## Shared flags
 
 | Flag             | Meaning                                                                                   |

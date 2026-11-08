@@ -1,0 +1,21 @@
+# Hooks for https://pre-commit.com. See "Pre-commit" in website/guide/usage.md.
+#
+# Both hooks run only when a lockfile, securock.lock, or the exceptions file is staged, and
+# check the whole project: the staged files say when to look, not what to look at.
+# They look packages up online like the CLI does; add `args: [--offline]` to skip that,
+# which leaves remote evidence unknown.
+- id: securock-verify
+  name: securock verify
+  description: Fail when dependencies drift from securock.lock
+  entry: securock verify
+  language: golang
+  pass_filenames: false
+  files: '(^|/)(securock\.lock|\.securock/.*|package-lock\.json|package\.json|pnpm-lock\.yaml|yarn\.lock|bun\.lockb?|deno\.lock|Cargo\.lock|go\.(mod|sum)|uv\.lock|poetry\.lock|pdm\.lock|Pipfile\.lock|composer\.lock|Gemfile\.lock|packages\.lock\.json|Package\.resolved|Podfile\.lock|conan\.lock|renv\.lock|Manifest\.toml|cabal\.project\.freeze|pubspec\.lock|mix\.lock|gradle\.lockfile)$'
+
+- id: securock-audit
+  name: securock audit
+  description: Fail on dependency findings at or above high severity
+  entry: securock audit
+  language: golang
+  pass_filenames: false
+  files: '(^|/)(securock\.lock|\.securock/.*|package-lock\.json|pnpm-lock\.yaml|yarn\.lock|bun\.lockb?|deno\.lock|Cargo\.lock|go\.(mod|sum)|uv\.lock|poetry\.lock|pdm\.lock|Pipfile\.lock|composer\.lock|Gemfile\.lock|packages\.lock\.json|Package\.resolved|Podfile\.lock|conan\.lock|renv\.lock|Manifest\.toml|cabal\.project\.freeze|pubspec\.lock|mix\.lock|gradle\.lockfile)$'
