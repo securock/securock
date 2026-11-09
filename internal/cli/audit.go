@@ -14,6 +14,7 @@ import (
 	"github.com/securock/securock/internal/osv"
 	"github.com/securock/securock/internal/policy"
 	"github.com/securock/securock/internal/scanner"
+	"github.com/securock/securock/internal/scorecard"
 	"github.com/securock/securock/pkg/lockfile"
 	pkgpolicy "github.com/securock/securock/pkg/policy"
 	"github.com/spf13/cobra"
@@ -22,6 +23,7 @@ import (
 func newAuditCommand(opts *options) *cobra.Command {
 	var failOn, minAge string
 	var prioritize bool
+	var minScorecard float64
 	cmd := &cobra.Command{
 		Use:   "audit [path]",
 		Short: "Audit dependencies and report findings by severity",
@@ -30,6 +32,9 @@ func newAuditCommand(opts *options) *cobra.Command {
 			threshold, err := finding.ParseSeverity(failOn)
 			if err != nil {
 				return opErr(err)
+			}
+			if minScorecard < 0 || minScorecard > 10 {
+				return opErr(fmt.Errorf("--min-scorecard %v: use a score from 0 to 10", minScorecard))
 			}
 			pol, err := policy.LoadWithProfile(opts.policy, opts.profile)
 			if err != nil {
@@ -63,6 +68,10 @@ func newAuditCommand(opts *options) *cobra.Command {
 			if prioritize {
 				auditOpts.Signals, auditOpts.SignalsUnavailable = exploitSignals(cmd.Context(), net.Mode, result.Document)
 			}
+			if minScorecard > 0 {
+				auditOpts.MinScorecard = minScorecard
+				auditOpts.Scorecards, auditOpts.ScorecardUnchecked = scorecard.New().Collect(cmd.Context(), net, result.Document)
+			}
 			report := exceptions.Apply(audit.RunWith(result.Document, auditOpts), accepted, time.Now().UTC()).WithLocation(reportLocation(path, opts.lockPath))
 			if err := finding.Write(cmd.OutOrStdout(), report, opts.format); err != nil {
 				return opErr(err)
@@ -77,6 +86,7 @@ func newAuditCommand(opts *options) *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVar(&minAge, "min-release-age", "", "report releases published more recently than this as high findings (default: rules.health.min_release_age in the policy): a number of days such as 7d, or a duration such as 72h (npm and PyPI)")
+	cmd.Flags().Float64Var(&minScorecard, "min-scorecard", 0, "report packages whose source repository has an OpenSSF Scorecard below this score (0 to 10) as medium findings; sends package names and versions from public registries to api.deps.dev (npm, PyPI, Cargo, Go, NuGet, RubyGems)")
 	cmd.Flags().BoolVar(&prioritize, "prioritize", false, "raise the severity of vulnerabilities that CISA lists as exploited (KEV) or whose EPSS score is 50% or more; sends the CVE IDs of public advisories to api.osv.dev, www.cisa.gov and api.first.org")
 	cmd.Flags().StringVar(&failOn, "fail-on", "high", "exit 1 when a finding is at or above this severity: critical, high, medium, low, or info")
 	return cmd

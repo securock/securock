@@ -184,6 +184,14 @@ assert_not_contains "$tmp/prioritize_off/calls" "--prioritize"
 run_case prioritize_not_forwarded env COMMAND=scan PRIORITIZE=true \
   bash "$root/action/run.sh"
 assert_not_contains "$tmp/prioritize_not_forwarded/calls" "--prioritize"
+# min-scorecard is audit-only as well.
+run_case scorecard env COMMAND=audit MIN_SCORECARD=5 \
+  bash "$root/action/run.sh"
+assert_contains "$tmp/scorecard/calls" "args:audit --min-scorecard 5"
+assert_not_contains "$tmp/audit_plain/calls" "--min-scorecard"
+run_case scorecard_not_forwarded env COMMAND=scan MIN_SCORECARD=5 \
+  bash "$root/action/run.sh"
+assert_not_contains "$tmp/scorecard_not_forwarded/calls" "--min-scorecard"
 run_case age_not_forwarded env COMMAND=scan MIN_RELEASE_AGE=7d \
   bash "$root/action/run.sh"
 assert_not_contains "$tmp/age_not_forwarded/calls" "--min-release-age"

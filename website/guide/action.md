@@ -35,23 +35,24 @@ branch and is not the security-first default.
 
 ## Inputs
 
-| Input             | Default                | Description                                                                              |
-| ----------------- | ---------------------- | ---------------------------------------------------------------------------------------- |
-| `path`            | `.`                    | Project directory to scan                                                                |
-| `command`         | `all`                  | `all`, `scan`, `diff`, `verify`, `audit`, `sast`, or `both`                              |
-| `policy`          | _(empty)_              | Path to a policy file (`--policy`; exclusive with `profile`)                             |
-| `profile`         | _(empty)_              | Built-in profile `default` or `strict` (`--profile`)                                     |
-| `offline`         | `false`                | Pass `--offline` to the CLI                                                              |
-| `reachability`    | `false`                | Pass `--reachability` ([Usage](/guide/usage#reachability))                               |
-| `min-release-age` | _(empty)_              | `audit` only: report releases newer than this, such as `7d` (empty uses the policy)      |
-| `prioritize`      | `false`                | `audit` only: pass `--prioritize` to raise vulnerabilities in CISA KEV or with high EPSS |
-| `import-sarif`    | _(empty)_              | `sast` only: SARIF reports from other scanners to merge in, one path per line            |
-| `sarif`           | `false`                | Upload an audit report to code scanning (needs `security-events: write`)                 |
-| `sbom`            | `false`                | Write a CycloneDX SBOM and return its path in the `sbom-file` output                     |
-| `report-format`   | `text`                 | `text` (code block) or `markdown` (findings table) in the job summary and PR comment     |
-| `comment`         | `true`                 | Comment a trust report on pull requests                                                  |
-| `token`           | Actions `github.token` | Token for PR comments and attested release downloads                                     |
-| `version`         | _(empty)_              | Release tag to install; empty uses a `v*` action ref, else builds from source            |
+| Input             | Default                | Description                                                                               |
+| ----------------- | ---------------------- | ----------------------------------------------------------------------------------------- |
+| `path`            | `.`                    | Project directory to scan                                                                 |
+| `command`         | `all`                  | `all`, `scan`, `diff`, `verify`, `audit`, `sast`, or `both`                               |
+| `policy`          | _(empty)_              | Path to a policy file (`--policy`; exclusive with `profile`)                              |
+| `profile`         | _(empty)_              | Built-in profile `default` or `strict` (`--profile`)                                      |
+| `offline`         | `false`                | Pass `--offline` to the CLI                                                               |
+| `reachability`    | `false`                | Pass `--reachability` ([Usage](/guide/usage#reachability))                                |
+| `min-release-age` | _(empty)_              | `audit` only: report releases newer than this, such as `7d` (empty uses the policy)       |
+| `prioritize`      | `false`                | `audit` only: pass `--prioritize` to raise vulnerabilities in CISA KEV or with high EPSS  |
+| `import-sarif`    | _(empty)_              | `sast` only: SARIF reports from other scanners to merge in, one path per line             |
+| `min-scorecard`   | _(empty)_              | `audit` only: report repositories with an OpenSSF Scorecard below this score, such as `5` |
+| `sarif`           | `false`                | Upload an audit report to code scanning (needs `security-events: write`)                  |
+| `sbom`            | `false`                | Write a CycloneDX SBOM and return its path in the `sbom-file` output                      |
+| `report-format`   | `text`                 | `text` (code block) or `markdown` (findings table) in the job summary and PR comment      |
+| `comment`         | `true`                 | Comment a trust report on pull requests                                                   |
+| `token`           | Actions `github.token` | Token for PR comments and attested release downloads                                      |
+| `version`         | _(empty)_              | Release tag to install; empty uses a `v*` action ref, else builds from source             |
 
 ### Code scanning, SBOM, and the cooldown
 
@@ -87,9 +88,10 @@ steps:
   them into the `sast` report (`securock sast --import`), including the report uploaded to
   code scanning. Other commands ignore it.
 - `sbom: "true"` runs `securock sbom export`, so `securock.lock` must exist.
-- `min-release-age`, `prioritize` and `command: audit` are the only way to pass the audit-only
-  flags; other commands ignore them. `prioritize` sends the CVE IDs of public advisories to OSV,
-  CISA and FIRST; see [Privacy](/reference/privacy#exploitation-data-opt-in).
+- `min-release-age`, `prioritize`, `min-scorecard` and `command: audit` are the only way to pass the
+  audit-only flags; other commands ignore them. `prioritize` sends the CVE IDs of public advisories to OSV,
+  CISA and FIRST, and `min-scorecard` sends package names and versions to deps.dev; see
+  [Privacy](/reference/privacy).
 
 ### Report format
 

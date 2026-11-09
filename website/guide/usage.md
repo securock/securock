@@ -180,6 +180,15 @@ two more hosts, sends only CVE IDs and skips on `--offline`: `audit` then report
 finding, `exploit-signals-unavailable`, instead of staying silent. See
 [Privacy](/reference/privacy#exploitation-data-opt-in).
 
+`audit --min-scorecard 5` reports a package whose source repository has an
+[OpenSSF Scorecard](https://securityscorecards.dev) below that score (0 to 10) as a medium
+`low-scorecard` finding. The repository comes from deps.dev, which gets it from the package's
+own metadata, so the finding says when the link is not verified; a high score never counts
+as a reason to trust a package, only a low one is reported. Only npm, PyPI, Cargo, Go, NuGet and
+RubyGems packages from a public registry are looked up, and `--offline` skips it. Packages
+with no score are counted in an `info` finding, `scorecard-unchecked`, because no score means
+unknown, not safe. See [Privacy](/reference/privacy#openssf-scorecard-opt-in).
+
 ### Severity and fixed versions
 
 For every advisory that matches, Securock reads its OSV record and stores the `severity`

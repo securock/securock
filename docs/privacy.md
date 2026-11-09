@@ -78,9 +78,24 @@ It follows the network mode: `--offline` skips it and `audit` reports an `info` 
 and in `public-only` mode only advisories of artifacts from a known public registry exist to look
 up. Nothing is written to `securock.lock`.
 
+## OpenSSF Scorecard (opt-in)
+
+`securock audit --min-scorecard <score>` is the only command that contacts these endpoints, and only
+when you pass the flag. For each package that the network mode allows to leave the machine, it sends
+the ecosystem, package name and version to deps.dev:
+
+- `https://api.deps.dev/v3/systems/<system>/packages/<name>/versions/<version>`, to find the source
+  repository the package points at
+- `https://api.deps.dev/v3/projects/<repository>`, for that repository's OpenSSF Scorecard
+
+Only npm, PyPI, Cargo, Go, NuGet and RubyGems packages are looked up. `--offline` skips it, and in
+`public-only` mode a package from a private registry, a `GOPRIVATE` module or a Git source is not
+sent: it counts toward an `info` finding, `scorecard-unchecked`, that says how many packages have no
+score. Nothing is written to `securock.lock`.
+
 ## Local cache
 
-Responses from OSV, the registries and the exploitation feeds are kept for one hour in your user cache
+Responses from OSV, the registries, the exploitation feeds and deps.dev are kept for one hour in your user cache
 directory (`securock/`), readable only by you, so repeated runs do not ask again. They
 hold the same public data that was already sent off-machine, never credentials: a
 request that carries `Authorization`, `Proxy-Authorization`, or `Cookie` is not

@@ -8,6 +8,7 @@ import (
 	"github.com/securock/securock/internal/exploit"
 	"github.com/securock/securock/internal/finding"
 	"github.com/securock/securock/internal/network"
+	"github.com/securock/securock/internal/scorecard"
 	"github.com/securock/securock/internal/typosquat"
 	"github.com/securock/securock/pkg/lockfile"
 )
@@ -44,6 +45,15 @@ type Options struct {
 	// SignalsUnavailable, when set, says why --prioritize could not look the signals up.
 	// It is reported as an info finding so a missing lookup is not read as "not exploited".
 	SignalsUnavailable string
+	// MinScorecard reports a package whose source repository has an OpenSSF Scorecard
+	// below this score (0 to 10) as a medium finding. Zero turns the check off.
+	MinScorecard float64
+	// Scorecards holds the Scorecards found, by artifact ID, from `audit --min-scorecard`.
+	Scorecards map[string]scorecard.Result
+	// ScorecardUnchecked, when set, says how many packages have no Scorecard to judge, or why
+	// none could be looked up. It is reported as an info finding so a package without a
+	// score is not read as one with a good score.
+	ScorecardUnchecked string
 }
 
 // RunWith is Run with options.
@@ -62,6 +72,15 @@ func RunWith(doc lockfile.Document, opts Options) finding.Report {
 			Title:       "Exploitation data was not checked",
 			Detail:      opts.SignalsUnavailable,
 			Remediation: "Run without --offline, or retry when CISA KEV and EPSS are reachable.",
+		})
+	}
+	if opts.ScorecardUnchecked != "" {
+		out = append(out, finding.Finding{
+			ID:          "scorecard-unchecked",
+			Severity:    finding.SeverityInfo,
+			Title:       "OpenSSF Scorecard was not available for every package",
+			Detail:      opts.ScorecardUnchecked,
+			Remediation: "A package with no Scorecard is unknown, not safe. Run without --offline to look them up.",
 		})
 	}
 	return finding.New("audit", out)
@@ -108,6 +127,7 @@ func artifact(art lockfile.Artifact, opts Options) []finding.Finding {
 	health(art, now, add)
 	recentRelease(art, opts, add)
 	dependencyConfusion(art, opts, add)
+	lowScorecard(art, opts, add)
 
 	if ev.Capabilities.State == lockfile.CapChecked {
 		caps := ev.Capabilities
@@ -322,4 +342,19 @@ func internalName(entries []string, ecosystem, name string) bool {
 		}
 	}
 	return false
+}
+
+// lowScorecard reports a weak source repository. The repository is the one the package's own
+// metadata names unless deps.dev verified it, so a good score is never taken as a reason to
+// trust the package; only a poor one is reported.
+func lowScorecard(art lockfile.Artifact, opts Options, add func(id string, sev finding.Severity, title, detail, fix string)) {
+	res, ok := opts.Scorecards[art.ArtifactID()]
+	if opts.MinScorecard <= 0 || !ok || res.Score >= opts.MinScorecard {
+		return
+	}
+	detail := fmt.Sprintf("%s scores %.1f of 10, below the minimum of %.1f", res.Repository, res.Score, opts.MinScorecard)
+	if !res.Verified {
+		detail += "; the repository is the one the package's metadata claims, not verified"
+	}
+	add("low-scorecard", finding.SeverityMedium, "Source repository has a low OpenSSF Scorecard", detail, "Check how the project is maintained and secured before relying on it.")
 }

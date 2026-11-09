@@ -75,6 +75,8 @@ Those changes are easy to miss in a language lockfile diff.
 - `audit --min-release-age` (or `rules.health.min_release_age` in the policy) holds back releases that are too new
 - `audit --prioritize` raises vulnerabilities that CISA lists as exploited (KEV) or that have an
   EPSS score of 50% or more; it is opt-in and only sends CVE IDs (see Privacy)
+- `audit --min-scorecard 5` reports packages whose source repository has an OpenSSF Scorecard below
+  that score (via deps.dev, opt-in); a score is only used to warn, never to vouch for a package
 - `rules.health.internal_names` in the policy lists your private packages; `audit` flags one that
   resolves from a public registry as a `dependency-confusion` risk
 - `--reachability` marks each vulnerability reachable, unreachable
@@ -265,6 +267,7 @@ Cargo under [`examples/`](examples/).
 | `--output`              | Write the report to a file instead of stdout (also on exit `1`)                                                                    |
 | `--min-release-age`     | `audit`. Report npm and PyPI releases newer than this, such as `7d`                                                                |
 | `--prioritize`          | `audit`. Raise vulnerabilities in CISA KEV or with EPSS of 50% or more; sends CVE IDs to OSV, CISA and FIRST                       |
+| `--min-scorecard`       | `audit`. Report packages whose source repository has an OpenSSF Scorecard below this score (0 to 10); sends names to deps.dev      |
 | `--fail-on`             | `audit`, `sast`, `chain`, `import` and `doctor`. Exit `1` at or above this severity (default `high`)                               |
 | `--assume-params`       | `sast` and `chain`. Treat string parameters of Go functions nothing calls directly as untrusted (registry handlers)                |
 | `--import`              | `sast`. Merge another scanner's SARIF report into the sast report (repeatable)                                                     |
