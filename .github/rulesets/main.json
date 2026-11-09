@@ -2,7 +2,9 @@
   "name": "Protect main: PR review and required checks",
   "target": "branch",
   "enforcement": "active",
-  "bypass_actors": [],
+  "bypass_actors": [
+    { "actor_id": 114616680, "actor_type": "User", "bypass_mode": "always" }
+  ],
   "conditions": {
     "ref_name": {
       "include": ["refs/heads/main"],
@@ -29,8 +31,9 @@
         "required_status_checks": [
           { "context": "test" },
           { "context": "govulncheck" },
-          { "context": "analyze" },
-          { "context": "npm-example" },
+          { "context": "analyze (go)" },
+          { "context": "analyze (actions)" },
+          { "context": "example (examples/npm)" },
           { "context": "dependency-review" },
           { "context": "release-snapshot" }
         ]
