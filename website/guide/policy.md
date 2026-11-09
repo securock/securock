@@ -165,6 +165,27 @@ cannot be shown to be private, so it is reported as medium instead of assumed sa
 Like `min_release_age` it only affects `audit` and is not part of the policy
 fingerprint.
 
+### Scorecard checks
+
+```yaml
+version: 1
+rules:
+  health:
+    scorecard_checks:
+      Dangerous-Workflow: 5
+      Maintained: 3
+```
+
+Sets a minimum score, from 0 to 10, for individual
+[OpenSSF Scorecard](https://securityscorecards.dev) checks of a package's source repository.
+`securock audit --scorecard` reports a package below it as a medium
+`low-scorecard-check:<Check>` finding; a check the repository has no score for is not judged.
+Check names are exact (`Dangerous-Workflow`, `Token-Permissions`, `Code-Review`, ...) and an
+unknown one is rejected, so a typo cannot silently turn the rule off. The rule is read only
+when `--scorecard` or `--min-scorecard` asks for the lookup, so sharing a policy never starts
+sending package names. Like `min_release_age` it only affects `audit` and is not part of the
+policy fingerprint.
+
 ### License gates
 
 ```yaml

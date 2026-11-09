@@ -32,6 +32,12 @@ inputs:
   import-sarif:
     description: "sast only: SARIF reports from other scanners to merge into the sast report, one path per line, relative to the repository root"
     default: ""
+  scorecard:
+    description: "audit only: pass --scorecard, so the per-check minimums in rules.health.scorecard_checks are applied (sends package names to deps.dev)"
+    default: "false"
+  min-scorecard:
+    description: "audit only: report packages whose source repository has an OpenSSF Scorecard below this score (0 to 10), such as 5 (sends package names to deps.dev)"
+    default: ""
   sarif:
     description: Upload an audit report (a sast report when command is sast) to GitHub code scanning (needs security-events write permission)
     default: "false"
@@ -129,6 +135,8 @@ runs:
         REACHABILITY: ${{ inputs.reachability }}
         MIN_RELEASE_AGE: ${{ inputs.min-release-age }}
         PRIORITIZE: ${{ inputs.prioritize }}
+        MIN_SCORECARD: ${{ inputs.min-scorecard }}
+        SCORECARD: ${{ inputs.scorecard }}
         IMPORT_SARIF: ${{ inputs.import-sarif }}
         SARIF_FILE: ${{ inputs.sarif == 'true' && format('{0}/securock.sarif', runner.temp) || '' }}
         REPORT_FORMAT: ${{ inputs.report-format }}

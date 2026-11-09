@@ -142,6 +142,11 @@ type HealthRule struct {
 	// risk. Like MinReleaseAge it is read by audit only, so it is not part of the
 	// fingerprint and Configured ignores it.
 	InternalNames []string `json:"internal_names,omitempty" yaml:"internal_names,omitempty"`
+	// ScorecardChecks sets a minimum score (0 to 10) for individual OpenSSF Scorecard checks,
+	// by name, such as Dangerous-Workflow: 5. `securock audit --scorecard` reports a package
+	// whose source repository scores below it. Like MinReleaseAge it is read by audit only, so
+	// it is not part of the fingerprint and Configured ignores it.
+	ScorecardChecks map[string]float64 `json:"scorecard_checks,omitempty" yaml:"scorecard_checks,omitempty"`
 }
 
 // ParseAge reads a minimum release age: empty (off), a day count such as 7d, or a Go

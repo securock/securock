@@ -9,6 +9,8 @@ profile="${PROFILE:-}"
 reachability="${REACHABILITY:-false}"
 min_release_age="${MIN_RELEASE_AGE:-}"
 prioritize="${PRIORITIZE:-false}"
+min_scorecard="${MIN_SCORECARD:-}"
+scorecard="${SCORECARD:-false}"
 import_sarif="${IMPORT_SARIF:-}"
 sarif_file="${SARIF_FILE:-}"
 sbom_file="${SBOM_FILE:-}"
@@ -57,6 +59,12 @@ if [ -n "$min_release_age" ]; then
 fi
 if [ "$prioritize" = "true" ]; then
   audit_flags+=(--prioritize)
+fi
+if [ -n "$min_scorecard" ]; then
+  audit_flags+=(--min-scorecard "$min_scorecard")
+fi
+if [ "$scorecard" = "true" ]; then
+  audit_flags+=(--scorecard)
 fi
 
 # Flags only sast understands. The reports are named relative to where the job started, which

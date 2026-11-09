@@ -260,3 +260,40 @@ func TestInternalNamesNotInFingerprint(t *testing.T) {
 		t.Fatal("internal_names must not make the health rule configured")
 	}
 }
+
+func TestScorecardChecksValidation(t *testing.T) {
+	tests := []struct {
+		checks  map[string]float64
+		wantErr bool
+	}{
+		{nil, false},
+		{map[string]float64{"Dangerous-Workflow": 5, "Maintained": 0, "Code-Review": 10}, false},
+		{map[string]float64{"Dangerous-Workflows": 5}, true},
+		{map[string]float64{"dangerous-workflow": 5}, true},
+		{map[string]float64{"Maintained": -1}, true},
+		{map[string]float64{"Maintained": 10.5}, true},
+	}
+	for _, tt := range tests {
+		doc := policy.Default()
+		doc.Rules.Health.ScorecardChecks = tt.checks
+		if err := policy.Validate(doc); (err != nil) != tt.wantErr {
+			t.Errorf("%v: err = %v, wantErr %v", tt.checks, err, tt.wantErr)
+		}
+	}
+}
+
+func TestScorecardChecksNotInFingerprint(t *testing.T) {
+	base, err := policy.Fingerprint(policy.Default())
+	if err != nil {
+		t.Fatal(err)
+	}
+	doc := policy.Default()
+	doc.Rules.Health.ScorecardChecks = map[string]float64{"Dangerous-Workflow": 5}
+	got, err := policy.Fingerprint(doc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != base || doc.Rules.Health.Configured() {
+		t.Fatal("scorecard_checks only affects audit: no fingerprint change, and not a configured health rule")
+	}
+}

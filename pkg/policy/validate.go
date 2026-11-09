@@ -10,6 +10,16 @@ var (
 	changeActions = []ChangeAction{"", ActionAllow, ActionWarn, ActionReview, ActionDeny}
 	capNames      = []string{"network", "filesystem", "environment", "shell", "native_code", "install_scripts"}
 	fsMaximums    = []string{"", "none", "read", "write"}
+
+	// ScorecardChecks are the checks OpenSSF Scorecard runs, for validating a policy that
+	// refers to them. A misspelled name would otherwise never match and silently turn the
+	// rule off.
+	ScorecardChecks = []string{
+		"Binary-Artifacts", "Branch-Protection", "CI-Tests", "CII-Best-Practices", "Code-Review",
+		"Contributors", "Dangerous-Workflow", "Dependency-Update-Tool", "Fuzzing", "License",
+		"Maintained", "Packaging", "Pinned-Dependencies", "SAST", "Security-Policy",
+		"Signed-Releases", "Token-Permissions", "Vulnerabilities", "Webhooks",
+	}
 )
 
 func Validate(doc Document) error {
@@ -91,6 +101,14 @@ func validateHealthRule(rule HealthRule) error {
 		}
 		if strings.Contains(strings.TrimSuffix(name, "*"), "*") {
 			return fmt.Errorf("health internal_names entry %q: * is only allowed at the end", entry)
+		}
+	}
+	for name, min := range rule.ScorecardChecks {
+		if !slices.Contains(ScorecardChecks, name) {
+			return fmt.Errorf("health scorecard_checks: unknown check %q (checks are named like Dangerous-Workflow)", name)
+		}
+		if min < 0 || min > 10 {
+			return fmt.Errorf("health scorecard_checks %s: %v is not a score from 0 to 10", name, min)
 		}
 	}
 	for _, name := range rule.TyposquatAllow {
