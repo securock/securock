@@ -44,6 +44,7 @@ branch and is not the security-first default.
 | `offline`         | `false`                | Pass `--offline` to the CLI                                                          |
 | `reachability`    | `false`                | Pass `--reachability` ([Usage](/guide/usage#reachability))                           |
 | `min-release-age` | _(empty)_              | `audit` only: report releases newer than this, such as `7d` (empty uses the policy)  |
+| `import-sarif`    | _(empty)_              | `sast` only: SARIF reports from other scanners to merge in, one path per line        |
 | `sarif`           | `false`                | Upload an audit report to code scanning (needs `security-events: write`)             |
 | `sbom`            | `false`                | Write a CycloneDX SBOM and return its path in the `sbom-file` output                 |
 | `report-format`   | `text`                 | `text` (code block) or `markdown` (findings table) in the job summary and PR comment |
@@ -81,6 +82,9 @@ steps:
   `command` is `sast`) from the repository root, so locations match the repository, and
   uploads it to code scanning. The upload never fails the job on its
   own. The report is also returned in the `sarif-file` output.
+- `import-sarif` takes one SARIF file per line, relative to the repository root, and merges
+  them into the `sast` report (`securock sast --import`), including the report uploaded to
+  code scanning. Other commands ignore it.
 - `sbom: "true"` runs `securock sbom export`, so `securock.lock` must exist.
 - `min-release-age` and `command: audit` are the only way to pass the audit-only flag; other
   commands ignore it.
