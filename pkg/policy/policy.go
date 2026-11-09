@@ -136,6 +136,12 @@ type HealthRule struct {
 	// by audit only. Trust status must not change because time passed, so it is not part of
 	// the fingerprint and Configured ignores it.
 	MinReleaseAge string `json:"min_release_age,omitempty" yaml:"min_release_age,omitempty"`
+	// InternalNames lists the packages your organization publishes privately, as
+	// "<ecosystem>:<name>", where a trailing * matches a prefix (npm:@acme/*). `securock
+	// audit` reports one that resolves from a public registry as a dependency-confusion
+	// risk. Like MinReleaseAge it is read by audit only, so it is not part of the
+	// fingerprint and Configured ignores it.
+	InternalNames []string `json:"internal_names,omitempty" yaml:"internal_names,omitempty"`
 }
 
 // ParseAge reads a minimum release age: empty (off), a day count such as 7d, or a Go

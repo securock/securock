@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/securock/securock/internal/finding"
+	"github.com/securock/securock/internal/network"
 	"github.com/securock/securock/internal/typosquat"
 	"github.com/securock/securock/pkg/lockfile"
 )
@@ -31,6 +32,10 @@ type Options struct {
 	// MinReleaseAge reports any release published more recently than this as a high
 	// finding. Zero turns the check off.
 	MinReleaseAge time.Duration
+	// InternalNames are the package names your organization publishes privately, in the
+	// policy's "<ecosystem>:<name>" form. One that resolves from a public registry is
+	// reported as a dependency-confusion risk.
+	InternalNames []string
 }
 
 // RunWith is Run with options.
@@ -85,6 +90,7 @@ func artifact(art lockfile.Artifact, opts Options) []finding.Finding {
 
 	health(art, now, add)
 	recentRelease(art, opts, add)
+	dependencyConfusion(art, opts, add)
 
 	if ev.Capabilities.State == lockfile.CapChecked {
 		caps := ev.Capabilities
@@ -220,4 +226,48 @@ func plural(n int, unit string) string {
 
 func enabled(b *bool) bool {
 	return b != nil && *b
+}
+
+// dependencyConfusion reports a package the policy names as internal that resolves from a
+// public registry: an attacker who publishes that name there can win the install. When the
+// lockfile records no registry the source cannot be shown to be private, so it is reported
+// too, at a lower severity, rather than assumed safe.
+func dependencyConfusion(art lockfile.Artifact, opts Options, add func(id string, sev finding.Severity, title, detail, fix string)) {
+	if !internalName(opts.InternalNames, art.Subject.Ecosystem, art.Subject.Name) {
+		return
+	}
+	const fix = "Pin the package to your private registry and claim the name on the public one."
+	switch registry := art.Source.Registry; {
+	case registry == "":
+		add("dependency-confusion", finding.SeverityMedium, "Internal package has no recorded registry", "the lockfile does not show where "+art.Subject.Name+" was resolved from", fix)
+	case network.Public(art.Subject.Ecosystem, registry):
+		add("dependency-confusion", finding.SeverityHigh, "Internal package resolves from a public registry", art.Subject.Name+" from "+registry, fix)
+	}
+}
+
+// internalName reports whether a policy entry covers the package. Python names are compared
+// the way PyPI does, ignoring case and the difference between -, _ and .
+func internalName(entries []string, ecosystem, name string) bool {
+	norm := func(eco, s string) string {
+		if eco == "pypi" {
+			s = strings.NewReplacer("_", "-", ".", "-").Replace(s)
+		}
+		return strings.ToLower(s)
+	}
+	name = norm(ecosystem, name)
+	for _, entry := range entries {
+		eco, pattern, _ := strings.Cut(entry, ":")
+		if eco != ecosystem {
+			continue
+		}
+		pattern = norm(eco, pattern)
+		if prefix, ok := strings.CutSuffix(pattern, "*"); ok {
+			if strings.HasPrefix(name, prefix) {
+				return true
+			}
+		} else if name == pattern {
+			return true
+		}
+	}
+	return false
 }

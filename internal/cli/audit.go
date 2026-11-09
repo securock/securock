@@ -53,7 +53,7 @@ func newAuditCommand(opts *options) *cobra.Command {
 			if err != nil {
 				return opErr(err)
 			}
-			report := exceptions.Apply(audit.RunWith(result.Document, audit.Options{MinReleaseAge: cooldown}), accepted, time.Now().UTC()).WithLocation(reportLocation(path, opts.lockPath))
+			report := exceptions.Apply(audit.RunWith(result.Document, audit.Options{MinReleaseAge: cooldown, InternalNames: pol.Rules.Health.InternalNames}), accepted, time.Now().UTC()).WithLocation(reportLocation(path, opts.lockPath))
 			if err := finding.Write(cmd.OutOrStdout(), report, opts.format); err != nil {
 				return opErr(err)
 			}

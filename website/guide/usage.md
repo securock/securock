@@ -167,6 +167,10 @@ than that as high findings (the default comes from `rules.health.min_release_age
 in the policy, if set); see
 [Release cooldown](/guide/evidence#release-cooldown).
 
+`audit` also reports a package listed in `rules.health.internal_names` that resolves
+from a public registry as a high `dependency-confusion` finding; see
+[Internal package names](/guide/policy#internal-package-names).
+
 ### Severity and fixed versions
 
 For every advisory that matches, Securock reads its OSV record and stores the `severity`
