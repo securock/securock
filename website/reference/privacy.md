@@ -112,9 +112,24 @@ rules:
 
 Unknown policy fields are rejected.
 
+## Exploitation data (opt-in)
+
+`securock audit --prioritize` is the only command that contacts these hosts, and only when you
+pass the flag. It sends the CVE identifiers of advisories that OSV matched, never package names or
+versions:
+
+- OSV (`https://api.osv.dev/v1/vulns/<id>`), to read the CVE aliases of each matched advisory
+- CISA (`https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json`):
+  the whole Known Exploited Vulnerabilities catalog, downloaded without sending anything
+- FIRST (`https://api.first.org/data/v1/epss?cve=...`): the EPSS score of those CVEs
+
+It follows the network mode: `--offline` skips it and `audit` reports an `info` finding saying so,
+and in `public-only` mode only advisories of artifacts from a known public registry exist to look
+up. Nothing is written to `securock.lock`.
+
 ## Local cache
 
-Responses from OSV and the registries are kept for one hour in your user cache
+Responses from OSV, the registries and the exploitation feeds are kept for one hour in your user cache
 directory (`securock/`), readable only by you, so repeated runs do not ask again. They
 hold the same public data that was already sent off-machine, never credentials: a
 request that carries `Authorization`, `Proxy-Authorization`, or `Cookie` is not

@@ -1,21 +1,27 @@
 package cli
 
 import (
+	"context"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
 	"github.com/securock/securock/internal/audit"
 	"github.com/securock/securock/internal/exceptions"
+	"github.com/securock/securock/internal/exploit"
 	"github.com/securock/securock/internal/finding"
+	"github.com/securock/securock/internal/osv"
 	"github.com/securock/securock/internal/policy"
 	"github.com/securock/securock/internal/scanner"
+	"github.com/securock/securock/pkg/lockfile"
 	pkgpolicy "github.com/securock/securock/pkg/policy"
 	"github.com/spf13/cobra"
 )
 
 func newAuditCommand(opts *options) *cobra.Command {
 	var failOn, minAge string
+	var prioritize bool
 	cmd := &cobra.Command{
 		Use:   "audit [path]",
 		Short: "Audit dependencies and report findings by severity",
@@ -53,7 +59,11 @@ func newAuditCommand(opts *options) *cobra.Command {
 			if err != nil {
 				return opErr(err)
 			}
-			report := exceptions.Apply(audit.RunWith(result.Document, audit.Options{MinReleaseAge: cooldown, InternalNames: pol.Rules.Health.InternalNames}), accepted, time.Now().UTC()).WithLocation(reportLocation(path, opts.lockPath))
+			auditOpts := audit.Options{MinReleaseAge: cooldown, InternalNames: pol.Rules.Health.InternalNames}
+			if prioritize {
+				auditOpts.Signals, auditOpts.SignalsUnavailable = exploitSignals(cmd.Context(), net.Mode, result.Document)
+			}
+			report := exceptions.Apply(audit.RunWith(result.Document, auditOpts), accepted, time.Now().UTC()).WithLocation(reportLocation(path, opts.lockPath))
 			if err := finding.Write(cmd.OutOrStdout(), report, opts.format); err != nil {
 				return opErr(err)
 			}
@@ -67,6 +77,7 @@ func newAuditCommand(opts *options) *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVar(&minAge, "min-release-age", "", "report releases published more recently than this as high findings (default: rules.health.min_release_age in the policy): a number of days such as 7d, or a duration such as 72h (npm and PyPI)")
+	cmd.Flags().BoolVar(&prioritize, "prioritize", false, "raise the severity of vulnerabilities that CISA lists as exploited (KEV) or whose EPSS score is 50% or more; sends the CVE IDs of public advisories to api.osv.dev, www.cisa.gov and api.first.org")
 	cmd.Flags().StringVar(&failOn, "fail-on", "high", "exit 1 when a finding is at or above this severity: critical, high, medium, low, or info")
 	return cmd
 }
@@ -86,4 +97,33 @@ func parseAge(flag, fromPolicy string) (time.Duration, error) {
 		return 0, fmt.Errorf("--min-release-age %w", err)
 	}
 	return d, nil
+}
+
+// exploitSignals looks up exploitation data for the advisories found in the scan. Only
+// artifacts whose vulnerabilities were actually checked have advisories, so in public-only
+// mode nothing about a private package is sent. It returns the reason when the lookup
+// cannot be made, rather than an empty result that would read as "not exploited".
+func exploitSignals(ctx context.Context, mode pkgpolicy.Mode, doc lockfile.Document) (map[string]exploit.Signal, string) {
+	if mode == pkgpolicy.ModeOffline {
+		return nil, "the lookup needs the network, and the network mode is offline"
+	}
+	var ids []string
+	for _, art := range doc.Artifacts {
+		if art.Evidence.Vulnerabilities.State != lockfile.VulnChecked {
+			continue
+		}
+		for _, v := range art.Evidence.Vulnerabilities.Items {
+			ids = append(ids, v.ID)
+		}
+	}
+	slices.Sort(ids)
+	ids = slices.Compact(ids)
+	if len(ids) == 0 {
+		return nil, ""
+	}
+	signals, err := exploit.New().ForAdvisories(ctx, osv.New(), ids)
+	if err != nil {
+		return nil, err.Error()
+	}
+	return signals, ""
 }

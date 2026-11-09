@@ -171,6 +171,15 @@ in the policy, if set); see
 from a public registry as a high `dependency-confusion` finding; see
 [Internal package names](/guide/policy#internal-package-names).
 
+`audit --prioritize` looks up each matched advisory's CVEs in the CISA Known Exploited
+Vulnerabilities catalog and the EPSS scores from FIRST. A vulnerability CISA lists as exploited
+becomes `critical`, and one with an EPSS score of 50% or more is at least `high`; it never
+lowers a severity, and a development-only dependency (with `--reachability`) stays `low`. The
+finding keeps its ID, so `accept` still matches it. It is off by default because it contacts
+two more hosts, sends only CVE IDs and skips on `--offline`: `audit` then reports an `info`
+finding, `exploit-signals-unavailable`, instead of staying silent. See
+[Privacy](/reference/privacy#exploitation-data-opt-in).
+
 ### Severity and fixed versions
 
 For every advisory that matches, Securock reads its OSV record and stores the `severity`

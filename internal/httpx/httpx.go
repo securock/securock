@@ -74,6 +74,13 @@ func CacheDir() string {
 }
 
 func Do(ctx context.Context, client *http.Client, req *http.Request) (*http.Response, error) {
+	return DoWithLimit(ctx, client, req, maxBody)
+}
+
+// DoWithLimit is Do with a larger cap on the response body, for the few feeds that are
+// bigger than the default. Callers that read package documents keep Do, whose cap decides
+// when a document is too large to read.
+func DoWithLimit(ctx context.Context, client *http.Client, req *http.Request, limit int) (*http.Response, error) {
 	if client == nil {
 		client = &http.Client{Timeout: 30 * time.Second}
 	}
@@ -122,13 +129,13 @@ func Do(ctx context.Context, client *http.Client, req *http.Request) (*http.Resp
 			last = err
 			continue
 		}
-		raw, err := io.ReadAll(io.LimitReader(res.Body, maxBody+1))
+		raw, err := io.ReadAll(io.LimitReader(res.Body, int64(limit)+1))
 		res.Body.Close()
 		if err != nil {
 			last = err
 			continue
 		}
-		if len(raw) > maxBody {
+		if len(raw) > limit {
 			return nil, fmt.Errorf("response too large")
 		}
 		if res.StatusCode >= 500 {

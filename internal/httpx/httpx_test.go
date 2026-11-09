@@ -55,3 +55,39 @@ func TestDoRejectsCrossOriginRedirect(t *testing.T) {
 		t.Fatalf("expected cross-origin redirect error, got %v", err)
 	}
 }
+
+func TestDoWithLimit(t *testing.T) {
+	httpx.Configure(true, 0)
+	t.Cleanup(func() { httpx.Configure(false, 0) })
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write(make([]byte, 3<<20))
+	}))
+	t.Cleanup(srv.Close)
+
+	get := func(do func(*http.Request) (*http.Response, error)) error {
+		req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, srv.URL, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		res, err := do(req)
+		if err == nil {
+			res.Body.Close()
+		}
+		return err
+	}
+	// Do keeps its cap: callers decide a package document is too large by it.
+	if err := get(func(r *http.Request) (*http.Response, error) { return httpx.Do(context.Background(), srv.Client(), r) }); err == nil || !strings.Contains(err.Error(), "too large") {
+		t.Fatalf("Do should reject a 3 MB response, got %v", err)
+	}
+	// The CISA KEV catalog is already close to 2 MB, so a feed needs a higher cap.
+	if err := get(func(r *http.Request) (*http.Response, error) {
+		return httpx.DoWithLimit(context.Background(), srv.Client(), r, 8<<20)
+	}); err != nil {
+		t.Fatalf("a 3 MB response should pass an 8 MB cap: %v", err)
+	}
+	if err := get(func(r *http.Request) (*http.Response, error) {
+		return httpx.DoWithLimit(context.Background(), srv.Client(), r, 1<<20)
+	}); err == nil {
+		t.Fatal("a 3 MB response should fail a 1 MB cap")
+	}
+}
