@@ -32,7 +32,8 @@ Enable **Require actions to be pinned to a full-length commit SHA**.
 - CI also runs `rulesets` (as-code vs live drift) but it is not a
   required check, so fork PRs are not blocked by missing admin token
   scopes
-- No permanent bypass actors (empty `bypass_actors`)
+- One bypass actor: the repository owner (`minagishl`, user ID 114616680), always. Nobody else
+  can skip the review or the required checks
 
 Example payload: `.github/rulesets/main.json`.
 
