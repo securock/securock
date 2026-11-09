@@ -46,6 +46,7 @@ branch and is not the security-first default.
 | `min-release-age` | _(empty)_              | `audit` only: report releases newer than this, such as `7d` (empty uses the policy)       |
 | `prioritize`      | `false`                | `audit` only: pass `--prioritize` to raise vulnerabilities in CISA KEV or with high EPSS  |
 | `import-sarif`    | _(empty)_              | `sast` only: SARIF reports from other scanners to merge in, one path per line             |
+| `scorecard`       | `false`                | `audit` only: pass `--scorecard` to apply `rules.health.scorecard_checks`                 |
 | `min-scorecard`   | _(empty)_              | `audit` only: report repositories with an OpenSSF Scorecard below this score, such as `5` |
 | `sarif`           | `false`                | Upload an audit report to code scanning (needs `security-events: write`)                  |
 | `sbom`            | `false`                | Write a CycloneDX SBOM and return its path in the `sbom-file` output                      |
@@ -88,9 +89,9 @@ steps:
   them into the `sast` report (`securock sast --import`), including the report uploaded to
   code scanning. Other commands ignore it.
 - `sbom: "true"` runs `securock sbom export`, so `securock.lock` must exist.
-- `min-release-age`, `prioritize`, `min-scorecard` and `command: audit` are the only way to pass the
+- `min-release-age`, `prioritize`, `scorecard`, `min-scorecard` and `command: audit` are the only way to pass the
   audit-only flags; other commands ignore them. `prioritize` sends the CVE IDs of public advisories to OSV,
-  CISA and FIRST, and `min-scorecard` sends package names and versions to deps.dev; see
+  CISA and FIRST, and `scorecard` and `min-scorecard` send package names and versions to deps.dev; see
   [Privacy](/reference/privacy).
 
 ### Report format

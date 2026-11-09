@@ -59,6 +59,9 @@ type Result struct {
 	// Verified is true only when deps.dev confirmed the package belongs to the repository.
 	// Otherwise the link is the package's own claim.
 	Verified bool
+	// Checks holds the score of each individual check, such as Dangerous-Workflow. A check
+	// that does not apply to the repository, which Scorecard marks -1, is left out.
+	Checks map[string]float64
 }
 
 type Client struct {
@@ -146,6 +149,10 @@ func (c *Client) one(ctx context.Context, t Target) (Result, bool, error) {
 	var project struct {
 		Scorecard *struct {
 			Overall *float64 `json:"overallScore"`
+			Checks  []struct {
+				Name  string   `json:"name"`
+				Score *float64 `json:"score"`
+			} `json:"checks"`
 		} `json:"scorecard"`
 	}
 	endpoint = fmt.Sprintf("%s/v3/projects/%s", c.base(), url.PathEscape(repo))
@@ -159,7 +166,13 @@ func (c *Client) one(ctx context.Context, t Target) (Result, bool, error) {
 	if score < 0 || score > 10 {
 		return Result{}, false, nil
 	}
-	return Result{Repository: repo, Score: score, Verified: verified}, true, nil
+	res := Result{Repository: repo, Score: score, Verified: verified, Checks: map[string]float64{}}
+	for _, check := range project.Scorecard.Checks {
+		if check.Score != nil && *check.Score >= 0 && *check.Score <= 10 {
+			res.Checks[check.Name] = *check.Score
+		}
+	}
+	return res, true, nil
 }
 
 func (c *Client) base() string {

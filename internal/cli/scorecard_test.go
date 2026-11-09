@@ -28,3 +28,32 @@ func TestAuditMinScorecard(t *testing.T) {
 		}
 	}
 }
+
+func TestAuditScorecardFlagAppliesPolicyChecks(t *testing.T) {
+	isolateHome(t)
+	dir := t.TempDir()
+	lock := `{"name":"app","lockfileVersion":3,"packages":{"":{"name":"app","dependencies":{"a":"1.0.0"}},"node_modules/a":{"version":"1.0.0","resolved":"https://registry.npmjs.org/a/-/a-1.0.0.tgz"}}}`
+	if err := os.WriteFile(filepath.Join(dir, "package-lock.json"), []byte(lock), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	pol := filepath.Join(t.TempDir(), "policy.yaml")
+	if err := os.WriteFile(pol, []byte("version: 1\nrules:\n  health:\n    scorecard_checks:\n      Dangerous-Workflow: 5\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	// The flag is what asks for the lookup; a policy alone must not start sending names.
+	if got := string(runCLI(t, "audit", dir, "--offline", "--no-fail", "--policy", pol)); strings.Contains(got, "scorecard-unchecked") {
+		t.Fatalf("a policy must not trigger a lookup by itself:\n%s", got)
+	}
+	if got := string(runCLI(t, "audit", dir, "--offline", "--no-fail", "--policy", pol, "--scorecard")); !strings.Contains(got, "scorecard-unchecked") {
+		t.Fatalf("--scorecard must ask for the lookup:\n%s", got)
+	}
+
+	bad := filepath.Join(t.TempDir(), "bad.yaml")
+	if err := os.WriteFile(bad, []byte("version: 1\nrules:\n  health:\n    scorecard_checks:\n      Dangerous-Workflows: 5\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := execCLI(t, "", "audit", dir, "--offline", "--policy", bad); err == nil {
+		t.Fatal("a misspelled check name must be rejected")
+	}
+}

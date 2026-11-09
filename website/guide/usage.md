@@ -189,6 +189,10 @@ RubyGems packages from a public registry are looked up, and `--offline` skips it
 with no score are counted in an `info` finding, `scorecard-unchecked`, because no score means
 unknown, not safe. See [Privacy](/reference/privacy#openssf-scorecard-opt-in).
 
+`audit --scorecard` does the same lookup without an overall minimum and applies the per-check
+minimums from `rules.health.scorecard_checks`; see
+[Scorecard checks](/guide/policy#scorecard-checks).
+
 ### Severity and fixed versions
 
 For every advisory that matches, Securock reads its OSV record and stores the `severity`

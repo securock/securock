@@ -80,8 +80,8 @@ up. Nothing is written to `securock.lock`.
 
 ## OpenSSF Scorecard (opt-in)
 
-`securock audit --min-scorecard <score>` is the only command that contacts these endpoints, and only
-when you pass the flag. For each package that the network mode allows to leave the machine, it sends
+`securock audit --min-scorecard <score>` and `securock audit --scorecard` are the only commands that
+contact these endpoints, and only when you pass one of the flags. For each package that the network mode allows to leave the machine, it sends
 the ecosystem, package name and version to deps.dev:
 
 - `https://api.deps.dev/v3/systems/<system>/packages/<name>/versions/<version>`, to find the source

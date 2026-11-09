@@ -83,8 +83,9 @@ func TestLookup(t *testing.T) {
 		t.Fatalf("found %+v, want %+v", found, want)
 	}
 	for k, v := range want {
-		if found[k] != v {
-			t.Errorf("%v = %+v, want %+v", k, found[k], v)
+		got := found[k]
+		if got.Repository != v.Repository || got.Score != v.Score || got.Verified != v.Verified {
+			t.Errorf("%v = %+v, want %+v", k, got, v)
 		}
 	}
 }
@@ -196,5 +197,23 @@ func TestCollectNoteEmptyWhenEveryPackageHasAScore(t *testing.T) {
 	got, note := c.Collect(t.Context(), policy.Network{Mode: policy.ModePublicOnly}, doc(art("npm", "a", "1.0.0", "https://registry.npmjs.org")))
 	if len(got) != 1 || note != "" {
 		t.Fatalf("nothing to report: %+v %q", got, note)
+	}
+}
+
+func TestLookupReadsIndividualChecks(t *testing.T) {
+	c, _ := server(t, map[string]func(http.ResponseWriter){
+		"/v3/systems/npm/packages/a/versions/1.0.0": body(related("UNVERIFIED_METADATA")),
+		"/v3/projects/github.com%2Fo%2Fr": body(`{"scorecard":{"overallScore":6,"checks":[
+			{"name":"Maintained","score":10},
+			{"name":"Dangerous-Workflow","score":0},
+			{"name":"Packaging","score":-1},
+			{"name":"Fuzzing","score":null},
+			{"name":"SAST","score":42}]}}`),
+	})
+	target := scorecard.Target{Ecosystem: "npm", Name: "a", Version: "1.0.0"}
+	found, _ := c.Lookup(t.Context(), []scorecard.Target{target})
+	checks := found[target].Checks
+	if len(checks) != 2 || checks["Maintained"] != 10 || checks["Dangerous-Workflow"] != 0 {
+		t.Fatalf("a not-applicable (-1), missing or out-of-range score is left out, and 0 is kept: %v", checks)
 	}
 }

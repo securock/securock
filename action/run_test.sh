@@ -192,6 +192,12 @@ assert_not_contains "$tmp/audit_plain/calls" "--min-scorecard"
 run_case scorecard_not_forwarded env COMMAND=scan MIN_SCORECARD=5 \
   bash "$root/action/run.sh"
 assert_not_contains "$tmp/scorecard_not_forwarded/calls" "--min-scorecard"
+run_case scorecard_checks env COMMAND=audit SCORECARD=true \
+  bash "$root/action/run.sh"
+assert_contains "$tmp/scorecard_checks/calls" "args:audit --scorecard"
+run_case scorecard_checks_off env COMMAND=audit SCORECARD=false \
+  bash "$root/action/run.sh"
+assert_not_contains "$tmp/scorecard_checks_off/calls" "--scorecard"
 run_case age_not_forwarded env COMMAND=scan MIN_RELEASE_AGE=7d \
   bash "$root/action/run.sh"
 assert_not_contains "$tmp/age_not_forwarded/calls" "--min-release-age"

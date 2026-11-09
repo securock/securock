@@ -2,6 +2,7 @@ package audit
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
@@ -48,6 +49,9 @@ type Options struct {
 	// MinScorecard reports a package whose source repository has an OpenSSF Scorecard
 	// below this score (0 to 10) as a medium finding. Zero turns the check off.
 	MinScorecard float64
+	// ScorecardChecks sets a minimum score for individual Scorecard checks, by name, from the
+	// policy's rules.health.scorecard_checks.
+	ScorecardChecks map[string]float64
 	// Scorecards holds the Scorecards found, by artifact ID, from `audit --min-scorecard`.
 	Scorecards map[string]scorecard.Result
 	// ScorecardUnchecked, when set, says how many packages have no Scorecard to judge, or why
@@ -349,12 +353,29 @@ func internalName(entries []string, ecosystem, name string) bool {
 // trust the package; only a poor one is reported.
 func lowScorecard(art lockfile.Artifact, opts Options, add func(id string, sev finding.Severity, title, detail, fix string)) {
 	res, ok := opts.Scorecards[art.ArtifactID()]
-	if opts.MinScorecard <= 0 || !ok || res.Score >= opts.MinScorecard {
+	if !ok {
 		return
 	}
-	detail := fmt.Sprintf("%s scores %.1f of 10, below the minimum of %.1f", res.Repository, res.Score, opts.MinScorecard)
+	claim := ""
 	if !res.Verified {
-		detail += "; the repository is the one the package's metadata claims, not verified"
+		claim = "; the repository is the one the package's metadata claims, not verified"
 	}
-	add("low-scorecard", finding.SeverityMedium, "Source repository has a low OpenSSF Scorecard", detail, "Check how the project is maintained and secured before relying on it.")
+	const fix = "Check how the project is maintained and secured before relying on it."
+	if opts.MinScorecard > 0 && res.Score < opts.MinScorecard {
+		add("low-scorecard", finding.SeverityMedium, "Source repository has a low OpenSSF Scorecard",
+			fmt.Sprintf("%s scores %.1f of 10, below the minimum of %.1f%s", res.Repository, res.Score, opts.MinScorecard, claim), fix)
+	}
+	names := make([]string, 0, len(opts.ScorecardChecks))
+	for name := range opts.ScorecardChecks {
+		names = append(names, name)
+	}
+	slices.Sort(names)
+	for _, name := range names {
+		// A check that does not apply to the repository has no score and is not judged.
+		score, scored := res.Checks[name]
+		if min := opts.ScorecardChecks[name]; scored && score < min {
+			add("low-scorecard-check:"+name, finding.SeverityMedium, "Source repository fails an OpenSSF Scorecard check",
+				fmt.Sprintf("%s scores %.0f of 10 on %s, below the minimum of %.0f%s", res.Repository, score, name, min, claim), fix)
+		}
+	}
 }
