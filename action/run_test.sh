@@ -190,6 +190,20 @@ mkdir -p "$tmp/sarif_dir/project"
 run_case sarif_dir env COMMAND=scan WORKDIR=project REACHABILITY=true MIN_RELEASE_AGE=3d \
   SARIF_FILE="$tmp/sarif_dir/out.sarif" bash -c 'cd "$1" && shift && bash "$@"' _ "$tmp/sarif_dir" "$root/action/run.sh"
 assert_contains "$tmp/sarif_dir/calls" "args:audit project --format sarif --output $tmp/sarif_dir/out.sarif --no-fail --reachability --min-release-age 3d"
+# import-sarif goes to sast only, one --import per line, relative paths anchored at the job's start.
+run_case sast_import env COMMAND=sast IMPORT_SARIF=$'reports/a.sarif\n  /abs/b.sarif  \n\n' \
+  bash "$root/action/run.sh"
+assert_contains "$tmp/sast_import/calls" "args:sast --import $PWD/reports/a.sarif --import /abs/b.sarif"
+run_case sast_import_sarif env COMMAND=sast IMPORT_SARIF=reports/a.sarif SARIF_FILE="$tmp/sast_import_sarif/out.sarif" \
+  bash "$root/action/run.sh"
+assert_contains "$tmp/sast_import_sarif/calls" "--format sarif --output $tmp/sast_import_sarif/out.sarif --no-fail --import $PWD/reports/a.sarif"
+run_case sast_import_empty env COMMAND=sast IMPORT_SARIF= \
+  bash "$root/action/run.sh"
+assert_not_contains "$tmp/sast_import_empty/calls" "--import"
+run_case import_not_forwarded env COMMAND=audit IMPORT_SARIF=reports/a.sarif \
+  bash "$root/action/run.sh"
+assert_not_contains "$tmp/import_not_forwarded/calls" "--import"
+
 # A sast run uploads its own report, without the audit-only flags.
 run_case sast env COMMAND=sast MIN_RELEASE_AGE=7d \
   bash "$root/action/run.sh"

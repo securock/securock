@@ -12,9 +12,11 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["id", "severity", "title", "location"],
+        "required": ["id", "severity", "title"],
+        "if": { "properties": { "id": { "pattern": "^sast:" } } },
+        "then": { "required": ["location"] },
         "properties": {
-          "id": { "type": "string", "pattern": "^sast:" },
+          "id": { "type": "string", "pattern": "^(sast|sarif):" },
           "severity": { "enum": ["critical", "high", "medium", "low", "info"] },
           "title": { "type": "string", "minLength": 1 },
           "detail": { "type": "string" },

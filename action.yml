@@ -26,6 +26,9 @@ inputs:
   min-release-age:
     description: "audit only: report releases newer than this as high findings, such as 7d (npm and PyPI)"
     default: ""
+  import-sarif:
+    description: "sast only: SARIF reports from other scanners to merge into the sast report, one path per line, relative to the repository root"
+    default: ""
   sarif:
     description: Upload an audit report (a sast report when command is sast) to GitHub code scanning (needs security-events write permission)
     default: "false"
@@ -122,6 +125,7 @@ runs:
         PROFILE: ${{ inputs.profile }}
         REACHABILITY: ${{ inputs.reachability }}
         MIN_RELEASE_AGE: ${{ inputs.min-release-age }}
+        IMPORT_SARIF: ${{ inputs.import-sarif }}
         SARIF_FILE: ${{ inputs.sarif == 'true' && format('{0}/securock.sarif', runner.temp) || '' }}
         REPORT_FORMAT: ${{ inputs.report-format }}
         SBOM_FILE: ${{ inputs.sbom == 'true' && format('{0}/securock.cdx.json', runner.temp) || '' }}

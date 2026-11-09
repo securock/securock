@@ -8,6 +8,7 @@ policy="${POLICY:-}"
 profile="${PROFILE:-}"
 reachability="${REACHABILITY:-false}"
 min_release_age="${MIN_RELEASE_AGE:-}"
+import_sarif="${IMPORT_SARIF:-}"
 sarif_file="${SARIF_FILE:-}"
 sbom_file="${SBOM_FILE:-}"
 report_format="${REPORT_FORMAT:-text}"
@@ -54,6 +55,20 @@ if [ -n "$min_release_age" ]; then
   audit_flags+=(--min-release-age "$min_release_age")
 fi
 
+# Flags only sast understands. The reports are named relative to where the job started, which
+# is not where this script runs, so relative paths are anchored there.
+sast_flags=()
+while IFS= read -r file; do
+  file="${file#"${file%%[![:space:]]*}"}"
+  file="${file%"${file##*[![:space:]]}"}"
+  [ -n "$file" ] || continue
+  case "$file" in
+    /*) ;;
+    *) file="$origin/$file" ;;
+  esac
+  sast_flags+=(--import "$file")
+done <<<"$import_sarif"
+
 : >"$report"
 failed=false
 
@@ -90,7 +105,7 @@ case "$command" in
     run_cmd "securock audit" securock audit ${audit_flags[@]+"${audit_flags[@]}"}
     ;;
   sast)
-    run_cmd "securock sast" securock sast
+    run_cmd "securock sast" securock sast ${sast_flags[@]+"${sast_flags[@]}"}
     ;;
   both)
     # Drift-only path for callers that intentionally skip current-state
@@ -122,7 +137,7 @@ if [ -n "$sarif_file" ]; then
   sarif_flags=(${audit_flags[@]+"${audit_flags[@]}"})
   if [ "$command" = "sast" ]; then
     sarif_cmd=sast
-    sarif_flags=()
+    sarif_flags=(${sast_flags[@]+"${sast_flags[@]}"})
   fi
   # --no-fail: the report is for code scanning; the step above decides pass or fail.
   if (cd "$origin" && securock "$sarif_cmd" "$workdir" --format sarif --output "$sarif_file" --no-fail \

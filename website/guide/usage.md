@@ -49,6 +49,7 @@ securock version
 | `audit`   | Report dependency findings ranked by severity                | [audit](#audit)                                             |
 | `sast`    | Find vulnerabilities in your own source code                 | [Source code analysis](/guide/sast)                         |
 | `chain`   | Correlate source findings into attack chains                 | [Source code analysis](/guide/sast)                         |
+| `import`  | Bring another tool's SARIF results under securock's policy   | [import](#import)                                           |
 | `doctor`  | Check the project setup for security problems                | [doctor](#doctor)                                           |
 | `sbom`    | Export the lockfile as an SBOM, or verify an SBOM against it | [Triage and exports](/guide/reports#sbom-export-and-verify) |
 | `accept`  | Accept a finding until a date, with a reason                 | [Triage and exports](/guide/reports#accept-findings)        |
@@ -301,27 +302,30 @@ pre-commit:
 
 ## Shared flags
 
-| Flag             | Meaning                                                                                   |
-| ---------------- | ----------------------------------------------------------------------------------------- |
-| `--network`      | `public-only` (default), `offline`, or `allow-all`                                        |
-| `--offline`      | Skip remote lookups; remote evidence stays `unknown`                                      |
-| `--policy`       | Path to a policy file                                                                     |
-| `--profile`      | Built-in policy: `default` or `strict` (not with `--policy`)                              |
-| `--lock`         | Path to `securock.lock` (for `lock` / `diff` / `update` / `verify`)                       |
-| `--format`       | `text` (default), `json`, `sarif`, `junit`, or `markdown` (`graph`: `mermaid`, `dot`)     |
-| `--recursive`    | `lock`, `scan`, `diff`, `verify`, `audit`: run for every project under the path           |
-| `--no-cache`     | Do not read or write the on-disk cache of registry and OSV responses                      |
-| `--cache-ttl`    | How long a cached response is used, such as `10m` or `24h` (default `1h`)                 |
-| `--output`       | Write the report to a file instead of stdout                                              |
-| `--exceptions`   | Path to the accepted-findings file (`accept`, `audit`, `sast`, `chain`, `doctor`)         |
-| `--reachability` | Record scope and dependencies and mark vulnerabilities reachable, unreachable, or unknown |
-| `--no-fail`      | Always exit `0`                                                                           |
+| Flag             | Meaning                                                                                     |
+| ---------------- | ------------------------------------------------------------------------------------------- |
+| `--network`      | `public-only` (default), `offline`, or `allow-all`                                          |
+| `--offline`      | Skip remote lookups; remote evidence stays `unknown`                                        |
+| `--policy`       | Path to a policy file                                                                       |
+| `--profile`      | Built-in policy: `default` or `strict` (not with `--policy`)                                |
+| `--lock`         | Path to `securock.lock` (for `lock` / `diff` / `update` / `verify`)                         |
+| `--format`       | `text` (default), `json`, `sarif`, `junit`, or `markdown` (`graph`: `mermaid`, `dot`)       |
+| `--recursive`    | `lock`, `scan`, `diff`, `verify`, `audit`: run for every project under the path             |
+| `--no-cache`     | Do not read or write the on-disk cache of registry and OSV responses                        |
+| `--cache-ttl`    | How long a cached response is used, such as `10m` or `24h` (default `1h`)                   |
+| `--output`       | Write the report to a file instead of stdout                                                |
+| `--exceptions`   | Path to the accepted-findings file (`accept`, `audit`, `sast`, `chain`, `import`, `doctor`) |
+| `--reachability` | Record scope and dependencies and mark vulnerabilities reachable, unreachable, or unknown   |
+| `--no-fail`      | Always exit `0`                                                                             |
 
 `--offline` records vulnerability, malicious, capability, behavior,
 ownership, provenance, signature, and chain evidence as `unknown`.
 
 `--policy` and `--profile` are mutually exclusive. See
 [Policy](/guide/policy) for profiles and YAML rules.
+
+`sast` also takes `--import <file.sarif>` to merge another scanner's findings into its report;
+see [Source code analysis](/guide/sast#other-scanners-in-the-same-report).
 
 `sast` also takes `--assume-params`; see
 [Source code analysis](/guide/sast#taint-tracking). `chain` takes it
@@ -341,6 +345,38 @@ counts confirmed chains only.
 ```sh
 securock chain --format sarif --output chains.sarif
 ```
+
+### `import`
+
+`import` reads SARIF 2.1.0 reports from other scanners (CodeQL, Semgrep,
+Trivy, Checkov and the like) and handles them like Securock's own
+findings: ranked by severity, accepted through the exceptions file, and
+failing the build at `--fail-on`. Pass `-` to read stdin.
+
+```sh
+semgrep scan --sarif --output semgrep.sarif
+securock import semgrep.sarif codeql.sarif --fail-on high
+```
+
+A finding's ID is `sarif:<tool>/<rule>` and its subject is the file it
+points at, so an exception looks like this:
+
+```sh
+securock accept sarif:semgrep/go.sqli --subject cmd/x.go \
+  --reason "input is validated upstream" --expires 2026-12-31
+```
+
+Severity comes from the numeric `security-severity` property when present
+(9.0 and above is `critical`, 7.0 `high`, 4.0 `medium`), then from the
+SARIF level (`error` is `high`, `warning` `medium`, `note` `low`). A result
+with neither is `medium`. A suppression inside the SARIF file is not
+honored: only the exceptions file accepts a finding. `import` reads
+`.securock/exceptions.yaml` from the current directory unless you pass
+`--exceptions`.
+
+An absolute file path under the current directory is made relative to it, so a report made
+on a CI runner matches exceptions written for `cmd/x.go`. A path outside it is kept as the
+tool wrote it.
 
 ## Exit codes
 

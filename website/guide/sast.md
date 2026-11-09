@@ -380,6 +380,17 @@ Known limits:
 
 Treat the results as a measured starting point, not a guarantee.
 
+## Other scanners in the same report
+
+`securock sast --import semgrep.sarif` adds the findings of a SARIF 2.1.0 report from another
+scanner (CodeQL, Semgrep, Trivy, Checkov and the like) to the sast report. The flag can be
+repeated, and `-` reads stdin. They get IDs of the form `sarif:<tool>/<rule>` and the file they
+point at as their subject, and then go through the same steps as sast's own findings: ranking by
+severity, `securock accept`, `--fail-on`, and every `--format`. File paths under the project are
+made relative to it. Imported results do not take part in `securock chain`, which needs the
+dataflow detail only sast produces. See [Usage](/guide/usage#import) for how severity is read and
+why a suppression inside the SARIF file is not honored.
+
 ## Attack chains
 
 `securock chain` runs this analysis and correlates the findings into attack chains: an
