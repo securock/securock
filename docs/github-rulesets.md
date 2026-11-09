@@ -23,10 +23,12 @@ Enable **Require actions to be pinned to a full-length commit SHA**.
 - Require status checks:
   - `test`
   - `govulncheck`
-  - `analyze` (CodeQL)
-  - `npm-example`
+  - `analyze (go)` and `analyze (actions)` (CodeQL)
+  - `example (examples/npm)`
   - `dependency-review`
   - `release-snapshot`
+- The names are those the jobs report, matrix value included: a job in a matrix reports
+  as `job (value)`, and a required check that no job reports waits forever
 - CI also runs `rulesets` (as-code vs live drift) but it is not a
   required check, so fork PRs are not blocked by missing admin token
   scopes

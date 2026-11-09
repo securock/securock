@@ -29,8 +29,9 @@
         "required_status_checks": [
           { "context": "test" },
           { "context": "govulncheck" },
-          { "context": "analyze" },
-          { "context": "npm-example" },
+          { "context": "analyze (go)" },
+          { "context": "analyze (actions)" },
+          { "context": "example (examples/npm)" },
           { "context": "dependency-review" },
           { "context": "release-snapshot" }
         ]
