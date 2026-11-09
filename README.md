@@ -129,6 +129,7 @@ Those changes are easy to miss in a language lockfile diff.
 - Severity comes from `security-severity`, then the SARIF level; a result
   with neither is `medium`. A suppression inside the SARIF file is not
   honored, so only the exceptions file accepts a finding
+- `sast --import report.sarif` merges such a report into the sast report instead, for one list and one exit code
 
 **Exports**
 
@@ -261,6 +262,7 @@ Cargo under [`examples/`](examples/).
 | `--min-release-age`     | `audit`. Report npm and PyPI releases newer than this, such as `7d`                                                                |
 | `--fail-on`             | `audit`, `sast`, `chain`, `import` and `doctor`. Exit `1` at or above this severity (default `high`)                               |
 | `--assume-params`       | `sast` and `chain`. Treat string parameters of Go functions nothing calls directly as untrusted (registry handlers)                |
+| `--import`              | `sast`. Merge another scanner's SARIF report into the sast report (repeatable)                                                     |
 | `--exceptions`          | Accepted-findings file (default `.securock/exceptions.yaml`)                                                                       |
 | `--reachability`        | Record package scope and dependencies; mark vulnerabilities reachable, unreachable, or unknown                                     |
 | `--no-fail`             | Always exit `0`                                                                                                                    |

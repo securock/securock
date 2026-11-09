@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"path/filepath"
 	"time"
 
 	"github.com/securock/securock/internal/exceptions"
@@ -12,6 +13,7 @@ import (
 func newSASTCommand(opts *options) *cobra.Command {
 	var failOn string
 	var assumeParams bool
+	var imports []string
 	cmd := &cobra.Command{
 		Use:   "sast [path]",
 		Short: "Find vulnerabilities in your own source code",
@@ -42,6 +44,11 @@ into the API it calls; the package's own findings are not reported.`,
 			if err != nil {
 				return opErr(err)
 			}
+			external, err := importedFindings(cmd, path, imports)
+			if err != nil {
+				return opErr(err)
+			}
+			found = append(found, external...)
 			accepted, err := exceptions.Load(exceptions.Path(path, opts.exceptions))
 			if err != nil {
 				return opErr(err)
@@ -60,6 +67,24 @@ into the API it calls; the package's own findings are not reported.`,
 		},
 	}
 	cmd.Flags().StringVar(&failOn, "fail-on", "high", "exit 1 when a finding is at or above this severity: critical, high, medium, low, or info")
+	cmd.Flags().StringArrayVar(&imports, "import", nil, "also include the findings of a SARIF 2.1.0 report from another scanner (repeatable; - reads stdin); they are ranked, accepted and failed on like the sast findings, with IDs of the form sarif:<tool>/<rule>")
 	cmd.Flags().BoolVar(&assumeParams, "assume-params", false, "treat string parameters of Go functions that nothing calls directly as untrusted (handlers reached through a registry); finds more, with more false positives")
 	return cmd
+}
+
+// importedFindings reads the SARIF reports given with --import, with file paths made
+// relative to the project so they read like sast's own.
+func importedFindings(cmd *cobra.Command, project string, files []string) ([]finding.Finding, error) {
+	var out []finding.Finding
+	for _, file := range files {
+		found, err := readSARIFFile(cmd, file)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, found...)
+	}
+	if abs, err := filepath.Abs(project); err == nil {
+		finding.RelativeTo(out, abs)
+	}
+	return out, nil
 }

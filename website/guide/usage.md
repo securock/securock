@@ -324,6 +324,9 @@ ownership, provenance, signature, and chain evidence as `unknown`.
 `--policy` and `--profile` are mutually exclusive. See
 [Policy](/guide/policy) for profiles and YAML rules.
 
+`sast` also takes `--import <file.sarif>` to merge another scanner's findings into its report;
+see [Source code analysis](/guide/sast#other-scanners-in-the-same-report).
+
 `sast` also takes `--assume-params`; see
 [Source code analysis](/guide/sast#taint-tracking). `chain` takes it
 too, since it reuses the sast analysis.
