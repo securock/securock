@@ -146,6 +146,25 @@ affects `audit`: trust status in `securock.lock` must not change because time pa
 `min_release_age` is not part of the policy fingerprint, and `scan`, `lock`, and `verify`
 ignore it. See [Release cooldown](/guide/evidence#release-cooldown).
 
+### Internal package names
+
+```yaml
+version: 1
+rules:
+  health:
+    internal_names:
+      - "npm:@acme/*"
+      - "pypi:acme-core"
+```
+
+List the packages your organization publishes privately, as `<ecosystem>:<name>`;
+a trailing `*` matches a prefix. `securock audit` reports one that resolves from a
+public registry as a high `dependency-confusion` finding: anyone can publish that name
+there and win the install. When the lockfile records no registry for it, the source
+cannot be shown to be private, so it is reported as medium instead of assumed safe.
+Like `min_release_age` it only affects `audit` and is not part of the policy
+fingerprint.
+
 ### License gates
 
 ```yaml

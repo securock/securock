@@ -218,3 +218,45 @@ func TestValidateProvenanceOriginEmptyEntry(t *testing.T) {
 		t.Fatal("empty allow_sources entry must fail")
 	}
 }
+
+func TestInternalNamesValidation(t *testing.T) {
+	tests := []struct {
+		entries []string
+		wantErr bool
+	}{
+		{nil, false},
+		{[]string{"npm:@acme/*", "pypi:acme-core"}, false},
+		{[]string{"acme-core"}, true},
+		{[]string{":acme"}, true},
+		{[]string{"npm:"}, true},
+		{[]string{"npm:*"}, true},
+		{[]string{"npm:@a*me/x"}, true},
+		{[]string{" npm:@acme/*"}, true},
+	}
+	for _, tt := range tests {
+		doc := policy.Default()
+		doc.Rules.Health.InternalNames = tt.entries
+		if err := policy.Validate(doc); (err != nil) != tt.wantErr {
+			t.Errorf("%v: err = %v, wantErr %v", tt.entries, err, tt.wantErr)
+		}
+	}
+}
+
+func TestInternalNamesNotInFingerprint(t *testing.T) {
+	base, err := policy.Fingerprint(policy.Default())
+	if err != nil {
+		t.Fatal(err)
+	}
+	doc := policy.Default()
+	doc.Rules.Health.InternalNames = []string{"npm:@acme/*"}
+	got, err := policy.Fingerprint(doc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != base {
+		t.Fatal("internal_names only affects audit and must not change the fingerprint")
+	}
+	if doc.Rules.Health.Configured() {
+		t.Fatal("internal_names must not make the health rule configured")
+	}
+}
