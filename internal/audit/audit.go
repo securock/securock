@@ -5,6 +5,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/securock/securock/internal/exploit"
 	"github.com/securock/securock/internal/finding"
 	"github.com/securock/securock/internal/network"
 	"github.com/securock/securock/internal/typosquat"
@@ -36,6 +37,13 @@ type Options struct {
 	// policy's "<ecosystem>:<name>" form. One that resolves from a public registry is
 	// reported as a dependency-confusion risk.
 	InternalNames []string
+	// Signals holds exploitation data by advisory ID, from `audit --prioritize`. It can
+	// only raise a vulnerability's severity: an advisory CISA lists as exploited is
+	// critical, and one with an EPSS score of 50% or more is at least high.
+	Signals map[string]exploit.Signal
+	// SignalsUnavailable, when set, says why --prioritize could not look the signals up.
+	// It is reported as an info finding so a missing lookup is not read as "not exploited".
+	SignalsUnavailable string
 }
 
 // RunWith is Run with options.
@@ -46,6 +54,15 @@ func RunWith(doc lockfile.Document, opts Options) finding.Report {
 	var out []finding.Finding
 	for _, art := range doc.Artifacts {
 		out = append(out, artifact(art, opts)...)
+	}
+	if opts.SignalsUnavailable != "" {
+		out = append(out, finding.Finding{
+			ID:          "exploit-signals-unavailable",
+			Severity:    finding.SeverityInfo,
+			Title:       "Exploitation data was not checked",
+			Detail:      opts.SignalsUnavailable,
+			Remediation: "Run without --offline, or retry when CISA KEV and EPSS are reachable.",
+		})
 	}
 	return finding.New("audit", out)
 }
@@ -71,7 +88,7 @@ func artifact(art lockfile.Artifact, opts Options) []finding.Finding {
 	switch ev.Vulnerabilities.State {
 	case lockfile.VulnChecked:
 		for _, v := range ev.Vulnerabilities.Items {
-			sev, title, detail := vulnerability(v)
+			sev, title, detail := vulnerability(v, opts.Signals[v.ID])
 			add("known-vulnerability:"+v.ID, sev, title, detail, upgradeAdvice(v))
 		}
 	default:
@@ -133,25 +150,60 @@ func health(art lockfile.Artifact, now time.Time, add func(id string, sev findin
 
 // vulnerability ranks a known vulnerability. The advisory's own severity sets the level, and
 // high is assumed when it gave none, which is how every advisory was ranked before severity
-// was recorded. Reachability can only lower it: a vulnerability the lockfile shows to be
-// development-only is low. Unknown reachability changes nothing.
-func vulnerability(v lockfile.Vulnerability) (finding.Severity, string, string) {
+// was recorded. Exploitation data can raise the level and reachability can lower it: a
+// vulnerability the lockfile shows to be development-only is low whatever the signals say,
+// though they are still shown. Unknown reachability changes nothing.
+func vulnerability(v lockfile.Vulnerability, sig exploit.Signal) (finding.Severity, string, string) {
 	sev := advisorySeverity(v.Severity)
 	title := "Known vulnerability"
 	detail := v.ID
 	if v.Severity != "" {
 		detail += " (" + string(v.Severity) + " severity)"
 	}
+	if note := signalNote(sig); note != "" {
+		detail += ", " + note
+	}
 	switch v.Reachable {
 	case lockfile.ReachNo:
 		return finding.SeverityLow, "Known vulnerability in a development-only dependency", detail + ", not part of the runtime dependencies"
 	case lockfile.ReachYes:
+		sev = raised(sev, sig)
 		if len(v.Via) > 1 {
 			return sev, title, detail + ", reached via " + strings.Join(v.Via, " -> ")
 		}
 		return sev, title, detail + ", runtime dependency"
 	}
-	return sev, title, detail
+	return raised(sev, sig), title, detail
+}
+
+// epssHigh is the EPSS score, a probability from 0 to 1, from which a vulnerability is
+// treated as likely to be exploited.
+const epssHigh = 0.5
+
+// raised lifts sev to what the exploitation data warrants, and never lowers it.
+func raised(sev finding.Severity, sig exploit.Signal) finding.Severity {
+	floor := finding.SeverityInfo
+	switch {
+	case sig.KEV:
+		floor = finding.SeverityCritical
+	case sig.HasEPSS && sig.EPSS >= epssHigh:
+		floor = finding.SeverityHigh
+	}
+	if floor.Rank() > sev.Rank() {
+		return floor
+	}
+	return sev
+}
+
+func signalNote(sig exploit.Signal) string {
+	var parts []string
+	if sig.KEV {
+		parts = append(parts, "actively exploited (CISA KEV)")
+	}
+	if sig.HasEPSS {
+		parts = append(parts, fmt.Sprintf("EPSS %.1f%%", sig.EPSS*100))
+	}
+	return strings.Join(parts, ", ")
 }
 
 func advisorySeverity(s lockfile.VulnSeverity) finding.Severity {

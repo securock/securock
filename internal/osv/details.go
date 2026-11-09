@@ -21,6 +21,10 @@ type Detail struct {
 	// Severity is critical, high, medium, or low; empty when OSV gives no usable rating.
 	Severity string
 	Affected []Affected
+	// CVEs are the CVE identifiers the advisory is also known by, sorted. Other databases,
+	// such as the exploit signals securock can look up, are keyed by CVE rather than by
+	// the advisory's own ID.
+	CVEs []string
 }
 
 // Affected is the part of an advisory that covers one package.
@@ -119,6 +123,8 @@ func (c *HTTPClient) detail(ctx context.Context, id string) (Detail, bool) {
 }
 
 type rawVuln struct {
+	ID       string   `json:"id"`
+	Aliases  []string `json:"aliases"`
 	Severity []struct {
 		Type  string `json:"type"`
 		Score string `json:"score"`
@@ -142,7 +148,7 @@ type rawVuln struct {
 }
 
 func (r rawVuln) detail() Detail {
-	d := Detail{Severity: r.severity()}
+	d := Detail{Severity: r.severity(), CVEs: r.cves()}
 	for _, a := range r.Affected {
 		aff := Affected{Ecosystem: a.Package.Ecosystem, Name: a.Package.Name}
 		for _, rg := range a.Ranges {
@@ -237,4 +243,16 @@ func fixedFor(version string, ranges []Range) []string {
 		}
 	}
 	return out
+}
+
+// cves returns the advisory's CVE identifiers, upper-cased, from its ID and aliases.
+func (r rawVuln) cves() []string {
+	var out []string
+	for _, id := range append([]string{r.ID}, r.Aliases...) {
+		if id = strings.ToUpper(strings.TrimSpace(id)); strings.HasPrefix(id, "CVE-") {
+			out = append(out, id)
+		}
+	}
+	slices.Sort(out)
+	return slices.Compact(out)
 }

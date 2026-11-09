@@ -73,6 +73,8 @@ Those changes are easy to miss in a language lockfile diff.
 - `accept` records reviewed findings with a reason and expiry in
   `.securock/exceptions.yaml`; `audit` suppresses them until they lapse
 - `audit --min-release-age` (or `rules.health.min_release_age` in the policy) holds back releases that are too new
+- `audit --prioritize` raises vulnerabilities that CISA lists as exploited (KEV) or that have an
+  EPSS score of 50% or more; it is opt-in and only sends CVE IDs (see Privacy)
 - `rules.health.internal_names` in the policy lists your private packages; `audit` flags one that
   resolves from a public registry as a `dependency-confusion` risk
 - `--reachability` marks each vulnerability reachable, unreachable
@@ -262,6 +264,7 @@ Cargo under [`examples/`](examples/).
 | `--no-cache`            | Do not read or write the on-disk response cache; `--cache-ttl` sets its lifetime (default `1h`), `securock cache clear` empties it |
 | `--output`              | Write the report to a file instead of stdout (also on exit `1`)                                                                    |
 | `--min-release-age`     | `audit`. Report npm and PyPI releases newer than this, such as `7d`                                                                |
+| `--prioritize`          | `audit`. Raise vulnerabilities in CISA KEV or with EPSS of 50% or more; sends CVE IDs to OSV, CISA and FIRST                       |
 | `--fail-on`             | `audit`, `sast`, `chain`, `import` and `doctor`. Exit `1` at or above this severity (default `high`)                               |
 | `--assume-params`       | `sast` and `chain`. Treat string parameters of Go functions nothing calls directly as untrusted (registry handlers)                |
 | `--import`              | `sast`. Merge another scanner's SARIF report into the sast report (repeatable)                                                     |
