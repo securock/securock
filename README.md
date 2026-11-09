@@ -121,6 +121,15 @@ Those changes are easy to miss in a language lockfile diff.
   and a link is confirmed only when both findings are proven inside the
   same function — nothing unproven is reported as verified
 
+**Other scanners** (`import`)
+
+- Reads SARIF 2.1.0 from CodeQL, Semgrep, Trivy, Checkov and similar tools
+  and treats the results like securock's own findings: ranked by severity,
+  accepted through `securock accept`, and failing the build at `--fail-on`
+- Severity comes from `security-severity`, then the SARIF level; a result
+  with neither is `medium`. A suppression inside the SARIF file is not
+  honored, so only the exceptions file accepts a finding
+
 **Exports**
 
 - CycloneDX 1.6 / SPDX 2.3 SBOM export with trust evidence, and
@@ -226,6 +235,7 @@ Cargo under [`examples/`](examples/).
 | `securock audit`   | Report dependency findings by severity                      |
 | `securock sast`    | Find vulnerabilities in your own source code                |
 | `securock chain`   | Correlate source findings into attack chains                |
+| `securock import`  | Bring another tool's SARIF results under securock's policy  |
 | `securock doctor`  | Check the project setup for security problems               |
 | `securock sbom`    | Export `securock.lock` as CycloneDX or SPDX, or verify one  |
 | `securock accept`  | Accept a finding until a date, with a reason                |
@@ -249,7 +259,7 @@ Cargo under [`examples/`](examples/).
 | `--no-cache`            | Do not read or write the on-disk response cache; `--cache-ttl` sets its lifetime (default `1h`), `securock cache clear` empties it |
 | `--output`              | Write the report to a file instead of stdout (also on exit `1`)                                                                    |
 | `--min-release-age`     | `audit`. Report npm and PyPI releases newer than this, such as `7d`                                                                |
-| `--fail-on`             | `audit`, `sast`, `chain` and `doctor`. Exit `1` at or above this severity (default `high`)                                         |
+| `--fail-on`             | `audit`, `sast`, `chain`, `import` and `doctor`. Exit `1` at or above this severity (default `high`)                               |
 | `--assume-params`       | `sast` and `chain`. Treat string parameters of Go functions nothing calls directly as untrusted (registry handlers)                |
 | `--exceptions`          | Accepted-findings file (default `.securock/exceptions.yaml`)                                                                       |
 | `--reachability`        | Record package scope and dependencies; mark vulnerabilities reachable, unreachable, or unknown                                     |
