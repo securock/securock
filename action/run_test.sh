@@ -174,6 +174,16 @@ assert_not_contains "$tmp/audit_plain/calls" "--min-release-age"
 run_case audit_fail env COMMAND=audit FAIL_AUDIT=1 \
   bash "$root/action/run.sh"
 assert_contains "$tmp/audit_fail/github_output" "failed=true"
+# prioritize is audit-only too, and off unless asked for.
+run_case prioritize env COMMAND=audit PRIORITIZE=true \
+  bash "$root/action/run.sh"
+assert_contains "$tmp/prioritize/calls" "args:audit --prioritize"
+run_case prioritize_off env COMMAND=audit PRIORITIZE=false \
+  bash "$root/action/run.sh"
+assert_not_contains "$tmp/prioritize_off/calls" "--prioritize"
+run_case prioritize_not_forwarded env COMMAND=scan PRIORITIZE=true \
+  bash "$root/action/run.sh"
+assert_not_contains "$tmp/prioritize_not_forwarded/calls" "--prioritize"
 run_case age_not_forwarded env COMMAND=scan MIN_RELEASE_AGE=7d \
   bash "$root/action/run.sh"
 assert_not_contains "$tmp/age_not_forwarded/calls" "--min-release-age"

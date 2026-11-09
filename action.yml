@@ -26,6 +26,9 @@ inputs:
   min-release-age:
     description: "audit only: report releases newer than this as high findings, such as 7d (npm and PyPI)"
     default: ""
+  prioritize:
+    description: "audit only: pass --prioritize, so vulnerabilities in CISA KEV or with an EPSS score of 50% or more are raised (sends CVE IDs to OSV, CISA and FIRST)"
+    default: "false"
   import-sarif:
     description: "sast only: SARIF reports from other scanners to merge into the sast report, one path per line, relative to the repository root"
     default: ""
@@ -125,6 +128,7 @@ runs:
         PROFILE: ${{ inputs.profile }}
         REACHABILITY: ${{ inputs.reachability }}
         MIN_RELEASE_AGE: ${{ inputs.min-release-age }}
+        PRIORITIZE: ${{ inputs.prioritize }}
         IMPORT_SARIF: ${{ inputs.import-sarif }}
         SARIF_FILE: ${{ inputs.sarif == 'true' && format('{0}/securock.sarif', runner.temp) || '' }}
         REPORT_FORMAT: ${{ inputs.report-format }}
