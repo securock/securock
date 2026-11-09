@@ -125,3 +125,27 @@ func TestImportErrors(t *testing.T) {
 		})
 	}
 }
+
+func TestImportMakesPathsRelativeToTheWorkingDirectory(t *testing.T) {
+	isolateHome(t)
+	dir := t.TempDir()
+	t.Chdir(dir)
+	abs, err := os.Getwd() // the resolved path, which is what the command sees
+	if err != nil {
+		t.Fatal(err)
+	}
+	sarif := `{"version":"2.1.0","runs":[{"tool":{"driver":{"name":"T"}},"results":[
+	  {"ruleId":"r","level":"error","message":{"text":"m"},
+	   "locations":[{"physicalLocation":{"artifactLocation":{"uri":"file://` + filepath.ToSlash(abs) + `/cmd/x.go"},"region":{"startLine":4}}}]}]}]}`
+	path := filepath.Join(t.TempDir(), "abs.sarif")
+	if err := os.WriteFile(path, []byte(sarif), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	out, err := execCLI(t, "", "import", path, "--no-fail", "--format", "json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(out), abs) || !strings.Contains(string(out), `"subject": "cmd/x.go"`) {
+		t.Fatalf("the absolute path should be relative:\n%s", out)
+	}
+}

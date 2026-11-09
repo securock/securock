@@ -222,3 +222,42 @@ func toolSlug(name string) string {
 	}
 	return strings.Join(strings.Fields(name), "-")
 }
+
+// RelativeTo rewrites absolute paths under root as paths relative to it, in place, so a
+// report made on a CI runner reads the same as one made anywhere else and an exception
+// written for "cmd/x.go" matches. A path outside root is left as the tool wrote it, since
+// there is no relative form that would still point at the same file.
+func RelativeTo(findings []Finding, root string) {
+	root = strings.TrimRight(filepath.ToSlash(root), "/")
+	if root == "" {
+		return
+	}
+	rel := func(p string) string {
+		if rest, ok := strings.CutPrefix(p, root+"/"); ok && rest != "" {
+			return rest
+		}
+		return p
+	}
+	for i := range findings {
+		f := &findings[i]
+		if f.Location != nil {
+			// The subject is the file for these findings; rewrite it with the location.
+			if f.Subject == f.Location.File {
+				f.Subject = rel(f.Subject)
+			}
+			loc := *f.Location
+			loc.File = rel(loc.File)
+			f.Location = &loc
+		} else {
+			f.Subject = rel(f.Subject)
+		}
+		if len(f.Trace) > 0 {
+			trace := make([]Step, len(f.Trace))
+			copy(trace, f.Trace)
+			for j := range trace {
+				trace[j].File = rel(trace[j].File)
+			}
+			f.Trace = trace
+		}
+	}
+}

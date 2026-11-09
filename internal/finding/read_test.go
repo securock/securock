@@ -107,3 +107,29 @@ func TestReadSARIFEmpty(t *testing.T) {
 		t.Fatalf("want an empty, non-nil list: %+v, %v", got, err)
 	}
 }
+
+func TestRelativeTo(t *testing.T) {
+	findings := []finding.Finding{
+		{ID: "a", Subject: "/work/repo/cmd/x.go", Location: &finding.Location{File: "/work/repo/cmd/x.go", Line: 3},
+			Trace: []finding.Step{{Location: finding.Location{File: "/work/repo/cmd/y.go", Line: 1}, Message: "m"}, {Location: finding.Location{File: "/elsewhere/z.go", Line: 2}, Message: "n"}}},
+		{ID: "b", Subject: "/work/repo/cfg/app.yaml"},
+		{ID: "c", Subject: "/work/repository/other.go", Location: &finding.Location{File: "/work/repository/other.go", Line: 1}},
+		{ID: "d", Subject: "already/relative.go", Location: &finding.Location{File: "already/relative.go", Line: 1}},
+		{ID: "e", Subject: "/work/repo"},
+	}
+	finding.RelativeTo(findings, "/work/repo/")
+
+	a := findings[0]
+	if a.Subject != "cmd/x.go" || a.Location.File != "cmd/x.go" || a.Trace[0].File != "cmd/y.go" || a.Trace[1].File != "/elsewhere/z.go" {
+		t.Errorf("a: %+v %+v", a, a.Trace)
+	}
+	if findings[1].Subject != "cfg/app.yaml" {
+		t.Errorf("a finding without a line is rewritten too: %+v", findings[1])
+	}
+	if findings[2].Subject != "/work/repository/other.go" {
+		t.Errorf("a sibling directory sharing a prefix is not under the root: %+v", findings[2])
+	}
+	if findings[3].Subject != "already/relative.go" || findings[4].Subject != "/work/repo" {
+		t.Errorf("relative paths and the root itself stay as they are: %+v %+v", findings[3], findings[4])
+	}
+}

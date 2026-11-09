@@ -371,6 +371,10 @@ honored: only the exceptions file accepts a finding. `import` reads
 `.securock/exceptions.yaml` from the current directory unless you pass
 `--exceptions`.
 
+An absolute file path under the current directory is made relative to it, so a report made
+on a CI runner matches exceptions written for `cmd/x.go`. A path outside it is kept as the
+tool wrote it.
+
 ## Exit codes
 
 | Code | Meaning                                 |

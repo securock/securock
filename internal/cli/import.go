@@ -24,7 +24,8 @@ A finding's ID is sarif:<tool>/<rule>, and its subject is the file it points at,
 "securock accept sarif:semgrep/go.lang.security.audit --subject cmd/x.go" works as
 usual. Severity comes from the numeric security-severity property when present, then
 the SARIF level; a result with neither is medium. Suppressions inside the SARIF file
-are not honored: only the exceptions file accepts a finding.`,
+are not honored: only the exceptions file accepts a finding. Absolute file paths under the
+current directory are made relative to it.`,
 		Args: cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			threshold, err := finding.ParseSeverity(failOn)
@@ -38,6 +39,9 @@ are not honored: only the exceptions file accepts a finding.`,
 					return opErr(err)
 				}
 				found = append(found, one...)
+			}
+			if root, err := os.Getwd(); err == nil {
+				finding.RelativeTo(found, root)
 			}
 			accepted, err := exceptions.Load(exceptions.Path(".", opts.exceptions))
 			if err != nil {
