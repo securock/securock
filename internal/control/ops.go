@@ -14,7 +14,7 @@ func (s *Server) opsAPI(w http.ResponseWriter, r *http.Request, p identity.Princ
 			reply(w, 403, nil)
 			return true
 		}
-		t := s.Store.Read().Tenants[p.Tenant]
+		t := s.Store.Tenant(p.Tenant)
 		statuses := map[string]int{}
 		severity := map[string]int{}
 		for _, j := range t.Jobs {
@@ -34,7 +34,7 @@ func (s *Server) opsAPI(w http.ResponseWriter, r *http.Request, p identity.Princ
 			reply(w, 403, nil)
 			return true
 		}
-		t := s.Store.Read().Tenants[p.Tenant]
+		t := s.Store.Tenant(p.Tenant)
 		for id, j := range t.Jobs {
 			j.Lease = ""
 			t.Jobs[id] = j

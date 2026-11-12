@@ -12,6 +12,7 @@ import (
 	"github.com/securock/securock/internal/finding"
 	"github.com/securock/securock/internal/identity"
 	"github.com/securock/securock/internal/lifecycle"
+	bolt "go.etcd.io/bbolt"
 	"os"
 	"path/filepath"
 	"sync"
@@ -57,6 +58,7 @@ type State struct {
 }
 type Store struct {
 	newState bool
+	db       *bolt.DB
 	signer   ed25519.PrivateKey
 	mu       sync.Mutex
 	dir      string
@@ -91,26 +93,46 @@ func Open(dir string, key []byte, bindings []identity.Binding) (*Store, error) {
 	block, _ := aes.NewCipher(key)
 	aead, _ := cipher.NewGCM(block)
 	s := &Store{dir: dir, aead: aead, state: State{Version: 1, Tenants: map[string]*Tenant{}}}
-	if info, err := os.Stat(filepath.Join(dir, "state.enc")); err == nil && info.Size() > 65<<20 {
-		s.Close()
-		return nil, fmt.Errorf("encrypted state exceeds limit")
-	}
-	raw, e := os.ReadFile(filepath.Join(dir, "state.enc"))
-	s.newState = os.IsNotExist(e)
-	if e == nil {
-		if len(raw) < aead.NonceSize() {
+	dbInfo, dbErr := os.Lstat(filepath.Join(dir, "state.db"))
+	if dbErr == nil {
+		if !dbInfo.Mode().IsRegular() {
 			s.Close()
-			return nil, fmt.Errorf("invalid encrypted state")
+			return nil, fmt.Errorf("database must be a regular file")
 		}
-		plain, e := aead.Open(nil, raw[:aead.NonceSize()], raw[aead.NonceSize():], []byte("securock-control-v1"))
-		if e != nil || json.Unmarshal(plain, &s.state) != nil || s.state.Version != 1 || s.state.Tenants == nil {
+		if _, e := os.Lstat(filepath.Join(dir, "state.enc")); !os.IsNotExist(e) {
 			s.Close()
-			return nil, fmt.Errorf("state authentication or version check failed")
+			return nil, fmt.Errorf("ambiguous database and legacy state; choose a migrated state directory")
 		}
-	} else if !os.IsNotExist(e) {
+		if e := s.openDatabase(false); e != nil {
+			s.Close()
+			return nil, e
+		}
+	} else if !os.IsNotExist(dbErr) {
 		s.Close()
-		return nil, e
+		return nil, dbErr
+	} else {
+		if info, err := os.Stat(filepath.Join(dir, "state.enc")); err == nil && info.Size() > 65<<20 {
+			s.Close()
+			return nil, fmt.Errorf("encrypted state exceeds limit")
+		}
+		raw, e := os.ReadFile(filepath.Join(dir, "state.enc"))
+		s.newState = os.IsNotExist(e)
+		if e == nil {
+			if len(raw) < aead.NonceSize() {
+				s.Close()
+				return nil, fmt.Errorf("invalid encrypted state")
+			}
+			plain, e := aead.Open(nil, raw[:aead.NonceSize()], raw[aead.NonceSize():], []byte("securock-control-v1"))
+			if e != nil || json.Unmarshal(plain, &s.state) != nil || s.state.Version != 1 || s.state.Tenants == nil {
+				s.Close()
+				return nil, fmt.Errorf("state authentication or version check failed")
+			}
+		} else if !os.IsNotExist(e) {
+			s.Close()
+			return nil, e
+		}
 	}
+
 	if s.newState {
 		for _, b := range bindings {
 			t := s.state.Tenants[b.Tenant]
@@ -133,8 +155,19 @@ func Open(dir string, key []byte, bindings []identity.Binding) (*Store, error) {
 	}
 	return s, nil
 }
-func (s *Store) Close() error { return os.Remove(filepath.Join(s.dir, "instance.lock")) }
+func (s *Store) Close() error {
+	if s.db != nil {
+		if e := s.db.Close(); e != nil {
+			return e
+		}
+		s.db = nil
+	}
+	return os.Remove(filepath.Join(s.dir, "instance.lock"))
+}
 func (s *Store) save(v State) error {
+	if s.db != nil {
+		return s.saveDatabase(v)
+	}
 	plain, e := json.Marshal(v)
 	if e != nil {
 		return e

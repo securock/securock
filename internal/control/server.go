@@ -135,7 +135,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path == "/api/v1/projects" {
 		if r.Method == "GET" {
 			projects := []Project{}
-			for _, v := range s.Store.Read().Tenants[p.Tenant].Projects {
+			for _, v := range s.Store.Tenant(p.Tenant).Projects {
 				projects = append(projects, v)
 			}
 			slices.SortFunc(projects, func(a, b Project) int { return strings.Compare(a.ID, b.ID) })
@@ -176,7 +176,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path == "/api/v1/jobs" {
 		if r.Method == "GET" {
 			jobs := []Job{}
-			for _, j := range s.Store.Read().Tenants[p.Tenant].Jobs {
+			for _, j := range s.Store.Tenant(p.Tenant).Jobs {
 				j.Report = nil
 				j.Lease = ""
 				jobs = append(jobs, j)
@@ -219,7 +219,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if id := strings.TrimPrefix(r.URL.Path, "/api/v1/jobs/"); id != r.URL.Path && identity.ValidID(id) {
-		j, ok := s.Store.Read().Tenants[p.Tenant].Jobs[id]
+		j, ok := s.Store.Tenant(p.Tenant).Jobs[id]
 		if !ok {
 			reply(w, 404, nil)
 			return

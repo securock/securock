@@ -22,6 +22,9 @@ func (s *Store) Backup(path string) error {
 			return e
 		}
 	}
+	if s.db != nil {
+		return s.backupDatabase(path)
+	}
 	raw, e := os.ReadFile(filepath.Join(s.dir, "state.enc"))
 	if e != nil {
 		return e

@@ -141,7 +141,7 @@ func (s *Server) deliveryAPI(w http.ResponseWriter, r *http.Request, p identity.
 		return true
 	}
 	if r.Method == "GET" {
-		reply(w, 200, s.Store.Read().Tenants[p.Tenant].Deliveries)
+		reply(w, 200, s.Store.Tenant(p.Tenant).Deliveries)
 		return true
 	}
 	var req Delivery

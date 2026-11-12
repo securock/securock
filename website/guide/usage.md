@@ -1334,3 +1334,17 @@ refused. Credentials, cookies, captures and response bodies do not enter reports
 A status mismatch stops the scenario and exits 1; transport, scope or capture
 failures exit 2. This is a user-authored HTTP contract, not automatic exploit
 discovery or a browser interaction recorder.
+
+## Transactional control-plane storage
+
+`control NEW_DIRECTORY --migrate-database --state-dir OLD_DIRECTORY` creates an
+authenticated encrypted bbolt copy of stopped control-plane state. Supply the
+existing key and audit seed with the standard file/environment flags. The source
+remains intact. Point `serve` at the new directory after reviewing it; `state.db`
+is detected automatically. Per-tenant transactions avoid rewriting other tenants,
+with a 64 MiB tenant limit. This local embedded database remains single-instance.
+
+`control BACKUP --state-dir DIRECTORY` backs up either backend. For database
+backups, use `control BACKUP --restore --database --state-dir ABSENT_DIRECTORY`.
+Legacy snapshot restores retain their original syntax. Database restores accept
+up to 1 GiB and authenticate the encryption and audit history before succeeding.

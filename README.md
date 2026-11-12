@@ -167,8 +167,9 @@ language, framework, and rule; see the
 [analysis guide](website/guide/sast.md#how-accurate-is-sast) and
 [benchmark methodology](docs/sast-benchmarks.md).
 
-The team control plane is a single-instance pilot backend with a 64 MiB state
-limit. Read the [deployment and assurance guide](docs/enterprise.md) before
+The team control plane is a single-instance backend. Legacy snapshots have a
+64 MiB state limit; opt-in encrypted bbolt storage commits individual tenants
+with a 64 MiB limit per tenant. Read the [deployment and assurance guide](docs/enterprise.md) before
 operating it for a team.
 
 The default network mode is `public-only`. `--offline` skips remote lookups;

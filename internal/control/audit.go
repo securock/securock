@@ -109,7 +109,7 @@ func VerifyAudit(v AuditExport, pinned ed25519.PublicKey) error {
 	return nil
 }
 func (s *Store) UpdateAs(p identity.Principal, action string, fn func(*State) error) error {
-	return s.Update(func(st *State) error {
+	return s.updateTenant(p.Tenant, func(st *State) error {
 		if len(s.signer) != ed25519.PrivateKeySize {
 			return fmt.Errorf("audit signer unavailable")
 		}
@@ -148,7 +148,7 @@ func (s *Server) auditAPI(w http.ResponseWriter, r *http.Request, p identity.Pri
 			public = base64.StdEncoding.EncodeToString(s.Store.signer.Public().(ed25519.PublicKey))
 		}
 		s.Store.mu.Unlock()
-		reply(w, 200, AuditExport{1, public, s.Store.Read().Tenants[p.Tenant].Audit})
+		reply(w, 200, AuditExport{1, public, s.Store.Tenant(p.Tenant).Audit})
 		return true
 	}
 	base := "/api/v1/approvals"
@@ -157,7 +157,7 @@ func (s *Server) auditAPI(w http.ResponseWriter, r *http.Request, p identity.Pri
 	}
 	if r.Method == "GET" && p.Can("read") {
 		items := map[string]Approval{}
-		for id, a := range s.Store.Read().Tenants[p.Tenant].Approvals {
+		for id, a := range s.Store.Tenant(p.Tenant).Approvals {
 			exp, e := time.Parse(time.RFC3339, a.Expires)
 			if e != nil || !exp.After(time.Now()) {
 				a.Status = "expired"

@@ -51,7 +51,7 @@ func (s *Server) scim(w http.ResponseWriter, r *http.Request, p identity.Princip
 		scimError(w, 404)
 		return
 	}
-	members := s.Store.Read().Tenants[p.Tenant].Members
+	members := s.Store.Tenant(p.Tenant).Members
 	if r.Method == "GET" {
 		if !collection {
 			for _, m := range members {

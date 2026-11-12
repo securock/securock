@@ -34,7 +34,7 @@ func (s *Server) issueAPI(w http.ResponseWriter, r *http.Request, p identity.Pri
 			asof = time.Now().UTC().Format("2006-01-02")
 		}
 		out := map[string]lifecycle.Registry{}
-		for project, registry := range s.Store.Read().Tenants[p.Tenant].Registries {
+		for project, registry := range s.Store.Tenant(p.Tenant).Registries {
 			if e := lifecycle.Age(&registry, asof); e != nil {
 				reply(w, 400, nil)
 				return true

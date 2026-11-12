@@ -2,8 +2,10 @@
 
 ## Supported deployment boundary
 
-The control plane is a single-instance pilot backend with an encrypted 64 MiB
-state limit, not a horizontally scalable database service. Use a private local
+The control plane remains a single-instance backend. The legacy encrypted JSON
+snapshot has a 64 MiB total limit. Opt-in encrypted bbolt storage uses atomic
+per-tenant transactions and a 64 MiB limit per tenant. It is not a horizontally
+scalable database service. Use a private local
 filesystem; do not share state across replicas or mount it over a network
 filesystem. State backup/recovery, subject binding, key custody and outbound
 destinations are operator responsibilities. Deploy only after reviewing this
@@ -131,3 +133,25 @@ go test -fuzz=FuzzAuthorizationMatrix -fuzztime=30s -parallel=2 ./internal/dast
 These exercise malformed access tokens and authorization contracts without
 contacting an identity provider or application. They complement role/isolation
 tests and do not replace a penetration test of a real deployment.
+
+## Transactional tenant storage
+
+Stop the service and workers, then run
+`control NEW_DIRECTORY --migrate-database --state-dir OLD_DIRECTORY` with the
+existing mounted encryption and audit keys. The new directory must not exist.
+Migration authenticates the source and preserves it; it neither overwrites nor
+deletes the old snapshot. Switch the service state directory only after verifying
+the migrated copy and recording independent audit checkpoints. Never run both
+copies as active services for the same workspace.
+
+Directories containing `state.db` are opened automatically. Backup with the normal
+`control BACKUP --state-dir DIRECTORY`; restore a database backup using
+`control BACKUP --restore --database --state-dir ABSENT_DIRECTORY`. Restore is
+limited to 1 GiB of database input. State records use AES-GCM, bind ciphertext to
+a hashed tenant key, and contain no plaintext findings or user names. bbolt adds
+a CGO-free transactional store with crash recovery and atomic tenant writes.
+Authenticated requests clone only the selected tenant. The backend still loads
+all tenants in memory, serializes writes and takes a local instance lock; qualify
+capacity and latency on the intended workload. It provides neither multi-host
+replication nor automatic failover. Deleted database pages and retained backups
+can contain old encrypted records; retention is logical, not secure media erasure.
