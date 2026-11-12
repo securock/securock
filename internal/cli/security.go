@@ -112,7 +112,7 @@ combined report. Operational failures still exit 2, even with --no-fail.`,
 					Remediation: "Generate a supported package-manager lockfile, or run security in each dependency project directory.",
 				})
 			} else {
-				result, err := scanner.Scan(cmd.Context(), scanner.Options{
+				result, err := scanner.Scan(cmd.Context(), scanner.Options{Attestations: opts.attestations, SignerKey: opts.signerKey,
 					Path: path, Offline: opts.offline, Network: net, Policy: pol, Reachability: opts.reachability,
 				})
 				if err != nil {

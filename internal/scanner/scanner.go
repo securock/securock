@@ -3,7 +3,9 @@ package scanner
 import (
 	"cmp"
 	"context"
+	"crypto/sha256"
 	"errors"
+	"fmt"
 	"slices"
 	"sync"
 
@@ -19,12 +21,14 @@ import (
 )
 
 type Options struct {
-	Path     string
-	Offline  bool
-	Network  policy.Network
-	Policy   policy.Document
-	Client   osv.Client
-	Evidence evidence.Collector
+	Path         string
+	Offline      bool
+	Network      policy.Network
+	Policy       policy.Document
+	Client       osv.Client
+	Evidence     evidence.Collector
+	Attestations string
+	SignerKey    string
 
 	// Reachability records each package's scope and dependencies and marks every
 	// vulnerability reachable, unreachable, or unknown. Off by default so the lockfile
@@ -46,6 +50,10 @@ func Scan(ctx context.Context, opts Options) (*Result, error) {
 	}
 
 	deps, err := ecosystem.Collect(path)
+	if err != nil {
+		return nil, err
+	}
+	pinned, signerFingerprint, err := evidence.LoadPinned(opts.Attestations, opts.SignerKey, deps)
 	if err != nil {
 		return nil, err
 	}
@@ -136,6 +144,10 @@ func Scan(ctx context.Context, opts Options) (*Result, error) {
 	if err != nil {
 		return nil, err
 	}
+	if signerFingerprint != "" {
+		sum := sha256.Sum256([]byte(fp + "\npackage-signer:" + signerFingerprint))
+		fp = fmt.Sprintf("sha256:%x", sum)
+	}
 
 	doc := lockfile.Document{
 		Version:   lockfile.SchemaVersion,
@@ -200,6 +212,11 @@ func Scan(ctx context.Context, opts Options) (*Result, error) {
 				art.Evidence.Chain = rec.Chain
 			}
 			art.Evidence.Health = rec.Health
+		}
+		if record, ok := pinned[evidence.Key(dep)]; ok {
+			art.Evidence.Provenance = record.Provenance
+			art.Evidence.Signature = record.Signature
+			art.Evidence.Chain = record.Chain
 		}
 		if allowed[key] {
 			art.Evidence.Vulnerabilities.State = lockfile.VulnChecked

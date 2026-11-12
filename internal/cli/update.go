@@ -47,7 +47,7 @@ func newUpdateCommand(opts *options) *cobra.Command {
 				fmt.Fprintln(cmd.ErrOrStderr(), lock.MigrationWarning)
 			}
 
-			result, err := scanner.Scan(cmd.Context(), scanner.Options{
+			result, err := scanner.Scan(cmd.Context(), scanner.Options{Attestations: opts.attestations, SignerKey: opts.signerKey,
 				Path:         path,
 				Offline:      opts.offline,
 				Network:      net,

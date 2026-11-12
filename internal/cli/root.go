@@ -15,15 +15,17 @@ import (
 )
 
 type options struct {
-	toolVersion string
-	offline     bool
-	network     string
-	format      string
-	lockPath    string
-	policy      string
-	profile     string
-	noFail      bool
-	output      string
+	toolVersion  string
+	attestations string
+	signerKey    string
+	offline      bool
+	network      string
+	format       string
+	lockPath     string
+	policy       string
+	profile      string
+	noFail       bool
+	output       string
 
 	exceptions string
 
@@ -54,6 +56,8 @@ func NewRoot(version, commit, date string) *cobra.Command {
 	}
 	root.SetVersionTemplate("{{.Version}}\n")
 
+	root.PersistentFlags().StringVar(&opts.attestations, "package-attestations", "", "local version 1 DSSE package provenance manifest")
+	root.PersistentFlags().StringVar(&opts.signerKey, "package-signer-key", "", "independently pinned base64 Ed25519 public-key file for local package attestations")
 	root.PersistentFlags().BoolVar(&opts.offline, "offline", false, "skip remote lookups")
 	root.PersistentFlags().StringVar(&opts.network, "network", "", "network mode: public-only, offline, or allow-all")
 	root.PersistentFlags().StringVar(&opts.format, "format", "text", "output format: text, json, sarif (code scanning), junit (JUnit XML), or markdown (PR comment); graph also takes mermaid and dot")

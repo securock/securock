@@ -60,7 +60,7 @@ expected on a first offline run: the files are still written. Use --no-fail to e
 			if err != nil {
 				return err
 			}
-			result, err := scanner.Scan(cmd.Context(), scanner.Options{
+			result, err := scanner.Scan(cmd.Context(), scanner.Options{Attestations: opts.attestations, SignerKey: opts.signerKey,
 				Path:         path,
 				Offline:      opts.offline,
 				Network:      net,

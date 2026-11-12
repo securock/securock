@@ -344,3 +344,11 @@ is supported; private, file, Git and unresolved sources do not use these APIs.
 NuGet catalog references stay on the configured registry origin. Offline mode
 makes none of these requests. These responses do not establish package signatures
 or build provenance, which remain unknown without separate verified evidence.
+
+## Local package attestations
+
+`--package-attestations` and `--package-signer-key` read local DSSE statements
+and a pinned public key without contacting a signer or registry. Exact artifact
+identities, digests and authenticated provenance fields can enter `securock.lock`;
+local manifest/key file paths do not. The public-key fingerprint affects the
+policy digest. Offline mode continues to skip all remote evidence collection.

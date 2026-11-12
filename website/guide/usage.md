@@ -1360,3 +1360,30 @@ atomically; existing audit signatures and independently recorded checkpoints
 remain valid. Update service credentials to the new key before restarting.
 Retain the old key for historical backups. This rotates encryption keys, not
 audit-signing keys.
+
+## Pinned local package provenance
+
+Dependency commands accept `--package-attestations manifest.json` together with
+`--package-signer-key signer.pub`. The key file contains an independently trusted
+base64 Ed25519 public key. Verification also works with `--offline` and private
+package sources; no network request is needed for local evidence.
+
+The manifest is `{"version":1,"attestations":[ENVELOPE]}`. Each standard DSSE
+envelope has `payloadType: "application/vnd.in-toto+json"`, a base64 payload,
+and `signatures` containing base64 `sig` values. DSSE pre-authentication encoding
+is verified before reading claims. The payload is an in-toto Statement v1 with
+a SLSA v1 provenance predicate, a builder identity, a build definition with an
+absolute `buildType` URI and `externalParameters` object, and exactly one subject.
+The subject name must equal Securock's exact identity, such as
+`cargo:serde@1.0.0` or `pypi:example@1.0.0#example.whl`. Its single digest entry
+must match the dependency lockfile's strong digest (`sha256`, `sha384`, `sha512`
+or `goh1`). Go `goh1` values are base64 module-content hashes, not ZIP-file hashes.
+
+Matching claims set signature, provenance and chain evidence to verified while
+leaving vulnerability, capability and other uncollected evidence unchanged.
+Malformed signatures and matching identities with mismatched digests fail with
+exit 2, even with `--no-fail`. Unmatched dependencies remain unknown. The pinned
+key fingerprint is bound into the policy digest, so changing or removing the
+trust root produces drift; local file paths are never recorded. Pinning a signer
+authenticates its claims, not a builder guarantee, transparency-log inclusion or
+package safety. Review the signer independently before accepting the lock.

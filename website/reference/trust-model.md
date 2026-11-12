@@ -164,3 +164,13 @@ supplies release dates, normalized licenses and yanked status; NuGet catalog
 entries supply available release dates, licenses and deprecation status. Failed
 or mismatched responses leave health unknown. This is registry metadata, not
 cryptographic artifact authentication: signatures and provenance remain unknown.
+
+### Pinned local package attestations
+
+An explicit DSSE manifest and independent Ed25519 public-key pin can authenticate
+SLSA claims for any dependency ecosystem, including offline/private packages.
+Both the exact artifact identity and strong digest must match. The public-key
+fingerprint participates in the policy digest, making signer changes visible in
+trust drift without recording machine-specific paths. A verified claim authenticates
+the pinned signer's statement; it is not independent builder assurance or proof
+of transparency inclusion. Other evidence remains unknown unless collected.

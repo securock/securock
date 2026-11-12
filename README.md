@@ -159,6 +159,10 @@ package's public source cannot be established. See the
 [ecosystem guide](website/guide/ecosystems.md) for lockfile formats, supported
 versions, and resolver-specific limits.
 
+Use `--package-attestations MANIFEST --package-signer-key PUBLIC_KEY_FILE`
+with dependency commands to verify local signed SLSA claims for any ecosystem,
+including offline scans. Signer changes produce policy drift.
+
 ## Status and privacy
 
 Securock is pre-1.0. Use `quality --per-rule --max-fpr 0.02` to gate labeled fixtures by rule.
