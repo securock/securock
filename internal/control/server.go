@@ -59,7 +59,11 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		reply(w, 200, map[string]string{"status": "ready"})
 		return
 	}
-	if r.URL.Path == "/" && r.Method == "GET" {
+	if (r.URL.Path == "/ui" || r.URL.Path == "/") && r.Method == "GET" {
+		console(w)
+		return
+	}
+	if r.URL.Path == "/unused-index" && r.Method == "GET" {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		_, _ = io.WriteString(w, `<!doctype html><html lang="en"><title>Securock control plane</title><h1>Securock control plane</h1><p>Authenticated API: /api/v1/me, /api/v1/projects, /api/v1/jobs</p><p>Use an OIDC API access token. Customer data is never shown without authentication.</p></html>`)
 		return
@@ -67,6 +71,9 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	p, e := s.principal(r)
 	if e != nil {
 		reply(w, 401, map[string]string{"error": "authentication required"})
+		return
+	}
+	if s.opsAPI(w, r, p) {
 		return
 	}
 	if s.deliveryAPI(w, r, p) {

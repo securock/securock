@@ -80,10 +80,14 @@ func (s *Store) UpdateAs(p identity.Principal, action string, fn func(*State) er
 		if len(s.signer) != ed25519.PrivateKeySize {
 			return fmt.Errorf("audit signer unavailable")
 		}
+		before := digest(st.Tenants[p.Tenant])
 		if e := fn(st); e != nil {
 			return e
 		}
 		t := st.Tenants[p.Tenant]
+		if before == digest(t) {
+			return nil
+		}
 		if t == nil {
 			return fmt.Errorf("tenant missing")
 		}

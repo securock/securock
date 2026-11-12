@@ -996,3 +996,25 @@ external write occurs unless a user explicitly queues a delivery.
 `PUT /api/v1/deliveries/ID` with `state` open/closed queues an existing issue
 update. Jira requires connector `close_transition` and `open_transition` IDs.
 Updates use the provider API and subsequent polling records the actual state.
+
+## Team console and operations
+
+Open `/ui` on the management service to sign in with an API access token,
+register projects, request scans and inspect shared results. The token lives only
+in page memory and is cleared on sign-out. Output is rendered as text; no CDN,
+analytics or external scripts are used. OIDC browser redirects are not implemented:
+obtain the API token through your organization's approved client.
+
+`GET /api/v1/metrics` provides tenant counts by job status and finding severity.
+Admins may `GET /api/v1/export` to export tenant state (lease secrets redacted),
+and `POST /api/v1/retention` with a past RFC3339 `before` cutoff to purge terminal
+jobs. Audit events retain actor/action metadata and digests, not report payloads.
+Pending/running work is never purged. Backups have independent retention duties.
+
+Stop the service, then run `control backup.enc --state-dir PRIVATE_DIR` with
+the encryption and audit seeds set. Existing backup files are never overwritten.
+`control backup.enc --restore --state-dir NEW_DIR` authenticates encrypted data
+and the audit chain before accepting a restore; destination must be absent.
+Perform restore drills and compare externally stored audit checkpoints before
+returning to service. Define availability, RTO/RPO and support commitments from
+measured deployments; no availability certification is implied.
