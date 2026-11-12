@@ -381,6 +381,17 @@ func (j *jsLower) declarator(d *node) []*stmt {
 			}
 		}
 	}
+	// A static member extracted from require keeps its package identity, just
+	// like destructuring. Unknown/computed members retain normal evaluation.
+	if value != nil && j.kind(name) == "identifier" && j.kind(value) == "member_expression" {
+		obj, prop := j.field(value, "object"), j.field(value, "property")
+		if obj != nil && prop != nil && j.kind(obj) == "call_expression" && j.text(j.field(obj, "function")) == "require" {
+			if spec := j.firstString(j.field(obj, "arguments")); spec != "" {
+				j.bindModule(j.text(name), spec, j.text(prop))
+				return nil
+			}
+		}
+	}
 	if value == nil {
 		return nil
 	}

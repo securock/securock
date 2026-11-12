@@ -95,6 +95,8 @@ func init() {
 
 	// ---- JavaScript and TypeScript
 	js := jsSpec
+	js.sinks["mathjs.eval"] = sink{kind: kCode, args: []int{0}}
+	js.misuse["md5"] = []misuse{bare(ruleWeakCrypto, "MD5 is not suitable for cryptographic security")}
 	js.misuse["crypto.createHash"] = []misuse{md(ruleWeakCrypto, "this hash is broken for collision resistance", map[int][]string{0: weakHash})}
 	js.misuse["crypto.createCipher"] = []misuse{bare(ruleWeakCrypto, "createCipher derives a weak key and is removed from Node")}
 	js.misuse["crypto.createCipheriv"] = []misuse{md(ruleWeakCrypto, "this cipher or mode is weak", map[int][]string{0: {"des", "rc4", "ecb", "bf-"}})}
