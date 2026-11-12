@@ -150,3 +150,18 @@ func BenchmarkTenantSnapshot(b *testing.B) {
 		})
 	}
 }
+
+func TestDatabaseMigrationRequiresExistingSource(t *testing.T) {
+	key := bytes.Repeat([]byte{7}, 32)
+	seed := bytes.Repeat([]byte{9}, 32)
+	source := filepath.Join(t.TempDir(), "missing-source")
+	dest := filepath.Join(t.TempDir(), "destination")
+	if e := control.MigrateDatabase(source, dest, key, seed); e == nil {
+		t.Fatal("missing migration source accepted")
+	}
+	for _, path := range []string{source, dest} {
+		if _, e := os.Stat(path); !os.IsNotExist(e) {
+			t.Fatalf("failed migration created %s", path)
+		}
+	}
+}

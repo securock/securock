@@ -144,6 +144,16 @@ func (s *Store) saveDatabase(v State) error {
 // MigrateDatabase creates an independent database directory. Source state and
 // audit history are authenticated before anything can be copied.
 func MigrateDatabase(source, dest string, key, seed []byte) error {
+	sourceExists := false
+	for _, name := range []string{"state.enc", "state.db"} {
+		info, e := os.Lstat(filepath.Join(source, name))
+		if e == nil && info.Mode().IsRegular() {
+			sourceExists = true
+		}
+	}
+	if !sourceExists {
+		return fmt.Errorf("migration requires existing control-plane state")
+	}
 	if _, e := os.Lstat(dest); !os.IsNotExist(e) {
 		return fmt.Errorf("database migration requires an absent destination")
 	}
