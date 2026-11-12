@@ -2,7 +2,6 @@ name: SAST benchmark
 
 on:
   push:
-    branches: [main]
     paths:
       - "internal/sast/**"
       - "internal/finding/**"
@@ -80,6 +79,20 @@ jobs:
           ref: a1978a2fed195acd093010af6395f86a281537ca
           path: .benchmarks/dvwa
           persist-credentials: false
+      - name: Fetch DVNA cases
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: appsecco/dvna
+          ref: 9ba473add536f66ac9007966acb2a775dd31277a
+          path: .benchmarks/dvna
+          persist-credentials: false
+      - name: Fetch RailsGoat cases
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: OWASP/railsgoat
+          ref: f5951f13089d85c979de09e7da3c8c0fb982f94a
+          path: .benchmarks/railsgoat
+          persist-credentials: false
       - name: Measure recall and false positives by category
         env:
           SECUROCK_OWASP_BENCHMARK: ${{ github.workspace }}/.benchmarks/java
@@ -88,5 +101,17 @@ jobs:
           SECUROCK_NODEGOAT: ${{ github.workspace }}/.benchmarks/nodegoat
           SECUROCK_JUICE_SHOP: ${{ github.workspace }}/.benchmarks/juice-shop
           SECUROCK_DVWA: ${{ github.workspace }}/.benchmarks/dvwa
+          SECUROCK_DVNA: ${{ github.workspace }}/.benchmarks/dvna
+          SECUROCK_RAILSGOAT: ${{ github.workspace }}/.benchmarks/railsgoat
           SECUROCK_BENCHMARK_DETAILS: "1"
-        run: go test ./internal/sast -run '^Test(OWASPBenchmark|PyGoat|NodeGoat|JuiceShop|DVWA)' -count=1 -v -timeout 15m
+        shell: bash
+        run: |
+          set -euo pipefail
+          go test ./internal/sast -run '^Test(OWASPBenchmark|PyGoat|NodeGoat|JuiceShop|DVWA|DVNA|RailsGoat)' -count=1 -v -timeout 15m 2>&1 | tee sast-benchmark.log
+      - name: Retain benchmark results
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: sast-benchmark-results
+          path: sast-benchmark.log
+          if-no-files-found: warn

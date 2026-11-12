@@ -1,6 +1,6 @@
 # SAST benchmarks
 
-OWASP Benchmark and selected PyGoat, NodeGoat, Juice Shop and DVWA source cases
+OWASP Benchmark and selected PyGoat, NodeGoat, Juice Shop, DVWA, DVNA and RailsGoat source cases
 are development and regression suites for Securock's SAST. Their labeled failures inform parser,
 dataflow and library-model improvements. They are **not a held-out evaluation**,
 and these scores do not establish parity
@@ -536,3 +536,138 @@ closures, including TLS configurations created before `main` or a handler runs.
 Repository regressions pair disabled verification and weak TLS minimums with
 safe settings and string decoys. These are development tests, not an independent
 accuracy evaluation and do not change the OWASP measurements above.
+
+## Additional JavaScript, Ruby and PHP source regressions
+
+`TestDVNA`, `TestRailsGoat` and `TestDVWAExtended` in
+`internal/sast/extended_application_benchmarks_test.go` add **40 source/rule
+cases: 29 vulnerable cases and 11 safe controls**. They add two application
+sources and the first checksum-pinned, labeled Ruby application regression.
+The existing six external suites and their labels remain unchanged.
+
+These cases were labeled from the source before measuring the scanner. They
+are development/regression inputs, not held-out accuracy evidence. A control
+is safe only for its labeled category. Authentication, authorization, stored
+XSS flows through a database and full-application exploitation are not scored.
+
+### Inputs and analysis boundary
+
+| Suite | Revision | Selection |
+| --- | --- | --- |
+| [DVNA](https://github.com/appsecco/dvna) | `9ba473add536f66ac9007966acb2a775dd31277a` | `core/appHandler.js` and `core/authHandler.js`, analyzed together |
+| [RailsGoat](https://github.com/OWASP/railsgoat) | `f5951f13089d85c979de09e7da3c8c0fb982f94a` | Seven controller files listed in the labels below, analyzed together |
+| DVWA extension | `a1978a2fed195acd093010af6395f86a281537ca` | Four reflected-XSS and four blind-SQL security variants, each analyzed separately |
+
+Every scanned file has a SHA-256 check in the test. Only these files are copied
+into the analysis root with their original relative paths. No upstream code,
+server, application runtime or application dependency is installed or executed.
+Models and database initialization outside this selection are not implicitly
+available. As with the earlier application suites, a detection must match the
+exact file, rule and inclusive source range; unrelated findings cannot count.
+
+### Measured results
+
+The baseline is Securock `6d87e63ee2d9fd9ba13f83d62d704f1142a38f9f`
+with the new harness. The updated analyzer is `ec08c0df01087ebe2ce8964a04edafad021d9535`.
+Measurements use Go 1.27.4 on linux/amd64, with the test cache disabled.
+
+| Selection | Before TP/FN/FP/TN | Updated TP/FN/FP/TN | Analysis incomplete |
+| --- | --- | --- | ---: |
+| DVNA / JavaScript | 4/4/0/4 | 8/0/0/4 | 0 |
+| RailsGoat / Ruby | 10/2/0/4 | 12/0/0/4 | 0 |
+| DVWA extension / PHP | 5/4/0/3 | 6/3/0/3 | 0 |
+| **Additional cases** | **19/10/0/11** | **26/3/0/11** | **0** |
+
+The seven recovered detections come from static CommonJS member aliases,
+legacy `mathjs.eval` and the `md5` package, nested Ruby request members,
+keeping unknown constructors separate from unrelated controller `new` methods,
+and retaining PHP regex-replacement subject/replacement taint.
+Offline unit tests also cover literal inputs, parameterized queries, shadowed
+request variables, unrelated local functions and HTML-encoded results.
+
+**Three known misses remain in the denominator.** They are the SQLite query
+calls in the low, medium and high blind-SQL fragments. Their global
+`sqlite_db_connection` receiver has no declaration/type in these isolated inputs
+and is outside the scanner's current database receiver-name model. The MySQL
+query in the same file cannot satisfy the SQLite label. These cases are marked
+as known misses, not accepted findings or safe controls; any future detection
+counts as an improvement. No general SQLite coverage or 100% detection claim is
+supported by this measurement.
+
+All 26 detected vulnerable cases are individually required. Losing any of them,
+flagging any of the 11 safe controls, changed/missing sources, invalid labels or
+incomplete analysis fails the regression test. Three misses and only eleven safe
+controls do not support a production-wide recall/FPR claim; the OWASP aggregate
+2% FPR ceiling is not applied to these application selections.
+
+### Reviewed additional labels
+
+`TP` means a required detection, `FN` a measured known miss, and `TN` a safe
+control that must remain unflagged. Paths are relative to each upstream root.
+Repeated source locations with different rules are distinct source/rule cases.
+
+| Suite | Source range | Rule | Updated outcome |
+| --- | --- | --- | --- |
+| DVNA | `core/appHandler.js:11-13` | `sql-injection` | TP |
+| DVNA | `core/appHandler.js:39-44` | `command-injection` | TP |
+| DVNA | `core/appHandler.js:188` | `open-redirect` | TP |
+| DVNA | `core/appHandler.js:197` | `code-injection` | TP |
+| DVNA | `core/appHandler.js:218` | `insecure-deserialization` | TP |
+| DVNA | `core/appHandler.js:235` | `xxe` | TP |
+| DVNA | `core/authHandler.js:49` | `weak-crypto` | TP |
+| DVNA | `core/authHandler.js:78` | `weak-crypto` | TP |
+| DVNA | `core/appHandler.js:59-65` | `sql-injection` | TN |
+| DVNA | `core/appHandler.js:85-89` | `sql-injection` | TN |
+| DVNA | `core/appHandler.js:122` | `open-redirect` | TN |
+| DVNA | `core/authHandler.js:10-16` | `open-redirect` | TN |
+| RailsGoat | `app/controllers/users_controller.rb:29` | `sql-injection` | TP |
+| RailsGoat | `app/controllers/users_controller.rb:50` | `mass-assignment` | TP |
+| RailsGoat | `app/controllers/benefit_forms_controller.rb:12` | `code-injection` | TP |
+| RailsGoat | `app/controllers/benefit_forms_controller.rb:13` | `path-traversal` | TP |
+| RailsGoat | `app/controllers/dashboard_controller.rb:16` | `code-injection` | TP |
+| RailsGoat | `app/controllers/api/v1/mobile_controller.rb:10` | `code-injection` | TP |
+| RailsGoat | `app/controllers/api/v1/mobile_controller.rb:17` | `code-injection` | TP |
+| RailsGoat | `app/controllers/password_resets_controller.rb:6` | `insecure-deserialization` | TP |
+| RailsGoat | `app/controllers/password_resets_controller.rb:36` | `xss` | TP |
+| RailsGoat | `app/controllers/password_resets_controller.rb:48` | `weak-crypto` | TP |
+| RailsGoat | `app/controllers/password_resets_controller.rb:57` | `weak-crypto` | TP |
+| RailsGoat | `app/controllers/sessions_controller.rb:26` | `open-redirect` | TP |
+| RailsGoat | `app/controllers/messages_controller.rb:11` | `sql-injection` | TN |
+| RailsGoat | `app/controllers/messages_controller.rb:15` | `sql-injection` | TN |
+| RailsGoat | `app/controllers/sessions_controller.rb:36` | `open-redirect` | TN |
+| RailsGoat | `app/controllers/benefit_forms_controller.rb:21` | `open-redirect` | TN |
+| DVWAExtended | `vulnerabilities/xss_r/source/low.php:8` | `xss` | TP |
+| DVWAExtended | `vulnerabilities/xss_r/source/medium.php:11` | `xss` | TP |
+| DVWAExtended | `vulnerabilities/xss_r/source/high.php:11` | `xss` | TP |
+| DVWAExtended | `vulnerabilities/xss_r/source/impossible.php:12` | `xss` | TN |
+| DVWAExtended | `vulnerabilities/sqli_blind/source/low.php:13` | `sql-injection` | TP |
+| DVWAExtended | `vulnerabilities/sqli_blind/source/low.php:34` | `sql-injection` | FN |
+| DVWAExtended | `vulnerabilities/sqli_blind/source/medium.php:15` | `sql-injection` | TP |
+| DVWAExtended | `vulnerabilities/sqli_blind/source/medium.php:36` | `sql-injection` | FN |
+| DVWAExtended | `vulnerabilities/sqli_blind/source/high.php:13` | `sql-injection` | TP |
+| DVWAExtended | `vulnerabilities/sqli_blind/source/high.php:35` | `sql-injection` | FN |
+| DVWAExtended | `vulnerabilities/sqli_blind/source/impossible.php:17-19` | `sql-injection` | TN |
+| DVWAExtended | `vulnerabilities/sqli_blind/source/impossible.php:26-28` | `sql-injection` | TN |
+
+### Reproduce the additional cases
+
+```sh
+git clone https://github.com/appsecco/dvna /tmp/securock-dvna
+git -C /tmp/securock-dvna checkout 9ba473add536f66ac9007966acb2a775dd31277a
+git clone https://github.com/OWASP/railsgoat /tmp/securock-railsgoat
+git -C /tmp/securock-railsgoat checkout f5951f13089d85c979de09e7da3c8c0fb982f94a
+git clone https://github.com/digininja/DVWA /tmp/securock-dvwa
+git -C /tmp/securock-dvwa checkout a1978a2fed195acd093010af6395f86a281537ca
+
+SECUROCK_DVNA=/tmp/securock-dvna \
+SECUROCK_RAILSGOAT=/tmp/securock-railsgoat \
+SECUROCK_DVWA=/tmp/securock-dvwa \
+go test ./internal/sast -run '^Test(DVNA|RailsGoat|DVWAExtended)$' -count=1 -v -timeout 5m
+```
+
+The SAST benchmark workflow fetches both new pinned applications and runs the
+extension alongside all existing suites on relevant branch pushes and pull
+requests, weekly and by manual dispatch. Its uploaded test log retains per-case
+outcomes, per-rule TP/FN/FP/TN counts and incomplete-analysis counts, even on test
+failure. Normal `go test ./...` skips external suites unless their environment
+variables are set; offline model regressions always run.

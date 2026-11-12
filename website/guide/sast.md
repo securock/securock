@@ -308,6 +308,13 @@ See [JS, TS and PHP source regressions](/reference/sast-benchmarks#javascript-ty
 for revisions, all labels, counts and reproduction commands using
 `SECUROCK_NODEGOAT`, `SECUROCK_JUICE_SHOP` and `SECUROCK_DVWA`.
 
+Additional checksum-pinned [application regressions](/reference/sast-benchmarks#additional-javascript-ruby-and-php-source-regressions)
+cover DVNA (JavaScript), RailsGoat (Ruby), and DVWA reflected XSS and blind SQL.
+Across the 40 additional cases, 26 of 29 vulnerable cases are detected and none
+of 11 safe controls is flagged. Three SQLite query calls in isolated PHP fragments
+remain measured misses. These are development cases, not independent accuracy
+proof; CI requires every retained detection and rejects new false positives.
+
 Read the numbers with their limits in mind. The two OWASP suites are synthetic and contain
 constructs real code rarely has. Constant Java `switch` and Python `match` selectors, and
 Python arithmetic and conditional expressions, are now evaluated when their values are known.
@@ -364,14 +371,15 @@ so its category-specific FPR remains high despite the low aggregate rate.
 Only Java and Python have an OWASP Benchmark score. For the other languages the evidence is weaker,
 and `sast` should be treated as experimental there:
 
-| Language              | What it was checked against                                                                                                                                                                            |
-| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Java                  | OWASP BenchmarkJava (score above), WebGoat                                                                                                                                                             |
-| Python                | OWASP BenchmarkPython (score above), PyGoat (14 selected vulnerable cases and two safe controls; results above), django.nV                                                                             |
-| JavaScript/TypeScript | Pinned NodeGoat and Juice Shop SQL/NoSQL source regressions (results above); exploratory checks against other Juice Shop `codefixes`, njsscan true negatives and dvna are not included in those counts |
-| Go                    | gosec's samples (SQL injection, TLS and RSA key size covered; rules that need no tainted data are only partly matched), go-test-bench with `--assume-params`                                           |
-| PHP                   | Pinned DVWA SQL, command and redirect source regressions (results above); no comparable benchmark score                                                                                                |
-| Ruby, C#, Kotlin      | Intentionally vulnerable applications read by hand (railsgoat, WebGoat.NET, ktor-samples, spring-petclinic-kotlin) and repository unit tests; no labeled score                                         |
+| Language              | What it was checked against                                                                                                                                                                                                                |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Java                  | OWASP BenchmarkJava (score above), WebGoat                                                                                                                                                                                                 |
+| Python                | OWASP BenchmarkPython (score above), PyGoat (14 selected vulnerable cases and two safe controls; results above), django.nV                                                                                                                 |
+| JavaScript/TypeScript | Pinned NodeGoat and Juice Shop SQL/NoSQL source regressions (results above); exploratory checks against other Juice Shop `codefixes`, njsscan true negatives are not included in those counts; pinned DVNA results are reported separately |
+| Go                    | gosec's samples (SQL injection, TLS and RSA key size covered; rules that need no tainted data are only partly matched), go-test-bench with `--assume-params`                                                                               |
+| PHP                   | Pinned DVWA SQL, command and redirect source regressions (results above); no comparable benchmark score                                                                                                                                    |
+| Ruby                  | Pinned RailsGoat controller selection: 12 vulnerable cases detected, four safe controls unflagged; no comparable OWASP score                                                                                                               |
+| C#, Kotlin            | Intentionally vulnerable applications read by hand (WebGoat.NET, ktor-samples, spring-petclinic-kotlin) and repository unit tests; no labeled score                                                                                        |
 
 Known limits:
 
