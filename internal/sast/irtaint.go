@@ -879,6 +879,11 @@ func (r *irRun) evalCall(e *expr, st istate) taintSet {
 			return r.sanitized(r.source(e.pos, desc), qname, field, recvExpr)
 		}
 	}
+	if r.spec.name == "php" && qname == "preg_replace" && len(args) >= 3 {
+		// Filtering with an arbitrary regex does not make the replacement or
+		// subject safe. The pattern itself is checked as a regex sink above.
+		return merge(args[1], args[2]).scalar()
+	}
 	if r.spec.name == "py" && len(args) >= 2 {
 		if i, ok := pyRegexSubjectArg(qname); ok && len(args) > i {
 			// These re functions transform their subject: what they return is the
