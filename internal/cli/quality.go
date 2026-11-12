@@ -37,6 +37,11 @@ func newQualityCommand(opts *options) *cobra.Command {
 		if e != nil {
 			return opErr(e)
 		}
+		// Resolve symlinks so the containment check compares like with like;
+		// inputs are resolved below, and temp dirs are often symlinked.
+		if resolved, e := filepath.EvalSymlinks(root); e == nil {
+			root = resolved
+		}
 		for _, step := range suite.Steps {
 			if step.Command != "security" && step.Command != "cspm" {
 				return opErr(fmt.Errorf("quality supports reproducible offline security/cspm fixtures"))
