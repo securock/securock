@@ -362,7 +362,7 @@ var commonMethods = map[string]bool{
 	"valueOf": true, "getClass": true, "name": true, "value": true, "getValue": true, "getName": true, "contains": true,
 	"isEmpty": true, "clear": true, "next": true, "print": true, "println": true, "write": true, "read": true, "of": true,
 	"to_s": true, "to_a": true, "to_h": true, "each": true, "map": true, "join": true, "split": true, "append": true,
-	"push": true, "pop": true, "keys": true, "values": true, "items": true,
+	"push": true, "pop": true, "keys": true, "values": true, "items": true, "new": true,
 }
 
 // maxNameCandidates bounds the name-based guess for a call on a value of unknown class.
@@ -666,6 +666,9 @@ func (r *irRun) rootSource(e *expr) (string, bool) {
 		base, chain = "request", chain[1:]
 	}
 	if d, ok := r.spec.sourceRoots[base][chain[0]]; ok {
+		return d, true
+	}
+	if d, ok := r.spec.sourceRoots[base]["*"]; ok {
 		return d, true
 	}
 	// this.route.snapshot...: a field of the class that holds the request-like object.
