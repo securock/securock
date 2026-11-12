@@ -658,3 +658,21 @@ Approver names are declared metadata, not authenticated human signatures. Protec
 organization and exception files with authenticated repository review.
 Standalone JSON follows `organization-report.schema.json` and includes task
 owners and due dates. Normal `--no-fail` remains available for report generation.
+
+## Reproducible integration validation
+
+`integration --local --format json` starts a temporary loopback HTTP fixture and
+checks actual source, AWS export and HTTP scanner results against expected rule
+IDs. Temporary files and the server are cleaned up. It needs loopback networking
+but no external service or credentials.
+`integration suite.json --network allow-all` validates prepared test cloud
+accounts, images or applications with installed provider tools. The version 1
+suite contains `steps`, each with unique `name`, read-only scanner `command`
+(`security`, `dast`, `cspm`, `container`), `args`, `expected` and `forbidden` rule
+ID arrays. Output redirection and nested orchestration commands are rejected.
+The outer network mode is enforced. No infrastructure is provisioned, changed
+or deleted; supply isolated test resources and read-only credentials. Missing
+expected findings, forbidden findings and scanner errors fail the suite.
+JSON results follow `integration-report.schema.json`. Cloud and container steps
+run only when explicitly configured; local fixtures do not establish provider
+API compatibility.

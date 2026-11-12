@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://securock.dev/schema/integration-report.schema.json",
+  "type": "object",
+  "required": [
+    "version",
+    "results"
+  ],
+  "properties": {
+    "version": {
+      "const": 1
+    },
+    "results": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "name",
+          "passed",
+          "operational_error",
+          "missing",
+          "unexpected"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "passed": {
+            "type": "boolean"
+          },
+          "operational_error": {
+            "type": "boolean"
+          },
+          "missing": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "unexpected": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    }
+  }
+}
