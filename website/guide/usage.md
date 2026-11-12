@@ -704,3 +704,12 @@ Machine-readable schemas live in the repository under
 - [Ecosystems](/guide/ecosystems) — which lockfiles and evidence depth
 - [Evidence](/guide/evidence) — how to read evidence states
 - [GitHub Action](/guide/action) — CI wiring
+
+## Finding baselines
+
+Save comparable JSON finding reports and run `securock baseline before.json after.json`.
+Only new occurrences and severity changes count toward `--fail-on`; scan tools
+must match. IDs, subjects and source files are matched without line numbers.
+Incomplete/unchecked evidence remains visible. Missing findings are unobserved,
+not certified fixed: compare identical scanner settings and scope. Standard finding
+formats are supported; JSON retains the current report's tool and schema.

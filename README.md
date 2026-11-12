@@ -521,3 +521,12 @@ See [SECURITY.md](SECURITY.md).
 
 This project is licensed under the Apache License, Version 2.0.
 See the [LICENSE](LICENSE) file for details.
+
+## Finding baselines
+
+Save comparable JSON finding reports and run `securock baseline before.json after.json`.
+Only new occurrences and severity changes count toward `--fail-on`; scan tools
+must match. IDs, subjects and source files are matched without line numbers.
+Incomplete/unchecked evidence remains visible. Missing findings are unobserved,
+not certified fixed: compare identical scanner settings and scope. Standard finding
+formats are supported; JSON retains the current report's tool and schema.
