@@ -117,7 +117,7 @@ var csSpec = &langSpec{
 		"System.Convert.ToInt32": kAll, "System.Convert.ToInt64": kAll, "System.Convert.ToDouble": kAll, "System.Convert.ToBoolean": kAll,
 		"int.Parse": kAll, "int.TryParse": kAll, "long.Parse": kAll, "Guid.Parse": kAll, "System.Guid.Parse": kAll, "bool.Parse": kAll,
 		"System.Net.WebUtility.HtmlEncode": kXSS, "System.Web.HttpUtility.HtmlEncode": kXSS, "?.Encode": kXSS,
-		"System.Net.WebUtility.UrlEncode": kXSS | kPath | kRedirect | kSSRF, "System.Uri.EscapeDataString": kXSS | kPath | kRedirect | kSSRF,
+		"System.Net.WebUtility.UrlEncode": kXSS, "System.Uri.EscapeDataString": kXSS,
 		"System.IO.Path.GetFileName": kPath, "System.Text.RegularExpressions.Regex.Escape": kRegex,
 		"LocalRedirect": kRedirect,
 	},

@@ -4,10 +4,32 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/securock/securock/internal/sast"
 )
+
+func TestJavaScriptURLEncodingIsNotValidation(t *testing.T) {
+	for _, encoder := range []string{"encodeURI", "encodeURIComponent"} {
+		for _, tt := range []struct {
+			name, body string
+			want       []string
+		}{
+			{"destination host", `fetch('https://' + ENCODE(req.query.host) + '/data');`, []string{"sast:js/ssrf"}},
+			{"redirect host", `res.redirect('https://' + ENCODE(req.query.host) + '/login');`, []string{"sast:js/open-redirect"}},
+			{"parent directory component", `fs.readFile('/srv/files/' + ENCODE(req.query.dir) + '/secret.txt');`, []string{"sast:js/path-traversal"}},
+			{"constant destination", `fetch('https://api.example.com/?q=' + ENCODE('fixed'));`, nil},
+		} {
+			t.Run(encoder+"/"+tt.name, func(t *testing.T) {
+				src := "import * as fs from 'fs';\nfunction handle(req, res) {\n" + strings.ReplaceAll(tt.body, "ENCODE", encoder) + "\n}\n"
+				if got := slices.Compact(analyze(t, map[string]string{"a.js": src})); !slices.Equal(got, tt.want) {
+					t.Fatalf("got %v, want %v", got, tt.want)
+				}
+			})
+		}
+	}
+}
 
 func TestJavaScriptStringGuards(t *testing.T) {
 	for _, tt := range []struct {

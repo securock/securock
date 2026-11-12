@@ -57,7 +57,7 @@ var rubySpec = &langSpec{
 		"?.size": kAll, "?.count": kAll, "h": kXSS, "html_escape": kXSS, "sanitize": kXSS, "strip_tags": kXSS,
 		"CGI.escapeHTML": kXSS, "ERB.Util.html_escape": kXSS, "ERB.Util.h": kXSS, "Rack.Utils.escape_html": kXSS,
 		"Shellwords.escape": kCmd, "?.shellescape": kCmd, "File.basename": kPath,
-		"CGI.escape": kXSS | kPath | kRedirect | kSSRF, "URI.encode_www_form_component": kXSS | kPath | kRedirect | kSSRF,
+		"CGI.escape": kXSS, "URI.encode_www_form_component": kXSS,
 		"?.sanitize_sql_array": kSQL, "?.sanitize_sql_like": kSQL, "?.quote": kSQL, "?.sanitize_sql": kSQL,
 		"Digest.SHA256.hexdigest": kAll, "Digest.MD5.hexdigest": kAll, "SecureRandom.hex": kAll,
 	},

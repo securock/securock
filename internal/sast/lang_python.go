@@ -79,7 +79,7 @@ var pySpec = &langSpec{
 		"shlex.quote": kCmd, "html.escape": kXSS, "markupsafe.escape": kXSS, "flask.escape": kXSS,
 		"django.utils.html.escape": kXSS, "bleach.clean": kXSS, "django.utils.html.strip_tags": kXSS,
 		"os.path.basename": kPath, "werkzeug.utils.secure_filename": kPath,
-		"urllib.parse.quote": kXSS | kPath | kRedirect | kSSRF, "urllib.parse.quote_plus": kXSS | kPath | kRedirect | kSSRF,
+		"urllib.parse.quote": kXSS, "urllib.parse.quote_plus": kXSS,
 		"uuid.UUID": kAll, "ipaddress.ip_address": kAll, "ipaddress.ip_network": kAll,
 		"hashlib.sha256": kAll, "hashlib.md5": kAll, "hashlib.sha1": kAll,
 	},

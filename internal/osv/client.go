@@ -9,6 +9,7 @@ import (
 	"maps"
 	"net/http"
 	"net/url"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -87,8 +88,9 @@ type queryRequest struct {
 }
 
 type queryItem struct {
-	Package queryPackage `json:"package"`
-	Version string       `json:"version"`
+	Package   queryPackage `json:"package"`
+	Version   string       `json:"version"`
+	PageToken string       `json:"page_token,omitempty"`
 }
 
 type queryPackage struct {
@@ -97,17 +99,25 @@ type queryPackage struct {
 }
 
 type queryResponse struct {
-	Results []struct {
-		Vulns []struct {
-			ID       string `json:"id"`
-			Modified string `json:"modified"`
-		} `json:"vulns"`
-	} `json:"results"`
+	Results []*queryResult `json:"results"`
+}
+
+type queryResult struct {
+	Vulns []struct {
+		ID string `json:"id"`
+	} `json:"vulns"`
+	NextPageToken string `json:"next_page_token"`
 }
 
 func (c *HTTPClient) queryBatch(ctx context.Context, deps []ecosystem.Dependency, out map[string][]lockfile.Vulnerability) error {
 	reqBody := queryRequest{Queries: make([]queryItem, 0, len(deps))}
-	for _, dep := range deps {
+	pending := make([]int, len(deps))
+	seenTokens := make([]map[string]bool, len(deps))
+	hits := make([]map[string]bool, len(deps))
+	for i, dep := range deps {
+		pending[i] = i
+		seenTokens[i] = map[string]bool{}
+		hits[i] = map[string]bool{}
 		reqBody.Queries = append(reqBody.Queries, queryItem{
 			Package: queryPackage{
 				Name:      QueryName(dep),
@@ -117,9 +127,60 @@ func (c *HTTPClient) queryBatch(ctx context.Context, deps []ecosystem.Dependency
 		})
 	}
 
+	// Each result has its own cursor. Only unfinished queries are sent again;
+	// pending keeps their original identities as the batch shrinks between pages.
+	for len(pending) > 0 {
+		if err := ctx.Err(); err != nil {
+			return fmt.Errorf("osv query: %w", err)
+		}
+		parsed, err := c.queryPage(ctx, reqBody)
+		if err != nil {
+			return err
+		}
+		if len(parsed.Results) != len(pending) {
+			return fmt.Errorf("osv query: result count %d does not match query count %d", len(parsed.Results), len(pending))
+		}
+		next := queryRequest{}
+		var nextPending []int
+		for i, result := range parsed.Results {
+			if result == nil {
+				return fmt.Errorf("osv query: missing result")
+			}
+			index := pending[i]
+			for _, v := range result.Vulns {
+				if strings.TrimSpace(v.ID) == "" {
+					return fmt.Errorf("osv query: missing vulnerability ID")
+				}
+				hits[index][v.ID] = true
+			}
+			if token := result.NextPageToken; token != "" {
+				if seenTokens[index][token] {
+					return fmt.Errorf("osv query: repeated page token")
+				}
+				seenTokens[index][token] = true
+				q := reqBody.Queries[i]
+				q.PageToken = token
+				next.Queries = append(next.Queries, q)
+				nextPending = append(nextPending, index)
+			}
+		}
+		reqBody, pending = next, nextPending
+	}
+	for i, dep := range deps {
+		ids := slices.Sorted(maps.Keys(hits[i]))
+		vulns := make([]lockfile.Vulnerability, 0, len(ids))
+		for _, id := range ids {
+			vulns = append(vulns, lockfile.Vulnerability{ID: id})
+		}
+		out[identity(dep)] = vulns
+	}
+	return nil
+}
+
+func (c *HTTPClient) queryPage(ctx context.Context, reqBody queryRequest) (queryResponse, error) {
 	raw, err := json.Marshal(reqBody)
 	if err != nil {
-		return err
+		return queryResponse{}, err
 	}
 
 	endpoint := c.Endpoint
@@ -129,7 +190,7 @@ func (c *HTTPClient) queryBatch(ctx context.Context, deps []ecosystem.Dependency
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(raw))
 	if err != nil {
-		return err
+		return queryResponse{}, err
 	}
 	req.GetBody = func() (io.ReadCloser, error) {
 		return io.NopCloser(bytes.NewReader(raw)), nil
@@ -146,36 +207,19 @@ func (c *HTTPClient) queryBatch(ctx context.Context, deps []ecosystem.Dependency
 
 	res, err := httpx.Do(ctx, httpClient, req)
 	if err != nil {
-		return fmt.Errorf("osv query: %w", err)
+		return queryResponse{}, fmt.Errorf("osv query: %w", err)
 	}
 	defer res.Body.Close()
 
 	if res.StatusCode != http.StatusOK {
-		return fmt.Errorf("osv query: unexpected status %s", res.Status)
+		return queryResponse{}, fmt.Errorf("osv query: unexpected status %s", res.Status)
 	}
 
 	var parsed queryResponse
 	if err := json.NewDecoder(res.Body).Decode(&parsed); err != nil {
-		return fmt.Errorf("osv query: %w", err)
+		return queryResponse{}, fmt.Errorf("osv query: %w", err)
 	}
-	if len(parsed.Results) != len(deps) {
-		return fmt.Errorf("osv query: result count %d does not match query count %d", len(parsed.Results), len(deps))
-	}
-
-	for i, dep := range deps {
-		key := identity(dep)
-		vulns := make([]lockfile.Vulnerability, 0, len(parsed.Results[i].Vulns))
-		for _, v := range parsed.Results[i].Vulns {
-			if v.ID == "" {
-				continue
-			}
-			vulns = append(vulns, lockfile.Vulnerability{
-				ID: v.ID,
-			})
-		}
-		out[key] = vulns
-	}
-	return nil
+	return parsed, nil
 }
 
 func identity(dep ecosystem.Dependency) string {

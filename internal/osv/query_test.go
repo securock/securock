@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"slices"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -13,6 +15,117 @@ import (
 	"github.com/securock/securock/internal/ecosystem"
 	"github.com/securock/securock/internal/osv"
 )
+
+func TestQueryPagination(t *testing.T) {
+	t.Setenv("XDG_CACHE_HOME", t.TempDir())
+	type query struct {
+		Package   struct{ Name, Ecosystem string }
+		Version   string
+		PageToken string `json:"page_token"`
+	}
+	var calls int
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var req struct{ Queries []query }
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			t.Error(err)
+			http.Error(w, "bad request", http.StatusBadRequest)
+			return
+		}
+		calls++
+		var wantNames, wantTokens []string
+		var response string
+		switch calls {
+		case 1:
+			wantNames, wantTokens = []string{"first", "clean", "last"}, []string{"", "", ""}
+			response = `{"results":[{"vulns":[{"id":"GHSA-z"}],"next_page_token":"first-1"},{},{"next_page_token":"last-1"}]}`
+		case 2:
+			wantNames, wantTokens = []string{"first", "last"}, []string{"first-1", "last-1"}
+			response = `{"results":[{"vulns":[{"id":"GHSA-a"},{"id":"GHSA-z"}],"next_page_token":"first-2"},{"vulns":[{"id":"MAL-last"}]}]}`
+		case 3:
+			wantNames, wantTokens = []string{"first"}, []string{"first-2"}
+			response = `{"results":[{"vulns":[{"id":"GHSA-b"}]}]}`
+		default:
+			t.Error("unexpected extra request")
+			http.Error(w, "extra request", http.StatusBadRequest)
+			return
+		}
+		var names, tokens []string
+		for _, q := range req.Queries {
+			names, tokens = append(names, q.Package.Name), append(tokens, q.PageToken)
+			if q.Package.Ecosystem != "npm" || q.Version != "1.0.0" {
+				t.Errorf("query lost package identity: %+v", q)
+			}
+		}
+		if !slices.Equal(names, wantNames) || !slices.Equal(tokens, wantTokens) {
+			t.Errorf("queries = %v / %v, want %v / %v", names, tokens, wantNames, wantTokens)
+		}
+		fmt.Fprint(w, response)
+	}))
+	defer srv.Close()
+	var deps []ecosystem.Dependency
+	for _, name := range []string{"first", "clean", "last"} {
+		deps = append(deps, ecosystem.Dependency{Ecosystem: "npm", Name: name, Version: "1.0.0"})
+	}
+	client := &osv.HTTPClient{Endpoint: srv.URL + "/v1/querybatch"}
+	got, err := client.Query(context.Background(), deps)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if calls != 3 {
+		t.Fatalf("requests = %d, want 3", calls)
+	}
+	for i, want := range [][]string{{"GHSA-a", "GHSA-b", "GHSA-z"}, {}, {"MAL-last"}} {
+		vulns, ok := got[ecosystem.Identity(deps[i])]
+		var ids []string
+		for _, v := range vulns {
+			ids = append(ids, v.ID)
+		}
+		if !ok || !slices.Equal(ids, want) {
+			t.Errorf("%s: ids = %v (present %t), want %v", deps[i].Name, ids, ok, want)
+		}
+	}
+}
+
+func TestQueryRejectsIncompleteResults(t *testing.T) {
+	for _, tt := range []struct{ name, response, wantError string }{
+		{"missing result", `{"results":[]}`, "result count"},
+		{"null result", `{"results":[null]}`, "missing result"},
+		{"missing ID", `{"results":[{"vulns":[{}]}]}`, "missing vulnerability ID"},
+		{"null vulnerability", `{"results":[{"vulns":[null]}]}`, "missing vulnerability ID"},
+		{"repeated token", `{"results":[{"next_page_token":"again"}]}`, "repeated page token"},
+		{"token cycle", `{"results":[{"next_page_token":"again"}]}`, "repeated page token"},
+		{"later HTTP failure", "", "unexpected status"},
+		{"later malformed JSON", `{`, "osv query:"},
+		{"later count mismatch", `{"results":[]}`, "result count"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Setenv("XDG_CACHE_HOME", t.TempDir())
+			calls := 0
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				calls++
+				if strings.HasPrefix(tt.name, "later ") && calls == 1 {
+					fmt.Fprint(w, `{"results":[{"vulns":[{"id":"GHSA-first"}],"next_page_token":"next"}]}`)
+					return
+				}
+				if tt.name == "token cycle" && calls == 2 {
+					fmt.Fprint(w, `{"results":[{"next_page_token":"other"}]}`)
+					return
+				}
+				if calls > 4 || tt.response == "" {
+					http.Error(w, "incomplete", http.StatusBadRequest)
+					return
+				}
+				fmt.Fprint(w, tt.response)
+			}))
+			defer srv.Close()
+			client := &osv.HTTPClient{Endpoint: srv.URL + "/v1/querybatch"}
+			got, err := client.Query(context.Background(), []ecosystem.Dependency{{Ecosystem: "npm", Name: "pkg", Version: "1.0.0"}})
+			if err == nil || !strings.Contains(err.Error(), tt.wantError) || got != nil {
+				t.Fatalf("Query = %v, %v; want no result and error containing %q", got, err, tt.wantError)
+			}
+		})
+	}
+}
 
 func TestQuerySendsBatchesTogether(t *testing.T) {
 	// The HTTP cache lives under the user cache dir; keep it out of the real one.

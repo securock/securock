@@ -24,6 +24,11 @@ vulnerabilities (`state: unknown`) are `unknown`, not `trusted`.
 Digest, provenance, signature, capability, and ownership checks are
 optional policy rules and are off by default.
 
+OSV queries follow every result's pagination cursor before recording vulnerability
+and malicious-package evidence as checked. Missing results or advisory IDs,
+repeated pagination cursors, and failures on later pages abort the scan rather
+than treating partial evidence as a clean result.
+
 Policy files are fail-closed: unknown fields, versions, and network
 modes are errors.
 

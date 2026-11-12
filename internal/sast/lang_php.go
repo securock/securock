@@ -66,7 +66,7 @@ var phpSpec = &langSpec{
 		"intval": kAll, "floatval": kAll, "doubleval": kAll, "boolval": kAll, "abs": kAll, "count": kAll, "strlen": kAll,
 		"htmlspecialchars": kXSS, "htmlentities": kXSS, "strip_tags": kXSS, "e": kXSS,
 		"escapeshellarg": kCmd, "escapeshellcmd": kCmd, "basename": kPath,
-		"urlencode": kXSS | kPath | kRedirect | kSSRF, "rawurlencode": kXSS | kPath | kRedirect | kSSRF,
+		"urlencode": kXSS, "rawurlencode": kXSS,
 		"?.quote": kSQL, "md5": kAll, "sha1": kAll, "hash": kAll, "crc32": kAll,
 	},
 	sourceRoots: phpSuperglobal,

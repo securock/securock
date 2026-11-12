@@ -202,6 +202,12 @@ while an integer conversion or a digest clears everything. Test files,
 `vendor`, `node_modules`, `testdata`, build output, and generated files are not
 analyzed.
 
+URL encoding is not destination or path validation. In Go, JavaScript/TypeScript,
+Python, Java, PHP, Ruby and C#, encoded request values remain tracked for SSRF,
+open redirects and path traversal: encoders can preserve attacker-chosen hosts
+and `..` directory components. Validate hosts against an allowlist and verify
+that resolved file paths stay inside the intended directory.
+
 A file that does not parse is reported as `sast:analysis-incomplete`: its
 vulnerabilities are unknown, not absent. A value that passes a strict check and
 then leaves the function on failure (`if !allowed[x] { return }`, or an

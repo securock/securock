@@ -90,7 +90,9 @@ var jsSpec = &langSpec{
 		"?.each": {kind: kSQL, args: []int{0}, recv: dbNames},
 	},
 	sanitizers: map[string]kind{
-		"encodeURIComponent": kXSS | kPath | kRedirect | kSSRF, "encodeURI": kXSS | kPath | kRedirect | kSSRF,
+		// URL encoding preserves attacker-chosen hosts and dot segments; it
+		// does not validate a destination or confine a filesystem path.
+		"encodeURIComponent": kXSS, "encodeURI": kXSS,
 		"path.basename": kPath, "escape-html": kXSS, "he.encode": kXSS, "he.escape": kXSS,
 		"validator.escape": kXSS, "dompurify.sanitize": kXSS, "sanitize-html": kXSS, "xss": kXSS,
 		"lodash.escape": kXSS, "mysql.escape": kSQL, "mysql2.escape": kSQL, "sqlstring.escape": kSQL,

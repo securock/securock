@@ -764,8 +764,12 @@ func (a *analyzer) checkSink(c *ast.CallExpr, name string, s sink, argT []taintS
 		if i >= len(argT) {
 			continue
 		}
+		checked := s.kind
+		if i < len(c.Args) && a.fixedEncodedURL(c.Args[i]) {
+			checked &^= kSSRF | kRedirect
+		}
 		for _, at := range argT[i] {
-			if hit := at.kinds & s.kind; hit != 0 {
+			if hit := at.kinds & checked; hit != 0 {
 				a.reachSink(c.Pos(), name, hit, at, nil)
 			}
 		}
