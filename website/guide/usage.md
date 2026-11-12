@@ -874,3 +874,16 @@ Binary content, submodule content, unreachable objects, reflogs and LFS payloads
 are outside the scan. Detection is pattern-based and does not prove validity.
 `security . --git-history --offline` includes the default HEAD history scan in
 the unified report. Standalone JSON follows `history-report.schema.json`.
+
+## Offline security dashboard
+
+`dashboard issues.json --run before.json --run after.json --as-of 2030-01-03 --output dashboard.html`
+renders a self-contained interactive HTML work queue from lifecycle state and
+validated execution records. Filter by lifecycle state, severity, owner, deadline
+or text; inspect remediation and coverage gaps, and compare observed high-severity
+counts across records supplied in chronological order. Different scope/coverage
+can change counts without an actual risk improvement. Overdue dates use the
+explicit as-of date or stored triage flags, not the viewing computer's clock.
+The report makes no external requests and needs no hosted service, CDN, font,
+JavaScript package or telemetry. User content is escaped and scripts are CSP
+hash-allowlisted. Protect exported HTML as project security data.
