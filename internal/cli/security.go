@@ -1,11 +1,13 @@
 package cli
 
 import (
+	"errors"
 	"fmt"
 	"path/filepath"
 	"time"
 
 	"github.com/securock/securock/internal/audit"
+	"github.com/securock/securock/internal/dast"
 	"github.com/securock/securock/internal/ecosystem"
 	"github.com/securock/securock/internal/exceptions"
 	"github.com/securock/securock/internal/finding"
@@ -19,6 +21,8 @@ func newSecurityCommand(opts *options) *cobra.Command {
 	var failOn string
 	var assumeParams bool
 	var imports []string
+	var targets []string
+	var dastTimeout time.Duration
 	cmd := &cobra.Command{
 		Use:   "security [path]",
 		Short: "Audit dependencies, source code, secrets, and infrastructure together",
@@ -26,7 +30,8 @@ func newSecurityCommand(opts *options) *cobra.Command {
 in one severity-ranked report. Dependency checks use the supported lockfiles in
 the project directory; no securock.lock is required or written. If none is found,
 the report explicitly marks dependency analysis as unchecked. Use --import to
-include other scanners' SARIF results. Exceptions and --fail-on apply to the
+include other scanners' SARIF results, or --target for opt-in live HTTP checks
+(requires allow-all network mode). Exceptions and --fail-on apply to the
 combined report. Operational failures still exit 2, even with --no-fail.`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -41,6 +46,9 @@ combined report. Operational failures still exit 2, even with --no-fail.`,
 			net, err := scanOptions(opts, pol)
 			if err != nil {
 				return err
+			}
+			if err := validateDAST(targets, dastTimeout, net); err != nil {
+				return opErr(err)
 			}
 			cooldown, err := parseAge("", pol.Rules.Health.MinReleaseAge)
 			if err != nil {
@@ -95,6 +103,9 @@ combined report. Operational failures still exit 2, even with --no-fail.`,
 					}
 				}
 			}
+			live, liveErr := scanDAST(cmd.Context(), targets, dastTimeout)
+			found = append(found, live...)
+			scanErr = errors.Join(scanErr, liveErr)
 			if abs, err := filepath.Abs(path); err == nil {
 				finding.RelativeTo(found, abs)
 			}
@@ -116,5 +127,7 @@ combined report. Operational failures still exit 2, even with --no-fail.`,
 	cmd.Flags().StringVar(&failOn, "fail-on", "high", "exit 1 when an unaccepted finding meets this severity: critical, high, medium, low, or info")
 	cmd.Flags().StringArrayVar(&imports, "import", nil, "include a SARIF 2.1.0 report from another scanner (repeatable; - reads stdin)")
 	cmd.Flags().BoolVar(&assumeParams, "assume-params", false, "treat string parameters of otherwise uncalled Go functions as untrusted")
+	cmd.Flags().StringArrayVar(&targets, "target", nil, "also inspect this live HTTP application URL (repeatable; requires --network allow-all)")
+	cmd.Flags().DurationVar(&dastTimeout, "dast-timeout", dast.DefaultTimeout, "total DAST request timeout per target, including redirects")
 	return cmd
 }

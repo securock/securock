@@ -14,6 +14,31 @@ public file provenance.
 > Canonical source:
 > [`docs/privacy.md`](https://github.com/securock/securock/blob/main/docs/privacy.md).
 
+## Live application checks (DAST)
+
+`securock dast URL...` and `securock security --target URL` contact only the
+application URLs you explicitly supply and redirects within the same scheme,
+host, and effective port. These checks require `--network allow-all` or the
+same mode in the selected policy. `--offline` and `--network offline` always
+refuse DAST before contacting a target; `public-only` also refuses it, even if
+the application happens to share a public registry host. The registry allowlist
+is a filter for public-only dependency evidence, not an application target
+allowlist. Allow-all bypasses that registry filter for dependency evidence.
+
+DAST sends GET requests with a `securock-dast` user agent. It follows at most
+five redirects per target, uses a total timeout of 15 seconds per target by
+default, and keeps normal TLS certificate verification and environment proxy
+settings. It does not crawl links, submit forms, inject payloads, authenticate,
+replay response cookies, or cache responses. Reports retain the target URL and
+cookie names, but not response bodies, cookie values, or raw response headers.
+Targets and redirects with URL credentials, query parameters, or fragments
+are refused. Target paths appear in reports, so do not put credentials in paths.
+
+Use a staging or other application you are authorized to inspect. Even a GET
+can trigger application-specific behavior. For `security --target`, allow-all
+also applies to dependency evidence as described below; use standalone `dast`
+when you only want live application checks.
+
 ## Default: public-only
 
 The default network mode is `public-only`. Securock only queries:

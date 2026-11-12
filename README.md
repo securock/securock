@@ -266,6 +266,7 @@ Cargo under [`examples/`](examples/).
 | `securock graph`   | Draw the dependency graph colored by trust status           |
 | `securock audit`   | Report dependency findings by severity                      |
 | `securock security` | Audit dependencies, source code, secrets, and infrastructure together |
+| `securock dast` | Inspect live HTTP transport, security headers, and cookies |
 | `securock sast`    | Find vulnerabilities in your own source code                |
 | `securock chain`   | Correlate source findings into attack chains                |
 | `securock import`  | Bring another tool's SARIF results under securock's policy  |
@@ -274,6 +275,30 @@ Cargo under [`examples/`](examples/).
 | `securock accept`  | Accept a finding until a date, with a reason                |
 | `securock vex`     | Export accepted vulnerabilities as OpenVEX or CycloneDX VEX |
 | `securock version` | Print the build version                                     |
+
+### Live application checks (DAST)
+
+Inspect explicitly selected URLs with bounded GET requests:
+
+```sh
+securock dast https://app.example.com/ --network allow-all
+securock dast https://app.example.com/ --network allow-all --timeout 10s --format json
+securock security . --target https://app.example.com/ --network allow-all
+```
+
+DAST checks unencrypted HTTP, HTTPS HSTS, HTML CSP and framing protection,
+HTML nosniff and referrer headers, and Cookie Secure/HttpOnly/SameSite attributes.
+These are response-configuration findings, not proof of exploitable XSS or CSRF.
+It uses the existing exceptions, severity thresholds, and output formats.
+DAST JSON uses `schemas/dast-report.schema.json`; combined results use the
+security report schema. Cookie values and response bodies are not reported.
+
+DAST requires allow-all mode and refuses offline/public-only mode. It never
+crawls, submits forms, sends injection payloads, or authenticates. Up to five
+same-origin redirects are followed; cross-origin redirects, HTTP errors,
+timeouts, and TLS failures produce incomplete-analysis findings and exit `2`,
+even with `--no-fail`. Target URLs cannot contain credentials, queries, or
+fragments. See [Privacy](docs/privacy.md#live-application-checks-dast).
 
 ### Flags
 

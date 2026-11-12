@@ -20,6 +20,7 @@ securock explain PACKAGE [path]
 securock graph [path]
 securock audit [path]
 securock security [path]
+securock dast URL...
 securock sast [path]
 securock chain [path]
 securock doctor [path]
@@ -50,6 +51,7 @@ securock version
 | `graph`    | Draw the dependency graph colored by trust status                         | [graph](#graph)                                             |
 | `audit`    | Report dependency findings ranked by severity                             | [audit](#audit)                                             |
 | `security` | Combine dependency, source, secret, infrastructure, and imported findings | [security](#security)                                       |
+| `dast`     | Inspect live HTTP transport, security headers, and cookies                | [Live application checks](#live-application-checks-dast)    |
 | `sast`     | Find vulnerabilities in your own source code                              | [Source code analysis](/guide/sast)                         |
 | `chain`    | Correlate source findings into attack chains                              | [Source code analysis](/guide/sast)                         |
 | `import`   | Bring another tool's SARIF results under securock's policy                | [import](#import)                                           |
@@ -58,6 +60,61 @@ securock version
 | `accept`   | Accept a finding until a date, with a reason                              | [Triage and exports](/guide/reports#accept-findings)        |
 | `vex`      | Export accepted vulnerabilities as OpenVEX or CycloneDX VEX               | [Triage and exports](/guide/reports#vex-export)             |
 | `version`  | Print the build version                                                   |                                                             |
+
+## Live application checks (`dast`)
+
+```sh
+securock dast https://app.example.com/ --network allow-all
+securock dast https://app.example.com/login --network allow-all --timeout 10s
+securock dast https://app.example.com/ --network allow-all --format sarif --output dast.sarif
+securock security . --target https://app.example.com/ --network allow-all --dast-timeout 10s
+```
+
+`dast URL...` inspects one or more explicit URLs. `security --target URL` adds
+live checks to the unified static/dependency report; repeat `--target` to
+inspect more endpoints. `--timeout` on `dast` and `--dast-timeout` on `security`
+set a positive total timeout per target (default `15s`, including redirects).
+Without `--target`, `security` does not run DAST.
+
+Checks include:
+
+- Unencrypted HTTP and missing or disabled HTTPS HSTS.
+- HTML responses without enforced CSP, framing protection, nosniff, or an
+  explicit Referrer-Policy. Report-only CSP does not count as enforced CSP.
+- Cookies without Secure, HttpOnly, or explicit SameSite, and SameSite=None
+  cookies without Secure. Review cookie findings against the intended use;
+  JavaScript-accessible cookies may be intentional.
+
+This initial DAST implementation inspects response headers. It does not execute
+JavaScript, crawl, authenticate, submit forms, test injection payloads, or prove
+exploitability. Responses without HTML Content-Type are not checked for HTML
+headers. It only observes cookies set on the requested response and redirects.
+It is not an exhaustive test of the application's routes or vulnerabilities.
+
+Both entry points require `--network allow-all` (or that mode in the policy).
+Offline and public-only modes refuse all target requests. URL credentials,
+queries, and fragments are rejected. Redirects stay within the original scheme,
+host, and effective port, with a limit of five; even HTTP-to-HTTPS redirects
+require scanning the final URL explicitly. TLS verification remains enabled.
+No response bodies or cookie values are retained. See [Privacy](/reference/privacy#live-application-checks-dast).
+
+`--fail-on` defaults to `high`; `--no-fail` suppresses severity failures only.
+Network/TLS failures, exhausted redirects, out-of-scope redirects, and non-2xx
+final responses (including login-required and not-found responses) produce
+`dast:analysis-incomplete` and exit `2`. Completed results remain in the report,
+including source findings in `security --target`. Every supplied target is
+attempted even if an earlier target fails. Exceptions are loaded from the
+current directory for `dast` and from the selected project for `security`;
+`--exceptions` overrides either. Accept a live finding with its URL as subject:
+
+```sh
+securock accept dast:unencrypted-http --subject http://localhost:8080/ --reason 'Local development server' --expires 30d
+```
+
+Text, JSON (`dast-report.schema.json`), SARIF, JUnit, and Markdown formats are
+supported. `--output` writes reports even when findings or incomplete scans
+cause failure. Accepting an incomplete finding never suppresses the exit-2
+operational error.
 
 ## The core commands
 
