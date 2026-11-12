@@ -528,3 +528,11 @@ external scans whose environment variable is unset, while the harness unit tests
 always run offline. No source is fetched from inside a Go test. Updating an input
 requires reviewing its revision, SHA-256, label rationale, line range, measurements
 and regression expectations together.
+
+## Go package initialization regressions
+
+Go API-misuse checks also inspect package-level declarations and initializer
+closures, including TLS configurations created before `main` or a handler runs.
+Repository regressions pair disabled verification and weak TLS minimums with
+safe settings and string decoys. These are development tests, not an independent
+accuracy evaluation and do not change the OWASP measurements above.

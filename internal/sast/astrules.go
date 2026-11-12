@@ -73,11 +73,12 @@ func astRules(fset *token.FileSet, p *pkg, rel func(token.Pos) string) []finding
 	r := &reporter{fset: fset, rel: rel}
 	for _, f := range p.files {
 		for _, d := range f.Decls {
-			fd, ok := d.(*ast.FuncDecl)
-			if !ok {
+			r.fn = "<package>"
+			if fd, ok := d.(*ast.FuncDecl); ok {
+				r.fn = declName(fd)
+			} else if gd, ok := d.(*ast.GenDecl); !ok || gd.Tok == token.IMPORT {
 				continue
 			}
-			r.fn = declName(fd)
 			checked := map[types.Object]bool{}
 			reported := map[token.Pos]bool{}
 			weak := func(pos token.Pos, name string) {
@@ -86,7 +87,7 @@ func astRules(fset *token.FileSet, p *pkg, rel func(token.Pos) string) []finding
 					r.add(pos, ruleInsecureRandom, name+" is predictable and is used to make a "+secretWord(r.fn))
 				}
 			}
-			ast.Inspect(fd, func(n ast.Node) bool {
+			ast.Inspect(d, func(n ast.Node) bool {
 				switch n := n.(type) {
 				case *ast.CallExpr:
 					name := ""
