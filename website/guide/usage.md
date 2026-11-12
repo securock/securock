@@ -1036,3 +1036,21 @@ provenance or exploitability. Tag-only desired images are not reported as verifi
 runtime digests. Init/ephemeral containers and non-Kubernetes deployments remain
 outside this collector. Repository discovery is bounded to 1,000 repos and pod
 imports to 10,000 pods.
+
+## API authorization DAST
+
+`dast-auth https://staging.example/api matrix.json --network allow-all` tests
+explicit GET-only object/role contracts with independent actor credentials.
+The version-1 matrix contains `actors` (`id`, `bearer_env`, `anonymous`) and
+`cases` (`id`, concrete `path`, `allow`/`deny` actor IDs, `pointer`, `expected`).
+Each allowed actor must first return 2xx JSON with the expected value at the
+JSON pointer. Only then are forbidden actors tested. Their 2xx responses are
+high findings; 401/403/404 are observed denials. Redirects, failed controls,
+server errors and oversized responses make coverage incomplete (exit 2).
+
+Use test-owned records and staging accounts. Paths must remain under the explicit
+base path; no queries, forms, mutations or redirects are used. TLS is required
+except literal loopback fixtures. Tokens come only from environment variables;
+bodies, expected values and credentials are absent from findings. Output uses
+`dast-report.schema.json`. These tests validate configured contracts, not every
+API or every business-logic authorization path.

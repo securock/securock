@@ -274,3 +274,12 @@ with the current context and operator credentials to read pods across namespaces
 Offline mode refuses live collection; `--pods` reads an existing local export.
 Only inventory JSON is retained; reports include namespace/pod/service-account
 identities and image digests. Treat exports as sensitive infrastructure data.
+
+## Authorization matrix tests
+
+`dast-auth` requires explicit allow-all networking and sends separate bearer
+credentials for the configured test actors to GET paths under the supplied base
+URL. It never redirects or replays cookies. HTTPS is required except literal
+loopback fixtures. Response JSON is checked in memory against the local contract;
+response bodies and expected values are not written to reports. Offline refuses
+all requests. Use operator-approved staging records, paths and accounts.
