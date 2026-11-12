@@ -967,3 +967,23 @@ or errors. Update consumers through your secret manager; this command cannot
 atomically update external applications. Provider changes can already have taken
 effect on communication/write failure: reconcile in the provider console.
 JSON follows `credential-report.schema.json`; all operations refuse offline.
+
+## Measured accuracy release gates
+
+`quality suite.json --fixture-root fixtures --offline` runs reproducible offline
+security/CSPM fixtures using the integration suite format. `expected` labels
+positive rule IDs and `forbidden` labels negative rule IDs per fixture. The report
+counts TP/FP/FN/TN at the rule-per-fixture level, not per finding, and includes
+unlabeled findings and operational/incomplete results. Unlabeled observations
+and incomplete coverage fail the gate; undefined precision/recall remain null.
+Default precision/recall thresholds are 1; set explicit pilot-specific thresholds
+with `--min-precision`/`--min-recall`. These fixture scores do not establish
+real-world accuracy on all repositories. Include representative vulnerable and
+non-vulnerable customer patterns and independently review ground truth.
+
+Fixture bytes, relative paths and suite configuration are fingerprinted, and
+the actual executable SHA-256 is recorded. `--baseline previous.json` refuses
+changed fixtures and fails increased false positives/negatives. All local inputs
+must be within the fingerprint root; symlinks and oversized fixtures are rejected.
+Live provider/browser validation stays in `integration`, separately from this
+repeatable source/cloud-export benchmark. JSON follows `quality-report.schema.json`.

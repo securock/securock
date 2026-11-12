@@ -1,0 +1,80 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://securock.dev/schema/quality-report.schema.json",
+  "type": "object",
+  "required": [
+    "version",
+    "fixture_digest",
+    "engine",
+    "tp",
+    "fp",
+    "fn",
+    "tn",
+    "precision",
+    "recall",
+    "results",
+    "passed"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "version": {
+      "const": 1
+    },
+    "fixture_digest": {
+      "type": "string"
+    },
+    "engine": {
+      "type": "string"
+    },
+    "tp": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "fp": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "fn": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "tn": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "precision": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "minimum": 0,
+      "maximum": 1
+    },
+    "recall": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "minimum": 0,
+      "maximum": 1
+    },
+    "results": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "name",
+          "tp",
+          "fp",
+          "fn",
+          "tn",
+          "unlabeled",
+          "incomplete"
+        ]
+      }
+    },
+    "passed": {
+      "type": "boolean"
+    }
+  }
+}

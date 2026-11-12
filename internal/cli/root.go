@@ -89,6 +89,7 @@ func NewRoot(version, commit, date string) *cobra.Command {
 	root.AddCommand(newPrioritizeCommand(opts))
 	root.AddCommand(newEnforceCommand(opts))
 	root.AddCommand(newIntegrationCommand(opts))
+	root.AddCommand(newQualityCommand(opts))
 	root.AddCommand(newHistoryCommand(opts))
 	root.AddCommand(newCredentialCommand(opts))
 	root.AddCommand(newProtectCommand(opts))
