@@ -151,3 +151,22 @@ func TestDASTAttemptsAllTargetsAfterFailure(t *testing.T) {
 		t.Fatalf("results lost: %s", raw)
 	}
 }
+
+func TestDASTBearerAndOpenAPI(t *testing.T) {
+	isolateHome(t)
+	t.Setenv("SCAN_TEST_TOKEN", "fixture-token")
+	var hits atomic.Int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		hits.Add(1)
+		if r.Header.Get("Authorization") != "Bearer fixture-token" {
+			t.Error("missing auth")
+		}
+	}))
+	defer srv.Close()
+	spec := filepath.Join(t.TempDir(), "api.json")
+	os.WriteFile(spec, []byte(`{"openapi":"3.0.0","paths":{"/health":{"get":{}}}}`), 0600)
+	raw := runCLI(t, "dast", srv.URL, "--network", "allow-all", "--bearer-env", "SCAN_TEST_TOKEN", "--openapi", spec, "--no-fail", "--format", "json")
+	if hits.Load() != 2 || strings.Contains(string(raw), "fixture-token") {
+		t.Fatal("missing requests or leaked token")
+	}
+}

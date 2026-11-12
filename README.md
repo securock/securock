@@ -558,3 +558,19 @@ the project. Review patches before `git apply --unidiff-zero`; source files are
 never automatically changed. `--verify` reruns offline SAST, emits its full report
 and gates new high source findings. It does not certify dependency, cloud or DAST
 remediation: rerun their original commands with identical scopes.
+
+## Extended DAST
+
+`securock dast https://app.example/ --network allow-all --bearer-env APP_TOKEN`
+reads authentication from the environment without writing it to reports.
+`--openapi api.json` expands up to 100 static GET paths from local OpenAPI 3 JSON;
+parameterized paths are explicitly reported as incomplete. Only the supplied
+origin is used; OpenAPI server declarations cannot redirect scans.
+`--browser` additionally uses installed Node.js, Playwright and Chromium to inspect
+rendered forms. Browser requests are limited to 100 same-origin GET/HEAD requests;
+mutating, cross-origin and WebSocket requests are blocked and reported as gaps.
+Browser or dependency failures exit 2. This executes application JavaScript and
+therefore belongs on authorized test environments. Existing header-only DAST
+remains available without browser dependencies.
+
+Set `SECUROCK_CHROMIUM_PATH` to use an existing Chromium executable instead of Playwright's bundled browser.

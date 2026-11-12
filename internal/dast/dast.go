@@ -22,7 +22,8 @@ type Options struct {
 	URL     string
 	Timeout time.Duration
 	// Client permits local TLS fixtures; production callers use the default transport.
-	Client *http.Client
+	Client      *http.Client
+	BearerToken string
 }
 
 // ValidateURL rejects credentials and queries so reports and errors cannot expose them.
@@ -83,6 +84,9 @@ func Scan(ctx context.Context, opts Options) (finding.Report, error) {
 			return incomplete("Could not construct the target request.")
 		}
 		req.Header.Set("User-Agent", "securock-dast")
+		if opts.BearerToken != "" {
+			req.Header.Set("Authorization", "Bearer "+opts.BearerToken)
+		}
 		req.Header.Set("Accept", "text/html,application/xhtml+xml,application/json;q=0.9,*/*;q=0.5")
 		resp, err := client.Do(req)
 		if err != nil {

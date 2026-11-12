@@ -220,3 +220,12 @@ vulnerability database repositories (normally ghcr.io). Local offline archives
 disable database updates and version checks and require preinstalled databases.
 Trivy manages registry authentication; Securock does not accept credential flags.
 Raw scanner stderr is not copied into reports.
+
+## Authenticated and browser DAST
+
+Explicit `dast --bearer-env NAME` forwards that environment variable as a bearer
+token to the chosen origin only. It is not written to reports or command arguments.
+`--browser` executes application JavaScript in installed Playwright Chromium;
+request interception blocks other origins, mutating methods, WebSockets and
+requests beyond 100. Service workers are blocked. Browser errors are reported
+as incomplete scans; raw browser diagnostics are not included.
