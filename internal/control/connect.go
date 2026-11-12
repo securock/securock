@@ -63,6 +63,37 @@ func (s *Server) connector(tenant, id string) (Connector, bool) {
 	return Connector{}, false
 }
 func (s *Server) deliveryAPI(w http.ResponseWriter, r *http.Request, p identity.Principal) bool {
+	if strings.HasPrefix(r.URL.Path, "/api/v1/deliveries/") && strings.HasSuffix(r.URL.Path, "/reconcile") && r.Method == "POST" {
+		if !p.Can("admin") {
+			reply(w, 403, nil)
+			return true
+		}
+		var req struct {
+			RemoteID string `json:"remote_id"`
+		}
+		if decode(w, r, &req) != nil || !identity.ValidID(req.RemoteID) {
+			reply(w, 400, nil)
+			return true
+		}
+		id := strings.TrimSuffix(strings.TrimPrefix(r.URL.Path, "/api/v1/deliveries/"), "/reconcile")
+		e := s.Store.UpdateAs(p, "delivery.reconcile", func(st *State) error {
+			d, ok := st.Tenants[p.Tenant].Deliveries[id]
+			if !ok || d.Kind != "issue" || !slices.Contains([]string{"uncertain", "sending", "failed"}, d.Status) {
+				return fmt.Errorf("delivery is not reconcilable")
+			}
+			d.RemoteID = req.RemoteID
+			d.Status = "reconciling"
+			d.Next = ""
+			st.Tenants[p.Tenant].Deliveries[id] = d
+			return nil
+		})
+		if e != nil {
+			reply(w, 409, nil)
+		} else {
+			reply(w, 202, map[string]string{"status": "reconciling"})
+		}
+		return true
+	}
 	if strings.HasPrefix(r.URL.Path, "/api/v1/deliveries/") && r.Method == "PUT" {
 		if !p.Can("integration") {
 			reply(w, 403, nil)
@@ -150,6 +181,7 @@ func (s *Server) deliveryAPI(w http.ResponseWriter, r *http.Request, p identity.
 	return true
 }
 func remotePath(c Connector, d Delivery, poll bool) (string, any, error) {
+	body := d.Body + "\n\nsecurock-delivery:" + d.ID
 	project := url.PathEscape(c.Project)
 	id := url.PathEscape(d.RemoteID)
 	if poll {
@@ -169,30 +201,30 @@ func remotePath(c Connector, d Delivery, poll bool) (string, any, error) {
 		prefix := "/repos/" + strings.ReplaceAll(project, "%2F", "/")
 		switch d.Kind {
 		case "pull":
-			return prefix + "/pulls", map[string]any{"title": d.Title, "body": d.Body, "head": d.Branch, "base": d.Base}, nil
+			return prefix + "/pulls", map[string]any{"title": d.Title, "body": body, "head": d.Branch, "base": d.Base}, nil
 		case "check":
-			return prefix + "/check-runs", map[string]any{"name": d.Title, "head_sha": d.Commit, "status": "completed", "conclusion": d.Result, "output": map[string]string{"title": d.Title, "summary": d.Body}}, nil
+			return prefix + "/check-runs", map[string]any{"name": d.Title, "head_sha": d.Commit, "status": "completed", "conclusion": d.Result, "output": map[string]string{"title": d.Title, "summary": body}}, nil
 		default:
-			return prefix + "/issues", map[string]string{"title": d.Title, "body": d.Body}, nil
+			return prefix + "/issues", map[string]string{"title": d.Title, "body": body}, nil
 		}
 	case "gitlab":
 		prefix := "/projects/" + project
 		switch d.Kind {
 		case "pull":
-			return prefix + "/merge_requests", map[string]string{"title": d.Title, "description": d.Body, "source_branch": d.Branch, "target_branch": d.Base}, nil
+			return prefix + "/merge_requests", map[string]string{"title": d.Title, "description": body, "source_branch": d.Branch, "target_branch": d.Base}, nil
 		case "check":
 			state := "success"
 			if d.Result == "failure" {
 				state = "failed"
 			}
-			return prefix + "/statuses/" + url.PathEscape(d.Commit), map[string]string{"state": state, "name": d.Title, "description": d.Body}, nil
+			return prefix + "/statuses/" + url.PathEscape(d.Commit), map[string]string{"state": state, "name": d.Title, "description": body}, nil
 		default:
-			return prefix + "/issues", map[string]string{"title": d.Title, "description": d.Body}, nil
+			return prefix + "/issues", map[string]string{"title": d.Title, "description": body}, nil
 		}
 	case "jira":
-		return "/rest/api/3/issue", map[string]any{"fields": map[string]any{"project": map[string]string{"key": c.Project}, "summary": d.Title, "issuetype": map[string]string{"name": "Task"}, "description": map[string]any{"type": "doc", "version": 1, "content": []any{map[string]any{"type": "paragraph", "content": []any{map[string]string{"type": "text", "text": d.Body}}}}}}}, nil
+		return "/rest/api/3/issue", map[string]any{"fields": map[string]any{"project": map[string]string{"key": c.Project}, "summary": d.Title, "issuetype": map[string]string{"name": "Task"}, "description": map[string]any{"type": "doc", "version": 1, "content": []any{map[string]any{"type": "paragraph", "content": []any{map[string]string{"type": "text", "text": body}}}}}}}, nil
 	case "servicenow":
-		return "/api/now/table/incident", map[string]string{"short_description": d.Title, "description": d.Body, "correlation_id": "securock-" + d.ID}, nil
+		return "/api/now/table/incident", map[string]string{"short_description": d.Title, "description": body, "correlation_id": "securock-" + d.ID}, nil
 	}
 	return "", nil, fmt.Errorf("unsupported provider")
 }
@@ -214,7 +246,7 @@ func (s *Server) Dispatch(ctx context.Context) error {
 		slices.Sort(ids)
 		for _, id := range ids {
 			d := t.Deliveries[id]
-			poll := d.Status == "delivered" && d.Kind == "issue"
+			poll := (d.Status == "delivered" || d.Status == "reconciling") && d.Kind == "issue"
 			next, _ := time.Parse(time.RFC3339, d.Next)
 			if d.Status != "queued" && !poll || next.After(time.Now()) {
 				continue
@@ -317,10 +349,23 @@ func (s *Server) Dispatch(ctx context.Context) error {
 					callErr = fmt.Errorf("invalid provider response")
 				}
 			}
+			if d.Status == "reconciling" && callErr == nil && status >= 200 && status < 300 {
+				raw, _ := json.Marshal(data)
+				marker := "securock-delivery:" + d.ID
+				if c.Provider == "servicenow" {
+					marker = "securock-" + d.ID
+				}
+				if !bytes.Contains(raw, []byte(marker)) {
+					callErr = fmt.Errorf("remote delivery marker mismatch")
+				}
+			}
 			e = s.Store.UpdateAs(p, "delivery.result", func(st *State) error {
 				v := st.Tenants[tenant].Deliveries[id]
 				v.Next = time.Now().Add(5 * time.Minute).UTC().Format(time.RFC3339)
 				if callErr != nil || status < 200 || status >= 300 {
+					if v.Status == "reconciling" {
+						v.Status = "uncertain"
+					}
 					if !poll {
 						v.Status = "uncertain"
 						if status == 429 && v.Attempts < 3 {
@@ -331,7 +376,7 @@ func (s *Server) Dispatch(ctx context.Context) error {
 						}
 					}
 				} else {
-					if !poll {
+					if !poll || v.Status == "reconciling" {
 						v.Status = "delivered"
 					}
 					switch c.Provider {

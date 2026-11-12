@@ -1051,3 +1051,13 @@ through your existing collector/SIEM, restrict access and set a retention period
 These request logs complement signed mutation audits; they are not themselves
 an append-only signed audit store. Membership checks read only identity data,
 not every tenant's stored scan payload.
+
+## Reconciling uncertain external writes
+
+Issue creation includes a unique `securock-delivery:ID` marker (ServiceNow also
+uses its correlation ID). After checking an ambiguous/sending issue in the remote
+system, an admin can `POST /api/v1/deliveries/ID/reconcile` with `remote_id`.
+The worker performs a read-only provider lookup and requires the matching marker
+before accepting the remote ID/state. Missing or mismatched objects remain
+uncertain. This does not replay a create. PR/check reconciliation remains a
+manual provider-side operation; those uncertain records are never auto-replayed.
