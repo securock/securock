@@ -926,3 +926,25 @@ Keep signing keys in trusted CI/secret infrastructure; protect catalog updates
 and externally retain signer revocations/checkpoints. JSON uses the release
 attestation/catalog/impact schemas, inventory schema for link, and release
 finding schema for drift. No command contacts an external service.
+
+## Secret push protection
+
+Run `protect . --offline` in a pre-commit hook to inspect changed regular text
+blobs in the Git index, including document files. It blocks high credential
+patterns even with `--no-fail`; repairing credentials is the default path.
+On a self-hosted Git server, use `protect REPO --pre-receive --offline` and pipe
+the receive hook's old/new/ref lines to stdin. Received commits must be fully
+materialized; full reachable text history (including legacy secrets) is scanned.
+It supports at most 100 received refs and bounded history/blobs. Large text blobs
+fail incomplete. Binary files, symlinks, submodules and LFS payloads are outside
+this pattern scanner; absence of findings does not establish their safety.
+Hosted GitHub/GitLab instances need their supported server enforcement mechanism;
+a local hook alone can be bypassed by clients. No hooks are installed implicitly.
+
+Findings contain redacted metadata and an exact approval-artifact digest. Optional
+`--server https://control.example --network allow-all` fetches authenticated
+approvals; only a matching rule/artifact, separate reviewer and unexpired approved
+status suppress a block. Unavailable authority fails closed. This is an exact
+exception to one finding identity, not a reusable bypass token. No credential
+validation, remote fetch, rotation or history rewrite is performed by `protect`.
+JSON follows `protect-report.schema.json`.

@@ -290,3 +290,11 @@ all requests. Use operator-approved staging records, paths and accounts.
 remotes plus installed GitHub/GitLab CLI authentication to push a branch and
 create a PR/MR. Only explicit publication performs remote writes. Local test
 commands are operator-trusted executables, not network-sandboxed by Securock.
+
+## Secret enforcement exceptions
+
+`protect --server ... --network allow-all` reads approved exception metadata
+from the configured HTTPS control-plane origin (literal loopback HTTP is permitted
+for tests). No matched secrets or Git blobs are sent. Offline protection is local
+and cannot fetch online exceptions. Git receive quarantine variables are inherited;
+lazy fetch and interactive Git prompts are disabled.
