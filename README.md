@@ -129,8 +129,9 @@ jobs:
           command: all
 ```
 
-`all` runs `scan`, `diff`, and `verify`. The action also supports source
-analysis, SARIF uploads, SBOM exports, and PR reports through separate options.
+`all` runs `scan`, `diff`, and `verify`. Set `command: security` for the unified
+report of dependencies, source, secrets, and infrastructure. The action also
+supports SARIF uploads, SBOM exports, and PR reports through separate options.
 See the [action guide](website/guide/action.md) for configuration and permissions.
 
 ## Supported ecosystems

@@ -67,7 +67,7 @@ if [ "$scorecard" = "true" ]; then
   audit_flags+=(--scorecard)
 fi
 
-# Flags only sast understands. The reports are named relative to where the job started, which
+# Flags the source analysis commands (sast, security) understand. The reports are named relative to where the job started, which
 # is not where this script runs, so relative paths are anchored there.
 sast_flags=()
 while IFS= read -r file; do
@@ -119,6 +119,11 @@ case "$command" in
   sast)
     run_cmd "securock sast" securock sast ${sast_flags[@]+"${sast_flags[@]}"}
     ;;
+  security)
+    # One report for dependencies, source, secrets and infrastructure. It is not part of
+    # all, which keeps running scan, diff and verify for existing workflows.
+    run_cmd "securock security" securock security ${sast_flags[@]+"${sast_flags[@]}"}
+    ;;
   both)
     # Drift-only path for callers that intentionally skip current-state
     # policy checks (for example offline fixtures with unknown evidence).
@@ -143,12 +148,12 @@ esac
 # Optional artifacts. They are written from the directory the job started in, so paths in
 # the SARIF report are relative to the repository root, which code scanning needs.
 if [ -n "$sarif_file" ]; then
-  # The code scanning report matches the command: source findings for sast, dependency
-  # findings for everything else.
+  # The code scanning report matches the command: source findings for sast, the unified
+  # report for security, dependency findings for everything else.
   sarif_cmd=audit
   sarif_flags=(${audit_flags[@]+"${audit_flags[@]}"})
-  if [ "$command" = "sast" ]; then
-    sarif_cmd=sast
+  if [ "$command" = "sast" ] || [ "$command" = "security" ]; then
+    sarif_cmd="$command"
     sarif_flags=(${sast_flags[@]+"${sast_flags[@]}"})
   fi
   # --no-fail: the report is for code scanning; the step above decides pass or fail.

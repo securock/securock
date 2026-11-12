@@ -9,7 +9,7 @@ inputs:
     description: Project directory
     default: "."
   command:
-    description: "scan, verify, diff, audit, sast, both (diff+verify), or all (scan+diff+verify)"
+    description: "scan, verify, diff, audit, sast, security (dependencies, source, secrets and infrastructure in one report), both (diff+verify), or all (scan+diff+verify)"
     default: all
   policy:
     description: Path to a policy file (mutually exclusive with profile)
@@ -30,7 +30,7 @@ inputs:
     description: "audit only: pass --prioritize, so vulnerabilities in CISA KEV or with an EPSS score of 50% or more are raised (sends CVE IDs to OSV, CISA and FIRST)"
     default: "false"
   import-sarif:
-    description: "sast only: SARIF reports from other scanners to merge into the sast report, one path per line, relative to the repository root"
+    description: "sast and security only: SARIF reports from other scanners to merge into the sast report, one path per line, relative to the repository root"
     default: ""
   scorecard:
     description: "audit only: pass --scorecard, so the per-check minimums in rules.health.scorecard_checks are applied (sends package names to deps.dev)"
@@ -39,7 +39,7 @@ inputs:
     description: "audit only: report packages whose source repository has an OpenSSF Scorecard below this score (0 to 10), such as 5 (sends package names to deps.dev)"
     default: ""
   sarif:
-    description: Upload an audit report (a sast report when command is sast) to GitHub code scanning (needs security-events write permission)
+    description: Upload an audit report (a sast or security report when command is sast or security) to GitHub code scanning (needs security-events write permission)
     default: "false"
   sbom:
     description: Write the lockfile as a CycloneDX SBOM and return its path in the sbom-file output

@@ -65,6 +65,20 @@ case "${1:-}" in
     fi
     echo "sast ok"
     ;;
+  security)
+    prev=""
+    for arg in "$@"; do
+      if [ "$prev" = "--output" ]; then
+        echo '{"version":"2.1.0"}' >"$arg"
+      fi
+      prev="$arg"
+    done
+    if [ "${FAIL_SECURITY:-0}" = 1 ]; then
+      echo "security failed" >&2
+      exit 1
+    fi
+    echo "security ok"
+    ;;
   sbom)
     if [ "${FAIL_SBOM:-0}" = 1 ]; then
       echo "sbom failed" >&2
@@ -242,6 +256,24 @@ run_case sast_sarif env COMMAND=sast MIN_RELEASE_AGE=7d SARIF_FILE="$tmp/sast_sa
 assert_contains "$tmp/sast_sarif/calls" "args:sast . --format sarif --output $tmp/sast_sarif/out.sarif --no-fail"
 assert_not_contains "$tmp/sast_sarif/calls" "args:audit"
 assert_contains "$tmp/sast_sarif/github_output" "sarif-file=$tmp/sast_sarif/out.sarif"
+# security is its own command: the unified report, with import and the shared flags, and
+# none of the audit-only flags. all keeps running scan, diff and verify only.
+run_case security env COMMAND=security OFFLINE=true MIN_RELEASE_AGE=7d IMPORT_SARIF=reports/a.sarif \
+  bash "$root/action/run.sh"
+assert_contains "$tmp/security/calls" "args:security --import $PWD/reports/a.sarif --offline"
+assert_not_contains "$tmp/security/calls" "--min-release-age"
+assert_contains "$tmp/security/github_output" "failed=false"
+run_case security_fail env COMMAND=security FAIL_SECURITY=1 \
+  bash "$root/action/run.sh"
+assert_contains "$tmp/security_fail/github_output" "failed=true"
+run_case security_sarif env COMMAND=security SARIF_FILE="$tmp/security_sarif/out.sarif" \
+  bash "$root/action/run.sh"
+assert_contains "$tmp/security_sarif/calls" "args:security . --format sarif --output $tmp/security_sarif/out.sarif --no-fail"
+assert_not_contains "$tmp/security_sarif/calls" "args:audit"
+assert_contains "$tmp/security_sarif/github_output" "sarif-file=$tmp/security_sarif/out.sarif"
+run_case all_without_security env COMMAND=all \
+  bash "$root/action/run.sh"
+assert_not_contains "$tmp/all_without_security/calls" "args:security"
 run_case sarif_off env COMMAND=scan \
   bash "$root/action/run.sh"
 assert_not_contains "$tmp/sarif_off/calls" "--format sarif"
