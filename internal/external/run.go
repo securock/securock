@@ -27,6 +27,9 @@ func Run(ctx context.Context, name string, args ...string) ([]byte, error) {
 	c.Stderr = io.Discard
 	c.WaitDelay = time.Second
 	c.Env = append(os.Environ(), "TRIVY_SKIP_VERSION_CHECK=true")
+	if name == "git" {
+		c.Env = append(c.Env, "GIT_NO_LAZY_FETCH=1", "GIT_TERMINAL_PROMPT=0", "GIT_OPTIONAL_LOCKS=0")
+	}
 	if c.Run() != nil {
 		return nil, fmt.Errorf("%s scanner failed; check installation, configuration, and permissions", name)
 	}

@@ -859,3 +859,18 @@ expected findings, forbidden findings and scanner errors fail the suite.
 JSON results follow `integration-report.schema.json`. Cloud and container steps
 run only when explicitly configured; local fixtures do not establish provider
 API compatibility.
+
+## Secrets in Git history
+
+`history . --offline` scans unique text blobs reachable from HEAD in memory,
+including removed files and document files. `--all-refs` includes every local
+ref; `--revision COMMIT` selects a different tip. Partial clones are refused and shallow boundaries fail closed. Git lazy fetching
+and interactive prompts are disabled. No remote fetch, checkout,
+credential validation, revocation or history rewrite occurs. Findings show blob
+identity, path and an observed commit, never matched credential values.
+`--max-commits` (1000) and `--max-blobs` (10000) bound work; budget exhaustion
+exits 2 with partial findings. Files over 512 KiB are explicitly unchecked.
+Binary content, submodule content, unreachable objects, reflogs and LFS payloads
+are outside the scan. Detection is pattern-based and does not prove validity.
+`security . --git-history --offline` includes the default HEAD history scan in
+the unified report. Standalone JSON follows `history-report.schema.json`.

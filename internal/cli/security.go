@@ -14,6 +14,7 @@ import (
 	"github.com/securock/securock/internal/ecosystem"
 	"github.com/securock/securock/internal/exceptions"
 	"github.com/securock/securock/internal/finding"
+	"github.com/securock/securock/internal/history"
 	"github.com/securock/securock/internal/organization"
 	"github.com/securock/securock/internal/policy"
 	"github.com/securock/securock/internal/runrecord"
@@ -34,6 +35,7 @@ func newSecurityCommand(opts *options) *cobra.Command {
 	var coverageOutput string
 	var recordPath, scopeID string
 	var orgFile, serviceID, orgDate string
+	var gitHistory bool
 	var scopes cloudScopes
 	cmd := &cobra.Command{
 		Use:   "security [path]",
@@ -146,6 +148,11 @@ combined report. Operational failures still exit 2, even with --no-fail.`,
 			extra, extraErr := scopes.scan(cmd.Context())
 			found = append(found, extra...)
 			scanErr = errors.Join(scanErr, extraErr)
+			if gitHistory {
+				historical, e := history.Scan(cmd.Context(), history.Options{Path: path, Revision: "HEAD", MaxCommits: 1000, MaxBlobs: 10000})
+				found = append(found, historical.Findings...)
+				scanErr = errors.Join(scanErr, e)
+			}
 			if abs, err := filepath.Abs(path); err == nil {
 				finding.RelativeTo(found, abs)
 			}
@@ -206,6 +213,7 @@ combined report. Operational failures still exit 2, even with --no-fail.`,
 	cmd.Flags().StringVar(&orgFile, "org-policy", "", "organization policy overlay")
 	cmd.Flags().StringVar(&serviceID, "service", "", "service identity in organization policy")
 	cmd.Flags().StringVar(&orgDate, "policy-date", "", "explicit organization policy evaluation date YYYY-MM-DD")
+	cmd.Flags().BoolVar(&gitHistory, "git-history", false, "also scan reachable HEAD history for credential patterns")
 	scopes.bind(cmd)
 	return cmd
 }

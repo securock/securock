@@ -127,7 +127,23 @@ func scanSecrets(root, full, rel, name string) []finding.Finding {
 	if err != nil || bytes.IndexByte(src[:min(len(src), 8192)], 0) >= 0 {
 		return nil
 	}
+	return secretContent(rel, name, src, false)
+}
+
+// SecretContent scans historical text in memory, including documents. It never
+// returns matched credential values. The working-tree scanner keeps its exclusions.
+func SecretContent(rel string, src []byte) []finding.Finding {
+	if len(src) == 0 || len(src) > 512<<10 || bytes.IndexByte(src[:min(len(src), 8192)], 0) >= 0 {
+		return nil
+	}
+	return secretContent(rel, filepath.Base(rel), src, true)
+}
+func secretContent(rel, name string, src []byte, history bool) []finding.Finding {
 	keyed, isGo := keyedFile(name)
+	if history {
+		keyed = true
+		isGo = false
+	}
 	rel = filepath.ToSlash(rel)
 	var out []finding.Finding
 	seen := map[string]bool{}
@@ -167,7 +183,7 @@ func scanSecrets(root, full, rel, name string) []finding.Finding {
 			continue // Go literals are reported by the typed analysis
 		}
 		res := []*regexp.Regexp{reKeyedQuoted}
-		if !isCodeFile(name) {
+		if history || !isCodeFile(name) {
 			// "KEY=value" with no quotes is configuration; in code it is an expression.
 			res = append(res, reKeyedBare)
 		}
