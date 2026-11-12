@@ -7,9 +7,8 @@
 <br>
 <br>
 
-<strong>Security for dependencies, source code, secrets, and infrastructure.</strong>
-
-<br>
+<strong>Security for dependencies, source code, secrets, and infrastructure.</strong>  
+<a href="https://securock.dev">Learn more →</a>
 
 <a href="https://securock.dev">Documentation</a> ·
 <a href="#install">Install</a> ·
