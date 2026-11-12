@@ -164,18 +164,23 @@ func secretContent(rel, name string, src []byte, history bool) []finding.Finding
 		})
 	}
 	for i, line := range strings.Split(string(src), "\n") {
-		if len(line) > 2000 || placeholderWord.MatchString(line) {
+		if len(line) > 2000 {
 			continue
 		}
+		// Placeholder words are judged on the candidate value, never on the whole
+		// line: a real credential beside a comment saying "example" is still one.
 		for _, p := range secretPatterns {
-			if p.re.MatchString(line) {
-				add(p.name, i+1, finding.SeverityHigh, p.name+" found; the value is not shown")
+			for _, m := range p.re.FindAllString(line, -1) {
+				if !placeholderWord.MatchString(m) {
+					add(p.name, i+1, finding.SeverityHigh, p.name+" found; the value is not shown")
+					break
+				}
 			}
 		}
 		if keyed {
-			if m := reConnPassword.FindStringSubmatch(line); m != nil && reConnContext.MatchString(line) && !referenceLike.MatchString(m[1]) && !strings.ContainsAny(m[1], "()[]") && len(m[1]) >= 6 {
+			if m := reConnPassword.FindStringSubmatch(line); m != nil && reConnContext.MatchString(line) && !placeholderWord.MatchString(m[1]) && !referenceLike.MatchString(m[1]) && !strings.ContainsAny(m[1], "()[]") && len(m[1]) >= 6 {
 				add("connection-string-password", i+1, finding.SeverityMedium, "a connection string contains a password")
-			} else if m := reURLPassword.FindStringSubmatch(line); m != nil && !referenceLike.MatchString(m[1]) && !strings.EqualFold(m[1], "password") {
+			} else if m := reURLPassword.FindStringSubmatch(line); m != nil && !placeholderWord.MatchString(m[0]) && !referenceLike.MatchString(m[1]) && !strings.EqualFold(m[1], "password") {
 				add("url-credentials", i+1, finding.SeverityMedium, "a URL contains a user name and password")
 			}
 		}
@@ -188,7 +193,7 @@ func secretContent(rel, name string, src []byte, history bool) []finding.Finding
 			res = append(res, reKeyedBare)
 		}
 		for _, re := range res {
-			if m := re.FindStringSubmatch(line); m != nil && !notSecret.MatchString(m[1]) && !referenceLike.MatchString(m[2]) &&
+			if m := re.FindStringSubmatch(line); m != nil && !notSecret.MatchString(m[1]) && !placeholderWord.MatchString(m[2]) && !referenceLike.MatchString(m[2]) &&
 				!strings.ContainsAny(m[2], "()[]{};,<>\"'`") && looksLikeSecret(m[2]) {
 				add("hardcoded-credential", i+1, finding.SeverityMedium, m[1]+" is set to a literal that looks like a secret")
 				break

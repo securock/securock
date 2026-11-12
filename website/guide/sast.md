@@ -165,7 +165,9 @@ code and configuration files when the literal looks random (rated medium).
 Connection strings with a password (`Server=...;Password=...`) and URLs with credentials
 (`postgres://user:secret@host/db`) are reported as well. The value is never copied into the report. Lockfiles, Markdown, minified files,
 tests and documented example keys are skipped, and a literal that names another
-variable (`var.db_password`) is not a secret.
+variable (`var.db_password`) is not a secret. A placeholder word such as `example`
+or `dummy` excuses only the candidate value that contains it; a real credential on
+the same line as a comment saying "example" is still reported.
 
 React's `dangerouslySetInnerHTML` is an `xss` sink in `.jsx` and `.tsx`. Values
 passed between components as props are not followed yet.
