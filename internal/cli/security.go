@@ -17,6 +17,7 @@ import (
 	"github.com/securock/securock/internal/policy"
 	"github.com/securock/securock/internal/sast"
 	"github.com/securock/securock/internal/scanner"
+	pkgpolicy "github.com/securock/securock/pkg/policy"
 	"github.com/spf13/cobra"
 )
 
@@ -29,6 +30,7 @@ func newSecurityCommand(opts *options) *cobra.Command {
 	var inventories []string
 	var awsRegion, awsProfile string
 	var coverageOutput string
+	var recordPath, scopeID string
 	var scopes cloudScopes
 	cmd := &cobra.Command{
 		Use:   "security [path]",
@@ -129,6 +131,15 @@ combined report. Operational failures still exit 2, even with --no-fail.`,
 				finding.RelativeTo(found, abs)
 			}
 			report := exceptions.Apply(finding.New("security", found), accepted, time.Now().UTC())
+			if recordPath != "" {
+				digest, e := pkgpolicy.Fingerprint(pol)
+				if e != nil {
+					return opErr(e)
+				}
+				if e := writeRunRecord(cmd, opts, path, recordPath, scopeID, report, scanErr == nil, digest); e != nil {
+					return opErr(e)
+				}
+			}
 			if coverageOutput != "" {
 				raw, err := json.MarshalIndent(coverage.Build(report, targets, inventories, awsRegion), "", "  ")
 				if err != nil {
@@ -161,6 +172,8 @@ combined report. Operational failures still exit 2, even with --no-fail.`,
 	cmd.Flags().StringVar(&awsRegion, "aws-region", "", "collect recorded AWS Config resources through the AWS CLI in this region (requires allow-all)")
 	cmd.Flags().StringVar(&awsProfile, "aws-profile", "", "AWS CLI profile for --aws-region")
 	cmd.Flags().StringVar(&coverageOutput, "coverage-output", "", "write a JSON scope and incomplete-evidence summary")
+	cmd.Flags().StringVar(&recordPath, "record", "", "write an integrity-checked scan record")
+	cmd.Flags().StringVar(&scopeID, "scope-id", "", "stable project identity for comparable scan records")
 	scopes.bind(cmd)
 	return cmd
 }

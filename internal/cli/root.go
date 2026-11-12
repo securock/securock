@@ -15,14 +15,15 @@ import (
 )
 
 type options struct {
-	offline  bool
-	network  string
-	format   string
-	lockPath string
-	policy   string
-	profile  string
-	noFail   bool
-	output   string
+	toolVersion string
+	offline     bool
+	network     string
+	format      string
+	lockPath    string
+	policy      string
+	profile     string
+	noFail      bool
+	output      string
 
 	exceptions string
 
@@ -33,7 +34,7 @@ type options struct {
 }
 
 func NewRoot(version, commit, date string) *cobra.Command {
-	opts := &options{}
+	opts := &options{toolVersion: version + "@" + commit}
 
 	root := &cobra.Command{
 		Use:           "securock",

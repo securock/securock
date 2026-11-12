@@ -788,3 +788,15 @@ receiver. The URL comes from the environment and is not printed. Configure your
 receiver to route alerts to an owner or team; this is a generic JSON webhook,
 not a Slack-specific payload. Delivery failures exit 2 without advancing state.
 Do not run multiple writers against the same state file.
+
+## Scan execution records
+
+`security . --offline --record run.json --scope-id billing-api` saves the
+engine/build identity, Git revision/dirty status, configuration and policy
+fingerprint, source-file inventory, source coverage status and report digest.
+There are no wall-clock timestamps or absolute source paths. Raw flag values
+are hashed rather than stored. Records are point-in-time scan evidence, not
+proof of runtime safety; anonymous scopes cannot certify comparable coverage.
+Development builds use an executable fingerprint when version metadata is unknown.
+Record checksums detect accidental changes, not producer authenticity; use trusted
+CI artifacts and protect records as security evidence.

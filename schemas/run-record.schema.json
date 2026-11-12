@@ -1,0 +1,72 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://securock.dev/schema/run-record.schema.json",
+  "type": "object",
+  "required": [
+    "version",
+    "engine",
+    "revision",
+    "dirty",
+    "configuration",
+    "report_digest",
+    "scopes",
+    "files",
+    "report",
+    "record_digest"
+  ],
+  "properties": {
+    "version": {
+      "const": 1
+    },
+    "engine": {
+      "type": "string",
+      "minLength": 1
+    },
+    "revision": {
+      "type": "string"
+    },
+    "dirty": {
+      "type": "boolean",
+      "description": "Conservative flag: true if dirty or status is unavailable; false only after a successful clean Git status."
+    },
+    "configuration": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "report_digest": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "scopes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "complete"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "complete": {
+            "type": "boolean"
+          }
+        }
+      }
+    },
+    "files": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "report": {
+      "$ref": "https://securock.dev/schema/security-report.schema.json"
+    },
+    "record_digest": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    }
+  }
+}
