@@ -247,3 +247,13 @@ identities and remediation, are POSTed as JSON to that environment variable's
 HTTPS URL. Redirects are not followed. URLs are not copied into reports. Local
 monitoring state contains prior finding reports and is created with private
 permissions; protect it as project security data.
+
+## Enterprise management and private runners
+
+Management clients contact only the explicitly configured control-plane origin
+using bearer tokens, without redirects. `runner` requires `--network allow-all`;
+offline refuses it. Offline scans execute locally, but their findings are uploaded
+to the configured service. No source checkout is uploaded. The control service
+stores tenant memberships, findings, jobs and audit records in encrypted state.
+Operate the service in an approved region, separately manage encryption/signing
+keys, and review report snippets, retention, backups and support exports.

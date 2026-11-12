@@ -67,6 +67,9 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		reply(w, 401, map[string]string{"error": "authentication required"})
 		return
 	}
+	if s.runnerAPI(w, r, p) {
+		return
+	}
 	if s.auditAPI(w, r, p) {
 		return
 	}
@@ -122,6 +125,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			jobs := []Job{}
 			for _, j := range s.Store.Read().Tenants[p.Tenant].Jobs {
 				j.Report = nil
+				j.Lease = ""
 				jobs = append(jobs, j)
 			}
 			slices.SortFunc(jobs, func(a, b Job) int { return strings.Compare(a.ID, b.ID) })
@@ -168,6 +172,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if r.Method == "GET" {
+			j.Lease = ""
 			reply(w, 200, j)
 			return
 		}

@@ -949,3 +949,22 @@ reviewer uses `PUT /api/v1/approvals/ID` with `status` approved/rejected.
 Self-approval, expired approval and editing a decided approval are rejected.
 `GET /api/v1/approvals` reports expiry at query time. Consumers must match the
 exact artifact and rule; an approval does not silently suppress unrelated scans.
+
+## Private scan runners
+
+`runner projects.json --server https://control.example --network allow-all`
+leases jobs using a runner-role OIDC token from `SECUROCK_TOKEN`. The local JSON
+map binds project IDs to local directories. The server cannot supply executable
+commands, paths or network targets: workers run this installed binary's
+`security --offline --no-fail --format json` only. Source stays local; findings
+(including paths and snippets in ordinary scanner reports) are uploaded. Review
+report content before allowing egress. `--once` processes at most one job.
+
+Leases last five minutes; scanner processes have a two-minute timeout. Expired
+leases are retried at most three attempts, then fail. Cancellation invalidates
+completion. Jobs are isolated by tenant and lease ownership; any runner within
+a tenant is trusted to report honestly for its mapped projects. This is not
+an OS sandbox: use an unprivileged disposable container/VM and read-only source
+mounts. The runner inherits its operator environment; supply only required
+credentials. Rotate short-lived API tokens in the process environment by restarting
+the worker. Browser and cloud scans remain explicit local CLI operations.

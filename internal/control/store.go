@@ -29,6 +29,7 @@ type Project struct {
 	Owner string `json:"owner"`
 }
 type Job struct {
+	LeaseUntil  string          `json:"lease_until,omitempty"`
 	ID          string          `json:"id"`
 	Project     string          `json:"project"`
 	Status      string          `json:"status"`
