@@ -1,0 +1,101 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://securock.dev/schema/organization-policy.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "services"
+  ],
+  "properties": {
+    "version": {
+      "const": 1
+    },
+    "services": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "owner",
+          "criticality",
+          "fail_on",
+          "require_approver",
+          "max_exception_days"
+        ],
+        "properties": {
+          "owner": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "\\S"
+          },
+          "criticality": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 5
+          },
+          "fail_on": {
+            "enum": [
+              "critical",
+              "high",
+              "medium",
+              "low",
+              "info"
+            ]
+          },
+          "require_approver": {
+            "type": "boolean"
+          },
+          "max_exception_days": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 3650
+          },
+          "sla_days": {
+            "type": "object",
+            "propertyNames": {
+              "enum": [
+                "critical",
+                "high",
+                "medium",
+                "low",
+                "info"
+              ]
+            },
+            "additionalProperties": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 3650
+            }
+          },
+          "reviewers": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "pattern": "\\S"
+            }
+          }
+        },
+        "if": {
+          "properties": {
+            "require_approver": {
+              "const": true
+            }
+          }
+        },
+        "then": {
+          "required": [
+            "reviewers"
+          ],
+          "properties": {
+            "reviewers": {
+              "minItems": 1
+            }
+          }
+        }
+      }
+    }
+  }
+}

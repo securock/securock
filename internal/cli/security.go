@@ -14,7 +14,9 @@ import (
 	"github.com/securock/securock/internal/ecosystem"
 	"github.com/securock/securock/internal/exceptions"
 	"github.com/securock/securock/internal/finding"
+	"github.com/securock/securock/internal/organization"
 	"github.com/securock/securock/internal/policy"
+	"github.com/securock/securock/internal/runrecord"
 	"github.com/securock/securock/internal/sast"
 	"github.com/securock/securock/internal/scanner"
 	pkgpolicy "github.com/securock/securock/pkg/policy"
@@ -31,6 +33,7 @@ func newSecurityCommand(opts *options) *cobra.Command {
 	var awsRegion, awsProfile string
 	var coverageOutput string
 	var recordPath, scopeID string
+	var orgFile, serviceID, orgDate string
 	var scopes cloudScopes
 	cmd := &cobra.Command{
 		Use:   "security [path]",
@@ -64,6 +67,22 @@ combined report. Operational failures still exit 2, even with --no-fail.`,
 			}
 			if err := scopes.validate(net); err != nil {
 				return opErr(err)
+			}
+			var orgPolicy organization.Policy
+			if orgFile != "" {
+				orgPolicy, err = loadOrganization(orgFile)
+				if err != nil {
+					return opErr(err)
+				}
+				if _, err := organization.Evaluate(finding.New("security", nil), orgPolicy, serviceID, orgDate); err != nil {
+					return opErr(err)
+				}
+				minimum, _ := finding.ParseSeverity(orgPolicy.Services[serviceID].FailOn)
+				if minimum.Rank() < threshold.Rank() {
+					threshold = minimum
+				}
+			} else if serviceID != "" || orgDate != "" {
+				return opErr(fmt.Errorf("service and policy-date require org-policy"))
 			}
 			cooldown, err := parseAge("", pol.Rules.Health.MinReleaseAge)
 			if err != nil {
@@ -131,10 +150,20 @@ combined report. Operational failures still exit 2, even with --no-fail.`,
 				finding.RelativeTo(found, abs)
 			}
 			report := exceptions.Apply(finding.New("security", found), accepted, time.Now().UTC())
+			if orgFile != "" {
+				governed, e := organization.Evaluate(report, orgPolicy, serviceID, orgDate)
+				if e != nil {
+					return opErr(e)
+				}
+				report = governed.Report
+			}
 			if recordPath != "" {
 				digest, e := pkgpolicy.Fingerprint(pol)
 				if e != nil {
 					return opErr(e)
+				}
+				if orgFile != "" {
+					digest = runrecord.Digest([]string{digest, runrecord.Digest(orgPolicy)})
 				}
 				if e := writeRunRecord(cmd, opts, path, recordPath, scopeID, report, scanErr == nil, digest); e != nil {
 					return opErr(e)
@@ -174,6 +203,9 @@ combined report. Operational failures still exit 2, even with --no-fail.`,
 	cmd.Flags().StringVar(&coverageOutput, "coverage-output", "", "write a JSON scope and incomplete-evidence summary")
 	cmd.Flags().StringVar(&recordPath, "record", "", "write an integrity-checked scan record")
 	cmd.Flags().StringVar(&scopeID, "scope-id", "", "stable project identity for comparable scan records")
+	cmd.Flags().StringVar(&orgFile, "org-policy", "", "organization policy overlay")
+	cmd.Flags().StringVar(&serviceID, "service", "", "service identity in organization policy")
+	cmd.Flags().StringVar(&orgDate, "policy-date", "", "explicit organization policy evaluation date YYYY-MM-DD")
 	scopes.bind(cmd)
 	return cmd
 }

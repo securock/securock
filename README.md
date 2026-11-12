@@ -640,3 +640,21 @@ asset requires evidence references; missing signals remain unknown. References
 are not fetched or independently verified, and no attack chain is inferred from
 co-location. Accepted findings remain visible at priority zero.
 JSON follows `priority-report.schema.json`.
+
+## Organization policy
+
+`enforce report.json --organization org.json --service api --as-of 2030-01-01`
+applies service ownership, SLA dates, severity gates and exception review limits.
+The policy is version 1 JSON with `services.api` containing `owner`,
+`criticality` (1–5), `fail_on`, `sla_days` (severity to positive days),
+`require_approver`, `reviewers`, and `max_exception_days`.
+`security --org-policy org.json --service api --policy-date 2030-01-01` applies
+the same gate during scanning. A CLI severity flag can strengthen but cannot
+weaken the organization threshold. Unapproved or overly long exceptions are
+unsuppressed and generate a high policy finding. Explicit dates keep decisions
+reproducible. Organization policy does not silently allow public resources; use
+reviewed, expiring exceptions with permitted approvers for intentional exposure.
+Approver names are declared metadata, not authenticated human signatures. Protect
+organization and exception files with authenticated repository review.
+Standalone JSON follows `organization-report.schema.json` and includes task
+owners and due dates. Normal `--no-fail` remains available for report generation.
