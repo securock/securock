@@ -17,7 +17,7 @@ import (
 )
 
 func newServeCommand(opts *options) *cobra.Command {
-	var listen, dir, keyEnv, cert, key string
+	var listen, dir, keyEnv, cert, key, auditEnv string
 	var local bool
 	c := &cobra.Command{Use: "serve OIDC.json", Short: "Run the authenticated, tenant-isolated control plane", Args: cobra.ExactArgs(1), RunE: func(c *cobra.Command, a []string) error {
 		if opts.offline || opts.network == "offline" {
@@ -51,6 +51,13 @@ func newServeCommand(opts *options) *cobra.Command {
 			return opErr(e)
 		}
 		defer store.Close()
+		seed, err := base64.StdEncoding.DecodeString(os.Getenv(auditEnv))
+		if err != nil {
+			return opErr(fmt.Errorf("invalid audit seed"))
+		}
+		if err = store.SetSigner(seed); err != nil {
+			return opErr(err)
+		}
 		ctx, stop := signal.NotifyContext(c.Context(), os.Interrupt, syscall.SIGTERM)
 		defer stop()
 		srv := &http.Server{Addr: listen, Handler: &control.Server{Store: store, Identity: id}, ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 30 * time.Second, WriteTimeout: 30 * time.Second, IdleTimeout: 60 * time.Second, MaxHeaderBytes: 32 << 10}
@@ -75,6 +82,7 @@ func newServeCommand(opts *options) *cobra.Command {
 		}
 		return opErr(e)
 	}}
+	c.Flags().StringVar(&auditEnv, "audit-key-env", "SECUROCK_AUDIT_SEED", "base64 Ed25519 32-byte seed from a separate secret")
 	c.Flags().StringVar(&listen, "listen", "127.0.0.1:8443", "listen address")
 	c.Flags().StringVar(&dir, "state-dir", ".securock/control", "private encrypted state directory")
 	c.Flags().StringVar(&keyEnv, "key-env", "SECUROCK_STATE_KEY", "base64 32-byte encryption key environment variable")

@@ -1,0 +1,62 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://securock.dev/schema/audit-export.schema.json",
+  "type": "object",
+  "required": [
+    "version",
+    "public_key",
+    "events"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "version": {
+      "const": 1
+    },
+    "public_key": {
+      "type": "string"
+    },
+    "events": {
+      "type": [
+        "array",
+        "null"
+      ],
+      "items": {
+        "type": "object",
+        "required": [
+          "sequence",
+          "actor",
+          "action",
+          "time",
+          "previous",
+          "state_digest",
+          "signature"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "sequence": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "actor": {
+            "type": "string"
+          },
+          "action": {
+            "type": "string"
+          },
+          "time": {
+            "type": "string"
+          },
+          "previous": {
+            "type": "string"
+          },
+          "state_digest": {
+            "type": "string"
+          },
+          "signature": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}

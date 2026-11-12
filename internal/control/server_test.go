@@ -29,6 +29,9 @@ func fixture(t *testing.T) (*control.Server, func(string) string, string) {
 		t.Fatal(e)
 	}
 	t.Cleanup(func() { _ = s.Close() })
+	if e := s.SetSigner(bytes.Repeat([]byte{9}, 32)); e != nil {
+		t.Fatal(e)
+	}
 	k, _ := rsa.GenerateKey(rand.Reader, 2048)
 	enc := base64.RawURLEncoding.EncodeToString
 	id := identity.Config{Issuer: "https://id.example", Audience: "api", Keys: []identity.Key{{Kty: "RSA", Kid: "k", N: enc(k.N.Bytes()), E: enc(big.NewInt(int64(k.E)).Bytes())}}, Bindings: bindings}

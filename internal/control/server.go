@@ -67,6 +67,9 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		reply(w, 401, map[string]string{"error": "authentication required"})
 		return
 	}
+	if s.auditAPI(w, r, p) {
+		return
+	}
 	if strings.HasPrefix(r.URL.Path, "/scim/v2/") {
 		s.scim(w, r, p)
 		return
@@ -95,7 +98,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				reply(w, 400, nil)
 				return
 			}
-			e := s.Store.Update(func(st *State) error {
+			e := s.Store.UpdateAs(p, r.Method+" "+r.URL.Path, func(st *State) error {
 				t := st.Tenants[p.Tenant]
 				if _, ok := t.Projects[v.ID]; ok {
 					return fmt.Errorf("project exists")
@@ -135,7 +138,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 			j := Job{ID: req.ID, Project: req.Project, Status: "queued", RequestedBy: p.Subject, Created: UTC()}
-			e := s.Store.Update(func(st *State) error {
+			e := s.Store.UpdateAs(p, r.Method+" "+r.URL.Path, func(st *State) error {
 				t := st.Tenants[p.Tenant]
 				if old, ok := t.Jobs[j.ID]; ok {
 					if old.Project != j.Project || old.RequestedBy != p.Subject {
@@ -169,7 +172,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if r.Method == "DELETE" && p.Can("scan") {
-			e := s.Store.Update(func(st *State) error {
+			e := s.Store.UpdateAs(p, r.Method+" "+r.URL.Path, func(st *State) error {
 				v := st.Tenants[p.Tenant].Jobs[id]
 				v.Status = "cancelled"
 				v.Lease = ""

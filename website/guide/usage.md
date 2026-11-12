@@ -931,3 +931,21 @@ bootstrap admins/provisioners are managed in operator configuration; provisionin
 cannot grant these roles. Deactivation rejects existing tokens immediately.
 SSO subjects must be unique across tenants. Put an API gateway in front for
 Internet rate limiting. `/healthz` discloses readiness only.
+
+## Authenticated approvals and signed audit
+
+Serving now also requires `SECUROCK_AUDIT_SEED`, a separate base64 Ed25519
+32-byte seed. Preserve the public key and checkpoints independently of this host.
+Every successful project, job, membership and approval mutation appends a signed
+actor/action/time/state-digest event to its tenant audit chain.
+`GET /api/v1/audit` returns a versioned export; extract the envelope's `data`
+and verify it with `evidence audit.json --public-key BASE64_PUBLIC_KEY`.
+Signatures detect alterations; independent sequence checkpoints are necessary to
+detect truncation or rollback. This local store is not a WORM service.
+
+`POST /api/v1/approvals` accepts `id`, `artifact` (exact SHA-256 hex), `rule`,
+`reason`, and `expires` (future RFC3339, at most 30 days). A different authenticated
+reviewer uses `PUT /api/v1/approvals/ID` with `status` approved/rejected.
+Self-approval, expired approval and editing a decided approval are rejected.
+`GET /api/v1/approvals` reports expiry at query time. Consumers must match the
+exact artifact and rule; an approval does not silently suppress unrelated scans.

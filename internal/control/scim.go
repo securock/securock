@@ -96,7 +96,7 @@ func (s *Server) scim(w http.ResponseWriter, r *http.Request, p identity.Princip
 		}
 	}
 	var result Member
-	e := s.Store.Update(func(st *State) error {
+	e := s.Store.UpdateAs(p, "scim."+r.Method, func(st *State) error {
 		t := st.Tenants[p.Tenant]
 		var old Member
 		for _, m := range t.Members {

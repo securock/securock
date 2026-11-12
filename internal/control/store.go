@@ -4,6 +4,7 @@ package control
 import (
 	"crypto/aes"
 	"crypto/cipher"
+	"crypto/ed25519"
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
@@ -39,19 +40,22 @@ type Job struct {
 	Attempts    int             `json:"attempts"`
 }
 type Tenant struct {
-	Members  map[string]Member  `json:"members"`
-	Projects map[string]Project `json:"projects"`
-	Jobs     map[string]Job     `json:"jobs"`
+	Approvals map[string]Approval `json:"approvals,omitempty"`
+	Audit     []AuditEvent        `json:"audit,omitempty"`
+	Members   map[string]Member   `json:"members"`
+	Projects  map[string]Project  `json:"projects"`
+	Jobs      map[string]Job      `json:"jobs"`
 }
 type State struct {
 	Version int                `json:"version"`
 	Tenants map[string]*Tenant `json:"tenants"`
 }
 type Store struct {
-	mu    sync.Mutex
-	dir   string
-	aead  cipher.AEAD
-	state State
+	signer ed25519.PrivateKey
+	mu     sync.Mutex
+	dir    string
+	aead   cipher.AEAD
+	state  State
 }
 
 func ID() string {
