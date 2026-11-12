@@ -1218,3 +1218,19 @@ are provisioned through audited APIs. Changing the original configuration cannot
 reactivate a deprovisioned subject or silently add an administrator. Keep an
 independently retained audit sequence/digest checkpoint: signatures alone cannot
 detect replacement with an older fully valid snapshot.
+
+## Service abuse controls and access logs
+
+`serve --requests-per-minute 600` limits authenticated subjects per minute and
+peer IPs to ten times that budget. Expired buckets are reclaimed; a bounded
+4,096-bucket table fails closed under saturation. Health probes bypass limits.
+Reverse-proxy deployments share a peer budget; forwarded headers are deliberately
+not trusted. Configure gateway limits for your actual proxy topology as well.
+
+Structured JSON access logs go to stderr with UTC time, normalized route,
+method, status, peer IP and authenticated subject/tenant. Query strings, object
+IDs, request bodies, authorization headers and cookies are omitted. Ship logs
+through your existing collector/SIEM, restrict access and set a retention period.
+These request logs complement signed mutation audits; they are not themselves
+an append-only signed audit store. Membership checks read only identity data,
+not every tenant's stored scan payload.

@@ -9,14 +9,19 @@ import (
 	"net/http"
 	"slices"
 	"strings"
+	"sync"
 )
 
 type Server struct {
-	SSO            *BrowserSSO
-	Connectors     []Connector
-	DeliveryClient *http.Client
-	Store          *Store
-	Identity       identity.Config
+	runtimeMu         sync.Mutex
+	buckets           map[string]bucket
+	AccessLog         io.Writer
+	RequestsPerMinute int
+	SSO               *BrowserSSO
+	Connectors        []Connector
+	DeliveryClient    *http.Client
+	Store             *Store
+	Identity          identity.Config
 }
 
 func (s *Server) principal(r *http.Request) (identity.Principal, error) {
@@ -50,10 +55,29 @@ func decode(w http.ResponseWriter, r *http.Request, v any) error {
 	return nil
 }
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	recorder := &response{ResponseWriter: w}
+	w = recorder
+	var authenticated identity.Principal
+	defer func() {
+		status := recorder.Status
+		if status == 0 {
+			status = 200
+		}
+		s.access(r, status, authenticated)
+	}()
 	w.Header().Set("Cache-Control", "no-store")
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.Header().Set("Content-Security-Policy", "default-src 'none'; frame-ancestors 'none'")
 	w.Header().Set("Strict-Transport-Security", "max-age=31536000")
+	budget := s.RequestsPerMinute
+	if budget <= 0 {
+		budget = 600
+	}
+	if r.URL.Path != "/healthz" && !s.permit("ip:"+peer(r), budget*10) {
+		w.Header().Set("Retry-After", "60")
+		reply(w, 429, nil)
+		return
+	}
 	if s.browserAuth(w, r) {
 		return
 	}
@@ -73,6 +97,12 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	p, e := s.principal(r)
 	if e != nil {
 		reply(w, 401, map[string]string{"error": "authentication required"})
+		return
+	}
+	authenticated = p
+	if !s.permit("subject:"+p.Tenant+":"+p.Subject, budget) {
+		w.Header().Set("Retry-After", "60")
+		reply(w, 429, nil)
 		return
 	}
 	if s.issueAPI(w, r, p) {

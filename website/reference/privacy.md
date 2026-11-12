@@ -316,3 +316,10 @@ endpoint. Client secrets, code verifiers and tokens are not logged. Token-endpoi
 redirects are refused. Session tokens stay in process memory; no browser storage
 is used. Public URL and callback URLs must match the operator's approved service
 origin. Offline mode cannot enable this network service.
+
+## Management request logging
+
+Service access logs contain peer IP, authenticated subject/tenant, normalized
+route, status and time. Raw URLs/queries/object IDs, bodies, tokens and cookies
+are not logged. Logs go to the operator's stderr collector; configure its region,
+access controls, deletion and retention separately from encrypted application state.

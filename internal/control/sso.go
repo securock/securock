@@ -246,16 +246,10 @@ func (s *Server) browserAuth(w http.ResponseWriter, r *http.Request) bool {
 }
 func (s *Server) identityConfig() identity.Config {
 	c := s.Identity
-	c.Bindings = nil
-	for tenant, t := range s.Store.Read().Tenants {
-		for _, m := range t.Members {
-			if m.Active {
-				c.Bindings = append(c.Bindings, identity.Binding{Subject: m.Subject, Tenant: tenant, Roles: m.Roles})
-			}
-		}
-	}
+	c.Bindings = s.Store.Bindings()
 	return c
 }
+
 func (s *Server) tokenPrincipal(token string) (identity.Principal, error) {
 	return s.identityConfig().Verify(token, time.Now())
 }

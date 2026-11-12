@@ -19,6 +19,7 @@ import (
 func newServeCommand(opts *options) *cobra.Command {
 	var listen, dir, keyEnv, cert, key, auditEnv, connectors, ssoFile string
 	var local bool
+	var rpm int
 	c := &cobra.Command{Use: "serve OIDC.json", Short: "Run the authenticated, tenant-isolated control plane", Args: cobra.ExactArgs(1), RunE: func(c *cobra.Command, a []string) error {
 		if opts.offline || opts.network == "offline" {
 			return opErr(fmt.Errorf("serve requires explicit networking"))
@@ -60,7 +61,10 @@ func newServeCommand(opts *options) *cobra.Command {
 		}
 		ctx, stop := signal.NotifyContext(c.Context(), os.Interrupt, syscall.SIGTERM)
 		defer stop()
-		handler := &control.Server{Store: store, Identity: id}
+		if rpm < 1 || rpm > 100000 {
+			return opErr(fmt.Errorf("requests-per-minute must be 1-100000"))
+		}
+		handler := &control.Server{Store: store, Identity: id, RequestsPerMinute: rpm, AccessLog: c.ErrOrStderr()}
 		if ssoFile != "" {
 			if opts.network != "allow-all" {
 				return opErr(fmt.Errorf("SSO requires --network allow-all"))
@@ -129,6 +133,7 @@ func newServeCommand(opts *options) *cobra.Command {
 		}
 		return opErr(e)
 	}}
+	c.Flags().IntVar(&rpm, "requests-per-minute", 600, "per-subject fixed-window request limit; peer limit is ten times this value")
 	c.Flags().StringVar(&ssoFile, "sso", "", "operator-pinned OIDC browser login configuration JSON")
 	c.Flags().StringVar(&connectors, "connectors", "", "operator-owned connector configuration JSON")
 	c.Flags().StringVar(&auditEnv, "audit-key-env", "SECUROCK_AUDIT_SEED", "base64 Ed25519 32-byte seed from a separate secret")
