@@ -17,7 +17,7 @@ import (
 )
 
 func newServeCommand(opts *options) *cobra.Command {
-	var listen, dir, keyEnv, cert, key, auditEnv string
+	var listen, dir, keyEnv, cert, key, auditEnv, connectors string
 	var local bool
 	c := &cobra.Command{Use: "serve OIDC.json", Short: "Run the authenticated, tenant-isolated control plane", Args: cobra.ExactArgs(1), RunE: func(c *cobra.Command, a []string) error {
 		if opts.offline || opts.network == "offline" {
@@ -60,8 +60,38 @@ func newServeCommand(opts *options) *cobra.Command {
 		}
 		ctx, stop := signal.NotifyContext(c.Context(), os.Interrupt, syscall.SIGTERM)
 		defer stop()
-		srv := &http.Server{Addr: listen, Handler: &control.Server{Store: store, Identity: id}, ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 30 * time.Second, WriteTimeout: 30 * time.Second, IdleTimeout: 60 * time.Second, MaxHeaderBytes: 32 << 10}
+		handler := &control.Server{Store: store, Identity: id}
+		if connectors != "" {
+			if opts.network != "allow-all" {
+				return opErr(fmt.Errorf("connectors require --network allow-all"))
+			}
+			raw, e := os.ReadFile(connectors)
+			if e != nil {
+				return opErr(e)
+			}
+			if e = json.Unmarshal(raw, &handler.Connectors); e != nil {
+				return opErr(e)
+			}
+			if e = control.ValidateConnectors(handler.Connectors); e != nil {
+				return opErr(e)
+			}
+		}
+		srv := &http.Server{Addr: listen, Handler: handler, ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 30 * time.Second, WriteTimeout: 30 * time.Second, IdleTimeout: 60 * time.Second, MaxHeaderBytes: 32 << 10}
 		done := make(chan struct{})
+		if len(handler.Connectors) > 0 {
+			go func() {
+				for {
+					select {
+					case <-done:
+						return
+					case <-ctx.Done():
+						return
+					case <-time.After(5 * time.Second):
+						_ = handler.Dispatch(ctx)
+					}
+				}
+			}()
+		}
 		defer close(done)
 		go func() {
 			select {
@@ -82,6 +112,7 @@ func newServeCommand(opts *options) *cobra.Command {
 		}
 		return opErr(e)
 	}}
+	c.Flags().StringVar(&connectors, "connectors", "", "operator-owned connector configuration JSON")
 	c.Flags().StringVar(&auditEnv, "audit-key-env", "SECUROCK_AUDIT_SEED", "base64 Ed25519 32-byte seed from a separate secret")
 	c.Flags().StringVar(&listen, "listen", "127.0.0.1:8443", "listen address")
 	c.Flags().StringVar(&dir, "state-dir", ".securock/control", "private encrypted state directory")

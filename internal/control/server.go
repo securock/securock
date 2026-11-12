@@ -12,8 +12,10 @@ import (
 )
 
 type Server struct {
-	Store    *Store
-	Identity identity.Config
+	Connectors     []Connector
+	DeliveryClient *http.Client
+	Store          *Store
+	Identity       identity.Config
 }
 
 func (s *Server) principal(r *http.Request) (identity.Principal, error) {
@@ -65,6 +67,9 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	p, e := s.principal(r)
 	if e != nil {
 		reply(w, 401, map[string]string{"error": "authentication required"})
+		return
+	}
+	if s.deliveryAPI(w, r, p) {
 		return
 	}
 	if s.runnerAPI(w, r, p) {

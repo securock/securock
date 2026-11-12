@@ -41,11 +41,12 @@ type Job struct {
 	Attempts    int             `json:"attempts"`
 }
 type Tenant struct {
-	Approvals map[string]Approval `json:"approvals,omitempty"`
-	Audit     []AuditEvent        `json:"audit,omitempty"`
-	Members   map[string]Member   `json:"members"`
-	Projects  map[string]Project  `json:"projects"`
-	Jobs      map[string]Job      `json:"jobs"`
+	Deliveries map[string]Delivery `json:"deliveries,omitempty"`
+	Approvals  map[string]Approval `json:"approvals,omitempty"`
+	Audit      []AuditEvent        `json:"audit,omitempty"`
+	Members    map[string]Member   `json:"members"`
+	Projects   map[string]Project  `json:"projects"`
+	Jobs       map[string]Job      `json:"jobs"`
 }
 type State struct {
 	Version int                `json:"version"`

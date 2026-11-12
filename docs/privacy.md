@@ -230,3 +230,12 @@ to the configured service. No source checkout is uploaded. The control service
 stores tenant memberships, findings, jobs and audit records in encrypted state.
 Operate the service in an approved region, separately manage encryption/signing
 keys, and review report snippets, retention, backups and support exports.
+
+## Configured workflow connectors
+
+With explicit `--connectors` and `--network allow-all`, the service sends queued
+titles, descriptions, commit IDs and branch names to operator-configured HTTPS
+GitHub/GitLab/Jira/ServiceNow API origins. Issue polling reads remote status.
+Credentials come from the configured environment variable. Redirects are refused,
+response bodies and tokens are not logged, and offline mode refuses serving.
+Only queue content approved for the destination; no automatic source upload occurs.

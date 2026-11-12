@@ -968,3 +968,31 @@ an OS sandbox: use an unprivileged disposable container/VM and read-only source
 mounts. The runner inherits its operator environment; supply only required
 credentials. Rotate short-lived API tokens in the process environment by restarting
 the worker. Browser and cloud scans remain explicit local CLI operations.
+
+## Development workflow connectors
+
+`serve ... --connectors connectors.json --network allow-all` enables the durable
+HTTPS outbox. Each operator-owned connector has `id`, `tenant`, `provider`
+(github/gitlab/jira/servicenow), `origin`, `project`, and `token_env`. Use an
+installation access token for GitHub App checks; Jira requires a bearer-capable
+OAuth token. SCM origins may include their API prefix (GitLab: `/api/v4`).
+Tokens remain in environment variables; API users cannot change destinations.
+
+`POST /api/v1/deliveries` queues `id`, `connector`, `kind` issue/pull/check,
+`title`, `body`; pull adds `branch`/`base`, check adds `commit` and `result`
+success/failure. GitHub/GitLab support all three; Jira and ServiceNow support
+issues. Duplicate IDs with identical content reuse the existing delivery.
+`GET /api/v1/deliveries` shows status and remote issue state. The worker creates
+remote objects and polls issue status back every five minutes. Remote closure
+does not prove a vulnerability fixed; rescanning is still required.
+
+HTTP 429 retries at most three attempts. Ambiguous creates, including connection
+loss or server failure, become `uncertain`; inspect the remote system before
+operator reconciliation. A crash during `sending` likewise requires reconciliation
+in the encrypted backup/restore workflow; it is never automatically replayed.
+Idempotency headers are sent but not assumed supported by every provider. No
+external write occurs unless a user explicitly queues a delivery.
+
+`PUT /api/v1/deliveries/ID` with `state` open/closed queues an existing issue
+update. Jira requires connector `close_transition` and `open_transition` IDs.
+Updates use the provider API and subsequent polling records the actual state.
