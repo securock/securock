@@ -202,3 +202,12 @@ token to the chosen origin only. It is not written to reports or command argumen
 request interception blocks other origins, mutating methods, WebSockets and
 requests beyond 100. Service workers are blocked. Browser errors are reported
 as incomplete scans; raw browser diagnostics are not included.
+
+## Azure and GCP collection
+
+Explicit Azure subscription and GCP project flags require allow-all. Installed
+`az graph query` contacts Azure Resource Graph (management.azure.com) and its
+configured credential endpoints. `gcloud asset list --content-type resource`
+contacts cloudasset.googleapis.com and configured Google authentication endpoints.
+Their existing credential providers and proxy settings apply. Resource exports
+are parsed in memory; raw properties and provider stderr are not printed.

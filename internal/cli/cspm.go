@@ -71,6 +71,7 @@ func scanCSPM(ctx context.Context, files []string, region, profile string) ([]fi
 
 func newCSPMCommand(opts *options) *cobra.Command {
 	var region, profile, failOn string
+	var scopes cloudScopes
 	cmd := &cobra.Command{
 		Use: "cspm [inventory.json...]", Short: "Audit recorded AWS cloud configuration and permissions",
 		Long: `Inspect AWS Config configurationItems snapshots or select-resource-config Results.
@@ -82,7 +83,7 @@ Unavailable settings and resource types are explicit; this is not a compliance
 certification or proof of effective access.`,
 		Args: cobra.ArbitraryArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if len(args) == 0 && region == "" {
+			if len(args) == 0 && region == "" && scopes.count() == 0 {
 				return opErr(fmt.Errorf("provide an AWS Config inventory or --aws-region for read-only collection"))
 			}
 			threshold, err := finding.ParseSeverity(failOn)
@@ -100,11 +101,17 @@ certification or proof of effective access.`,
 			if err := validateCSPM(region, profile, net); err != nil {
 				return opErr(err)
 			}
+			if err := scopes.validate(net); err != nil {
+				return opErr(err)
+			}
 			accepted, err := exceptions.Load(exceptions.Path(".", opts.exceptions))
 			if err != nil {
 				return opErr(err)
 			}
 			found, scanErr := scanCSPM(cmd.Context(), args, region, profile)
+			extra, extraErr := scopes.scan(cmd.Context())
+			found = append(found, extra...)
+			scanErr = errors.Join(scanErr, extraErr)
 			report := exceptions.Apply(finding.New("cspm", found), accepted, time.Now().UTC())
 			if err := finding.Write(cmd.OutOrStdout(), report, opts.format); err != nil {
 				return opErr(err)
@@ -123,5 +130,6 @@ certification or proof of effective access.`,
 	cmd.Flags().StringVar(&region, "aws-region", "", "collect AWS Config recorded resources in this region using the AWS CLI (requires allow-all)")
 	cmd.Flags().StringVar(&profile, "aws-profile", "", "AWS CLI profile for --aws-region; credentials are never accepted as flags")
 	cmd.Flags().StringVar(&failOn, "fail-on", "high", "exit 1 at this severity: critical, high, medium, low, or info")
+	scopes.bind(cmd)
 	return cmd
 }

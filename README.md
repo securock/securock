@@ -574,3 +574,19 @@ therefore belongs on authorized test environments. Existing header-only DAST
 remains available without browser dependencies.
 
 Set `SECUROCK_CHROMIUM_PATH` to use an existing Chromium executable instead of Playwright's bundled browser.
+
+## Multiple cloud scopes
+
+`cspm` and `security` accept repeatable `--aws-scope audit@us-east-1`,
+`--azure-subscription SUBSCRIPTION_ID` and `--gcp-project PROJECT_ID` with
+`--network allow-all`. Installed AWS CLI, Azure CLI with Resource Graph, and
+gcloud use their existing credentials and read-only queries. Every requested
+scope is attempted; collection failures remain visible and exit 2.
+Offline inventories also accept native Azure Resource Graph `data` responses
+and GCP Cloud Asset resource arrays. Initial Azure rules cover storage access
+and public administrative NSG rules; GCP rules cover public administrative
+firewall access and bucket access controls. Missing properties remain unknown.
+Azure pagination tokens fail closed: provide complete exports if a subscription
+exceeds the 1000-resource query limit. No provider settings are modified.
+Save comparable JSON reports and use `baseline` to detect newly observed cloud
+risks. This does not track every benign configuration change or prove resolution.

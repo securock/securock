@@ -29,6 +29,7 @@ func newSecurityCommand(opts *options) *cobra.Command {
 	var inventories []string
 	var awsRegion, awsProfile string
 	var coverageOutput string
+	var scopes cloudScopes
 	cmd := &cobra.Command{
 		Use:   "security [path]",
 		Short: "Audit dependencies, source code, secrets, and infrastructure together",
@@ -57,6 +58,9 @@ combined report. Operational failures still exit 2, even with --no-fail.`,
 				return opErr(err)
 			}
 			if err := validateCSPM(awsRegion, awsProfile, net); err != nil {
+				return opErr(err)
+			}
+			if err := scopes.validate(net); err != nil {
 				return opErr(err)
 			}
 			cooldown, err := parseAge("", pol.Rules.Health.MinReleaseAge)
@@ -118,6 +122,9 @@ combined report. Operational failures still exit 2, even with --no-fail.`,
 			cloud, cloudErr := scanCSPM(cmd.Context(), inventories, awsRegion, awsProfile)
 			found = append(found, cloud...)
 			scanErr = errors.Join(scanErr, cloudErr)
+			extra, extraErr := scopes.scan(cmd.Context())
+			found = append(found, extra...)
+			scanErr = errors.Join(scanErr, extraErr)
 			if abs, err := filepath.Abs(path); err == nil {
 				finding.RelativeTo(found, abs)
 			}
@@ -154,5 +161,6 @@ combined report. Operational failures still exit 2, even with --no-fail.`,
 	cmd.Flags().StringVar(&awsRegion, "aws-region", "", "collect recorded AWS Config resources through the AWS CLI in this region (requires allow-all)")
 	cmd.Flags().StringVar(&awsProfile, "aws-profile", "", "AWS CLI profile for --aws-region")
 	cmd.Flags().StringVar(&coverageOutput, "coverage-output", "", "write a JSON scope and incomplete-evidence summary")
+	scopes.bind(cmd)
 	return cmd
 }

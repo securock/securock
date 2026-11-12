@@ -37,6 +37,9 @@ func Read(r io.Reader) (finding.Report, error) {
 	if len(raw) > MaxInventoryBytes {
 		return finding.New("cspm", nil), fmt.Errorf("AWS Config inventory exceeds %d bytes", MaxInventoryBytes)
 	}
+	if report, ok, err := OtherCloud(raw); ok {
+		return report, err
+	}
 	var envelope struct {
 		Items     json.RawMessage `json:"configurationItems"`
 		Results   json.RawMessage `json:"Results"`
