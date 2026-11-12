@@ -903,3 +903,31 @@ and SAML federation in your IdP; SAML-only deployments require an OIDC identity
 broker. Native SAML assertion processing is not provided. Key rotation is explicit:
 pin overlapping trusted keys, restart services, then remove retired keys. Identity
 verification makes no network requests and works offline.
+
+## Shared control plane
+
+`serve oidc.json --state-dir PRIVATE_DIR --tls-cert CERT --tls-key KEY` runs a
+single-instance management API. Set `SECUROCK_STATE_KEY` to a base64-encoded
+32-byte random key, provision it from your secret manager, and retain it separately
+from backups. AES-256-GCM protects the atomic state snapshot. A directory lock
+rejects concurrent server processes. Do not use network filesystems or start
+multiple replicas; this backend has a 64 MiB capacity bound. Only stop-confirmed
+crash recovery may remove `instance.lock`. TLS is mandatory except explicit
+`--local-http` on a literal loopback address. Offline mode refuses serving.
+
+Send `Authorization: Bearer` API-audience OIDC tokens. `GET /api/v1/me`,
+`GET/POST /api/v1/projects` (`id`, `name`, `owner`), `GET/POST /api/v1/jobs`
+(`id`, `project`), and `GET/DELETE /api/v1/jobs/ID` provide team inventory and
+a durable queue. Job IDs are caller-provided idempotency keys. Lists and details
+are tenant-scoped; project and job quotas are enforced. The response envelope
+follows `control-response.schema.json`. No source code is uploaded by these APIs.
+
+Provisioner/admin tokens can use `/scim/v2/Users`: GET list/detail, POST create, PUT
+replace, PATCH replace active/roles, DELETE deactivate. User objects contain `userName` (exact OIDC subject),
+`active`, and `roles` (SCIM objects with `value` reader/developer/reviewer/runner).
+Supply the core User schema in `schemas`. UserName equality filtering is supported.
+This is a limited SCIM Users connector; Groups and general filters are unsupported. Protected
+bootstrap admins/provisioners are managed in operator configuration; provisioning
+cannot grant these roles. Deactivation rejects existing tokens immediately.
+SSO subjects must be unique across tenants. Put an API gateway in front for
+Internet rate limiting. `/healthz` discloses readiness only.
