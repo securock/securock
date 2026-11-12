@@ -713,3 +713,10 @@ must match. IDs, subjects and source files are matched without line numbers.
 Incomplete/unchecked evidence remains visible. Missing findings are unobserved,
 not certified fixed: compare identical scanner settings and scope. Standard finding
 formats are supported; JSON retains the current report's tool and schema.
+
+## Scan coverage
+
+`securock security . --coverage-output coverage.json` writes the requested live
+targets, recorded AWS account/regions, and incomplete/unchecked evidence to a
+separate JSON file (`coverage-report.schema.json`). Attempted scopes do not
+certify exhaustive source or route coverage; every gap remains visible.

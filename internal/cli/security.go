@@ -1,12 +1,15 @@
 package cli
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
 	"path/filepath"
 	"time"
 
 	"github.com/securock/securock/internal/audit"
+	"github.com/securock/securock/internal/coverage"
 	"github.com/securock/securock/internal/dast"
 	"github.com/securock/securock/internal/ecosystem"
 	"github.com/securock/securock/internal/exceptions"
@@ -25,6 +28,7 @@ func newSecurityCommand(opts *options) *cobra.Command {
 	var dastTimeout time.Duration
 	var inventories []string
 	var awsRegion, awsProfile string
+	var coverageOutput string
 	cmd := &cobra.Command{
 		Use:   "security [path]",
 		Short: "Audit dependencies, source code, secrets, and infrastructure together",
@@ -118,6 +122,15 @@ combined report. Operational failures still exit 2, even with --no-fail.`,
 				finding.RelativeTo(found, abs)
 			}
 			report := exceptions.Apply(finding.New("security", found), accepted, time.Now().UTC())
+			if coverageOutput != "" {
+				raw, err := json.MarshalIndent(coverage.Build(report, targets, inventories, awsRegion), "", "  ")
+				if err != nil {
+					return opErr(err)
+				}
+				if err := os.WriteFile(coverageOutput, append(raw, '\n'), 0600); err != nil {
+					return opErr(err)
+				}
+			}
 			if err := finding.Write(cmd.OutOrStdout(), report, opts.format); err != nil {
 				return opErr(err)
 			}
@@ -140,5 +153,6 @@ combined report. Operational failures still exit 2, even with --no-fail.`,
 	cmd.Flags().StringArrayVar(&inventories, "cloud-inventory", nil, "also inspect an AWS Config inventory JSON file (repeatable; works offline)")
 	cmd.Flags().StringVar(&awsRegion, "aws-region", "", "collect recorded AWS Config resources through the AWS CLI in this region (requires allow-all)")
 	cmd.Flags().StringVar(&awsProfile, "aws-profile", "", "AWS CLI profile for --aws-region")
+	cmd.Flags().StringVar(&coverageOutput, "coverage-output", "", "write a JSON scope and incomplete-evidence summary")
 	return cmd
 }
