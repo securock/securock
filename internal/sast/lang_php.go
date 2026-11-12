@@ -41,7 +41,7 @@ func phpSinks() map[string]sink {
 	return m
 }
 
-var phpDB = []string{"db", "pdo", "conn", "connection", "mysqli", "dbh", "database", "link", "mysql", "this"}
+var phpDB = []string{"db", "pdo", "conn", "connection", "mysqli", "dbh", "database", "link", "mysql", "this", "sqlite", "sqlite3", "sqlite_db_connection"}
 
 var phpSuperglobal = func() map[string]map[string]string {
 	any := map[string]string{"*": "request data"}

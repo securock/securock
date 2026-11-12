@@ -38,3 +38,23 @@ func TestPHPQuotedSQLEscaping(t *testing.T) {
 		})
 	}
 }
+
+func TestPHPSQLiteReceivers(t *testing.T) {
+	for _, tt := range []struct {
+		name, body string
+		want       []string
+	}{
+		{"global sqlite connection", `global $sqlite_db_connection; $sqlite_db_connection->query("SELECT * FROM users WHERE id = '" . $_GET['id'] . "'");`, []string{"sast:php/sql-injection"}},
+		{"SQLite3 object", `$sqlite = new SQLite3('app.db'); $sqlite->query("SELECT * FROM users WHERE id = " . $_POST['id']);`, []string{"sast:php/sql-injection"}},
+		{"literal query", `$sqlite_db_connection->query("SELECT * FROM users");`, nil},
+		{"integer conversion", `$id = intval($_GET['id']); $sqlite_db_connection->query("SELECT * FROM users WHERE id = $id");`, nil},
+		{"bound parameter", `$q = $sqlite_db_connection->prepare('SELECT * FROM users WHERE id = :id'); $q->bindValue(':id', $_GET['id']); $q->execute();`, nil},
+		{"unrelated receiver is not a database", `$cache->query($_GET['id']);`, nil},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := slices.Compact(analyze(t, map[string]string{"a.php": "<?php\n" + tt.body + "\n"})); !slices.Equal(got, tt.want) {
+				t.Fatalf("got %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

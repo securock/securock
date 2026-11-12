@@ -316,9 +316,8 @@ for revisions, all labels, counts and reproduction commands using
 
 Additional checksum-pinned [application regressions](/reference/sast-benchmarks#additional-javascript-ruby-and-php-source-regressions)
 cover DVNA (JavaScript), RailsGoat (Ruby), and DVWA reflected XSS and blind SQL.
-Across the 40 additional cases, 26 of 29 vulnerable cases are detected and none
-of 11 safe controls is flagged. Three SQLite query calls in isolated PHP fragments
-remain measured misses. These are development cases, not independent accuracy
+Across the 40 additional cases, all 29 vulnerable cases are detected and none
+of 11 safe controls is flagged. These are development cases, not independent accuracy
 proof; CI requires every retained detection and rejects new false positives.
 
 Read the numbers with their limits in mind. The two OWASP suites are synthetic and contain

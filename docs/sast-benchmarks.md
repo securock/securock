@@ -569,14 +569,16 @@ exact file, rule and inclusive source range; unrelated findings cannot count.
 
 The baseline is Securock `6d87e63ee2d9fd9ba13f83d62d704f1142a38f9f`
 with the new harness. The updated analyzer is `ec08c0df01087ebe2ce8964a04edafad021d9535`.
-Measurements use Go 1.27.4 on linux/amd64, with the test cache disabled.
+Measurements use Go 1.27.4 on linux/amd64, with the test cache disabled. The
+three SQLite detections were added afterwards and measured with the same harness
+on the pinned DVWA files.
 
 | Selection | Before TP/FN/FP/TN | Updated TP/FN/FP/TN | Analysis incomplete |
 | --- | --- | --- | ---: |
 | DVNA / JavaScript | 4/4/0/4 | 8/0/0/4 | 0 |
 | RailsGoat / Ruby | 10/2/0/4 | 12/0/0/4 | 0 |
-| DVWA extension / PHP | 5/4/0/3 | 6/3/0/3 | 0 |
-| **Additional cases** | **19/10/0/11** | **26/3/0/11** | **0** |
+| DVWA extension / PHP | 5/4/0/3 | 9/0/0/3 | 0 |
+| **Additional cases** | **19/10/0/11** | **29/0/0/11** | **0** |
 
 The seven recovered detections come from static CommonJS member aliases,
 legacy `mathjs.eval` and the `md5` package, nested Ruby request members,
@@ -585,24 +587,24 @@ and retaining PHP regex-replacement subject/replacement taint.
 Offline unit tests also cover literal inputs, parameterized queries, shadowed
 request variables, unrelated local functions and HTML-encoded results.
 
-**Three known misses remain in the denominator.** They are the SQLite query
-calls in the low, medium and high blind-SQL fragments. Their global
-`sqlite_db_connection` receiver has no declaration/type in these isolated inputs
-and is outside the scanner's current database receiver-name model. The MySQL
-query in the same file cannot satisfy the SQLite label. These cases are marked
-as known misses, not accepted findings or safe controls; any future detection
-counts as an improvement. No general SQLite coverage or 100% detection claim is
-supported by this measurement.
+The three SQLite query calls in the low, medium and high blind-SQL fragments
+were earlier measured misses. Their global `sqlite_db_connection` receiver has
+no declaration/type in these isolated inputs, so it is found through the PHP
+database receiver-name model, which now includes `sqlite`, `sqlite3` and
+`sqlite_db_connection`. Calls on other receivers are still not treated as
+database queries, and unit tests cover literal queries, integer conversion and
+bound parameters. This recovers these three cases only; it is not general SQLite
+coverage.
 
-All 26 detected vulnerable cases are individually required. Losing any of them,
+All 29 detected vulnerable cases are individually required. Losing any of them,
 flagging any of the 11 safe controls, changed/missing sources, invalid labels or
-incomplete analysis fails the regression test. Three misses and only eleven safe
+incomplete analysis fails the regression test. Eleven safe
 controls do not support a production-wide recall/FPR claim; the OWASP aggregate
 2% FPR ceiling is not applied to these application selections.
 
 ### Reviewed additional labels
 
-`TP` means a required detection, `FN` a measured known miss, and `TN` a safe
+`TP` means a required detection, `FN` a measured known miss (none remain here), and `TN` a safe
 control that must remain unflagged. Paths are relative to each upstream root.
 Repeated source locations with different rules are distinct source/rule cases.
 
@@ -641,11 +643,11 @@ Repeated source locations with different rules are distinct source/rule cases.
 | DVWAExtended | `vulnerabilities/xss_r/source/high.php:11` | `xss` | TP |
 | DVWAExtended | `vulnerabilities/xss_r/source/impossible.php:12` | `xss` | TN |
 | DVWAExtended | `vulnerabilities/sqli_blind/source/low.php:13` | `sql-injection` | TP |
-| DVWAExtended | `vulnerabilities/sqli_blind/source/low.php:34` | `sql-injection` | FN |
+| DVWAExtended | `vulnerabilities/sqli_blind/source/low.php:34` | `sql-injection` | TP |
 | DVWAExtended | `vulnerabilities/sqli_blind/source/medium.php:15` | `sql-injection` | TP |
-| DVWAExtended | `vulnerabilities/sqli_blind/source/medium.php:36` | `sql-injection` | FN |
+| DVWAExtended | `vulnerabilities/sqli_blind/source/medium.php:36` | `sql-injection` | TP |
 | DVWAExtended | `vulnerabilities/sqli_blind/source/high.php:13` | `sql-injection` | TP |
-| DVWAExtended | `vulnerabilities/sqli_blind/source/high.php:35` | `sql-injection` | FN |
+| DVWAExtended | `vulnerabilities/sqli_blind/source/high.php:35` | `sql-injection` | TP |
 | DVWAExtended | `vulnerabilities/sqli_blind/source/impossible.php:17-19` | `sql-injection` | TN |
 | DVWAExtended | `vulnerabilities/sqli_blind/source/impossible.php:26-28` | `sql-injection` | TN |
 

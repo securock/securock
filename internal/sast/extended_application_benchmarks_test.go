@@ -72,19 +72,19 @@ func TestDVWAExtended(t *testing.T) {
 		{"vulnerabilities/sqli_blind/source/high.php", "35165a2b85a80880b566a4605d2b23af5eefa5fff12e5b13961789dc4fafdc82"},
 		{"vulnerabilities/sqli_blind/source/impossible.php", "ccd72dcc781d921f3acbc02da2609018f2d604921a51e74d6b097624ddc18f83"},
 	}
-	// SQLite queries remain measured misses: their global receiver has no type
-	// declaration in these isolated fragments and is not a modeled DB name.
+	// The SQLite queries use a global receiver with no type declaration in these
+	// isolated fragments, so they are found through the modeled receiver names.
 	cases := []applicationCase{
 		{"vulnerabilities/xss_r/source/low.php", "sast:php/xss", 8, 8, true, true, false},
 		{"vulnerabilities/xss_r/source/medium.php", "sast:php/xss", 11, 11, true, true, false},
 		{"vulnerabilities/xss_r/source/high.php", "sast:php/xss", 11, 11, true, true, false},
 		{"vulnerabilities/xss_r/source/impossible.php", "sast:php/xss", 12, 12, false, false, false},
 		{"vulnerabilities/sqli_blind/source/low.php", "sast:php/sql-injection", 13, 13, true, true, false},
-		{"vulnerabilities/sqli_blind/source/low.php", "sast:php/sql-injection", 34, 34, true, false, false},
+		{"vulnerabilities/sqli_blind/source/low.php", "sast:php/sql-injection", 34, 34, true, true, false},
 		{"vulnerabilities/sqli_blind/source/medium.php", "sast:php/sql-injection", 15, 15, true, true, false},
-		{"vulnerabilities/sqli_blind/source/medium.php", "sast:php/sql-injection", 36, 36, true, false, false},
+		{"vulnerabilities/sqli_blind/source/medium.php", "sast:php/sql-injection", 36, 36, true, true, false},
 		{"vulnerabilities/sqli_blind/source/high.php", "sast:php/sql-injection", 13, 13, true, true, false},
-		{"vulnerabilities/sqli_blind/source/high.php", "sast:php/sql-injection", 35, 35, true, false, false},
+		{"vulnerabilities/sqli_blind/source/high.php", "sast:php/sql-injection", 35, 35, true, true, false},
 		{"vulnerabilities/sqli_blind/source/impossible.php", "sast:php/sql-injection", 17, 19, false, false, false},
 		{"vulnerabilities/sqli_blind/source/impossible.php", "sast:php/sql-injection", 26, 28, false, false, false},
 	}
