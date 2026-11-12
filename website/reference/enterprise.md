@@ -119,3 +119,14 @@ redaction, source fix verification, release/SBOM binding and accuracy labels.
 The local browser scenario exercises organization login, a private scan runner,
 shared assignment, tenant denial, logout and authenticated backup/restore.
 Retain CI results and customer PoC evidence alongside this control description.
+
+Parser resilience checks can be reproduced with:
+
+```bash
+go test -fuzz=FuzzVerifyAccessToken -fuzztime=30s -parallel=2 ./internal/identity
+go test -fuzz=FuzzAuthorizationMatrix -fuzztime=30s -parallel=2 ./internal/dast
+```
+
+These exercise malformed access tokens and authorization contracts without
+contacting an identity provider or application. They complement role/isolation
+tests and do not replace a penetration test of a real deployment.
