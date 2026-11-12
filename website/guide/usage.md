@@ -1002,8 +1002,8 @@ Updates use the provider API and subsequent polling records the actual state.
 Open `/ui` on the management service to sign in with an API access token,
 register projects, request scans and inspect shared results. The token lives only
 in page memory and is cleared on sign-out. Output is rendered as text; no CDN,
-analytics or external scripts are used. OIDC browser redirects are not implemented:
-obtain the API token through your organization's approved client.
+analytics or external scripts are used. For browser sign-in, configure the optional OIDC code/PKCE connector below;
+manual API tokens remain available for approved API clients.
 
 `GET /api/v1/metrics` provides tenant counts by job status and finding severity.
 Admins may `GET /api/v1/export` to export tenant state (lease secrets redacted),
@@ -1170,3 +1170,22 @@ changed fixtures and fails increased false positives/negatives. All local inputs
 must be within the fingerprint root; symlinks and oversized fixtures are rejected.
 Live provider/browser validation stays in `integration`, separately from this
 repeatable source/cloud-export benchmark. JSON follows `quality-report.schema.json`.
+
+## Organization browser sign-in
+
+`serve ... --sso sso.json --network allow-all` enables OIDC authorization-code
+login with S256 PKCE, one-time state, nonce-verified ID tokens and a separate
+API-audience access token. `sso.json` contains pinned HTTPS `authorize_url`,
+`token_url`, `client_id`, optional `secret_env`, public service origin `public_url`,
+and `scopes` (include openid and your API scopes). Register the exact callback
+PUBLIC_ORIGIN/auth/callback in your IdP. Both tokens must use the operator-pinned
+issuer/keys; API access tokens must target the configured API audience.
+
+The console shows organization sign-in. Session cookies are HttpOnly/SameSite
+and Secure on HTTPS; loopback HTTP is development-only. Cookie-authenticated
+mutations require the same Origin and a custom request header. Sessions are
+held only in process memory, expire after 15 minutes, and revalidate membership
+and token expiry on every request. Logout invalidates the local session; IdP
+logout/revocation remains IdP-managed. Restarting signs sessions out. MFA and
+SAML federation remain IdP responsibilities. No implicit issuer discovery or
+untrusted remote key fetching occurs.

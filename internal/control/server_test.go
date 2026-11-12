@@ -37,7 +37,8 @@ func fixture(t *testing.T) (*control.Server, func(string) string, string) {
 	id := identity.Config{Issuer: "https://id.example", Audience: "api", Keys: []identity.Key{{Kty: "RSA", Kid: "k", N: enc(k.N.Bytes()), E: enc(big.NewInt(int64(k.E)).Bytes())}}, Bindings: bindings}
 	sign := func(sub string) string {
 		h := enc([]byte(`{"alg":"RS256","kid":"k"}`))
-		b, _ := json.Marshal(map[string]any{"iss": id.Issuer, "aud": id.Audience, "sub": sub, "exp": time.Now().Unix() + 3600})
+		subject, nonce, _ := strings.Cut(sub, "|")
+		b, _ := json.Marshal(map[string]any{"iss": id.Issuer, "aud": id.Audience, "sub": subject, "nonce": nonce, "exp": time.Now().Unix() + 3600})
 		msg := h + "." + enc(b)
 		sum := sha256.Sum256([]byte(msg))
 		sig, _ := rsa.SignPKCS1v15(rand.Reader, k, crypto.SHA256, sum[:])

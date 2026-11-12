@@ -280,3 +280,12 @@ and refuses offline; redirects are disabled. GitHub OAuth mutation also sends
 the owning app's client credentials. Checks do not imply mutation; revoke and
 rotate require their explicit action. Replacement tokens go only to an exclusive
 private local file. No scanned source token is submitted automatically.
+
+## OIDC browser authentication
+
+Explicit `serve --sso ... --network allow-all` redirects users to the pinned IdP
+authorization endpoint and exchanges a one-time code at the pinned HTTPS token
+endpoint. Client secrets, code verifiers and tokens are not logged. Token-endpoint
+redirects are refused. Session tokens stay in process memory; no browser storage
+is used. Public URL and callback URLs must match the operator's approved service
+origin. Offline mode cannot enable this network service.

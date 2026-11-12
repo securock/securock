@@ -8,10 +8,10 @@ import (
 	"net/http"
 	"slices"
 	"strings"
-	"time"
 )
 
 type Server struct {
+	SSO            *BrowserSSO
 	Connectors     []Connector
 	DeliveryClient *http.Client
 	Store          *Store
@@ -19,21 +19,19 @@ type Server struct {
 }
 
 func (s *Server) principal(r *http.Request) (identity.Principal, error) {
-	c := s.Identity
-	c.Bindings = nil
-	for tenant, t := range s.Store.Read().Tenants {
-		for _, m := range t.Members {
-			if m.Active {
-				c.Bindings = append(c.Bindings, identity.Binding{Subject: m.Subject, Tenant: tenant, Roles: m.Roles})
-			}
+	header := r.Header.Get("Authorization")
+	if strings.HasPrefix(header, "Bearer ") && strings.TrimSpace(strings.TrimPrefix(header, "Bearer ")) != "" {
+		return s.tokenPrincipal(strings.TrimPrefix(header, "Bearer "))
+	}
+	if s.SSO != nil {
+		token, e := s.SSO.token(r)
+		if e == nil {
+			return s.tokenPrincipal(token)
 		}
 	}
-	header := r.Header.Get("Authorization")
-	if !strings.HasPrefix(header, "Bearer ") {
-		return identity.Principal{}, fmt.Errorf("authentication required")
-	}
-	return c.Verify(strings.TrimPrefix(header, "Bearer "), time.Now())
+	return identity.Principal{}, fmt.Errorf("authentication required")
 }
+
 func reply(w http.ResponseWriter, status int, v any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
@@ -55,12 +53,15 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.Header().Set("Content-Security-Policy", "default-src 'none'; frame-ancestors 'none'")
 	w.Header().Set("Strict-Transport-Security", "max-age=31536000")
+	if s.browserAuth(w, r) {
+		return
+	}
 	if r.URL.Path == "/healthz" && r.Method == "GET" {
 		reply(w, 200, map[string]string{"status": "ready"})
 		return
 	}
 	if (r.URL.Path == "/ui" || r.URL.Path == "/") && r.Method == "GET" {
-		console(w)
+		console(w, s.SSO != nil)
 		return
 	}
 	if r.URL.Path == "/unused-index" && r.Method == "GET" {
