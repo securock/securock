@@ -1,4 +1,6 @@
-# Securock
+<p align="center">
+  <img src="docs/assets/logo.svg" alt="Securock" height="64">
+</p>
 
 **Security for dependencies, source code, secrets, and infrastructure.**
 

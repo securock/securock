@@ -7,3 +7,4 @@ coverage.out
 website/node_modules/
 website/.vitepress/dist/
 website/.vitepress/cache/
+scripts/node_modules/
