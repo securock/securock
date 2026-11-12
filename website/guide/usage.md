@@ -887,3 +887,19 @@ explicit as-of date or stored triage flags, not the viewing computer's clock.
 The report makes no external requests and needs no hosted service, CDN, font,
 JavaScript package or telemetry. User content is escaped and scripts are CSP
 hash-allowlisted. Protect exported HTML as project security data.
+
+## Enterprise identity
+
+`identity oidc.json --token-env SECUROCK_TOKEN` verifies an RS256 OIDC access
+token using pinned RSA JWKS keys, an exact HTTPS issuer and API audience, expiry
+and not-before claims. The JSON config contains `issuer`, `audience`, `keys`
+(a JWKS `keys` array), and `bindings` (`subject`, `tenant`, `roles`). Roles are
+admin, reader, developer, reviewer, runner and provisioner. Unknown subjects and
+algorithms fail closed. Tokens are read only from the environment and never printed.
+JSON output follows `identity-report.schema.json`.
+
+Use an API audience, not an ID token intended for another client. Operate MFA
+and SAML federation in your IdP; SAML-only deployments require an OIDC identity
+broker. Native SAML assertion processing is not provided. Key rotation is explicit:
+pin overlapping trusted keys, restart services, then remove retired keys. Identity
+verification makes no network requests and works offline.
