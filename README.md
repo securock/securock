@@ -157,7 +157,8 @@ versions, and resolver-specific limits.
 
 ## Status and privacy
 
-Securock is pre-1.0. Source-analysis coverage and accuracy depend on the
+Securock is pre-1.0. Use `quality --per-rule --max-fpr 0.02` to gate labeled fixtures by rule.
+Source-analysis coverage and accuracy depend on the
 language, framework, and rule; see the
 [analysis guide](website/guide/sast.md#how-accurate-is-sast) and
 [benchmark methodology](docs/sast-benchmarks.md).

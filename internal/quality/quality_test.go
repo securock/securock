@@ -47,3 +47,35 @@ func TestFixtureChangesInvalidateComparison(t *testing.T) {
 		t.Fatal("fixture change missed", e)
 	}
 }
+
+func TestPerRuleGateCannotHideWeakCategory(t *testing.T) {
+	results := []quality.Result{}
+	for i := 0; i < 100; i++ {
+		r, e := quality.Evaluate(validation.Step{Name: fmt.Sprint(i), Expected: []string{"strong"}, Forbidden: []string{"weak"}}, finding.New("security", []finding.Finding{{ID: "strong"}}), nil)
+		if e != nil {
+			t.Fatal(e)
+		}
+		results = append(results, r)
+	}
+	r, e := quality.Evaluate(validation.Step{Name: "weak-positive", Expected: []string{"weak"}}, finding.New("security", nil), nil)
+	if e != nil {
+		t.Fatal(e)
+	}
+	results = append(results, r)
+	aggregate := quality.Aggregate(results, "fixture", "engine", .9, .9)
+	if !aggregate.Passed {
+		t.Fatal("aggregate should hide the weak rule before per-rule gating")
+	}
+	quality.GateRules(&aggregate, .9, .9, .02, true)
+	if aggregate.Passed {
+		t.Fatal("weak rule was hidden by aggregate accuracy")
+	}
+}
+
+func TestFalsePositiveRateUsesSafeCases(t *testing.T) {
+	r := quality.Report{Passed: true, TP: 1000, FP: 3, TN: 97}
+	quality.GateRules(&r, 0, 0, .02, false)
+	if r.Passed {
+		t.Fatal("3 percent false-positive rate passed 2 percent limit")
+	}
+}

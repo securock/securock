@@ -10,6 +10,7 @@ import (
 	"github.com/securock/securock/internal/quality"
 	"github.com/securock/securock/internal/validation"
 	"github.com/spf13/cobra"
+	"math"
 	"os"
 	"path/filepath"
 	"strings"
@@ -17,9 +18,10 @@ import (
 
 func newQualityCommand(opts *options) *cobra.Command {
 	var fixtureRoot, baselineFile string
-	var precision, recall float64
+	var precision, recall, maxFPR float64
+	var perRule bool
 	c := &cobra.Command{Use: "quality SUITE.json", Short: "Gate offline fixture accuracy and compare regressions on identical fixture bytes", Args: cobra.ExactArgs(1), RunE: func(c *cobra.Command, a []string) error {
-		if precision < 0 || precision > 1 || recall < 0 || recall > 1 || fixtureRoot == "" {
+		if math.IsNaN(maxFPR) || math.IsNaN(precision) || math.IsNaN(recall) || maxFPR < 0 || maxFPR > 1 || precision < 0 || precision > 1 || recall < 0 || recall > 1 || fixtureRoot == "" {
 			return opErr(fmt.Errorf("fixture root and precision/recall in [0,1] required"))
 		}
 		f, e := os.Open(a[0])
@@ -96,6 +98,7 @@ func newQualityCommand(opts *options) *cobra.Command {
 			results = append(results, result)
 		}
 		r := quality.Aggregate(results, fingerprint, "sha256:"+hex.EncodeToString(sum[:]), precision, recall)
+		quality.GateRules(&r, precision, recall, maxFPR, perRule)
 		if baselineFile != "" {
 			raw, e := os.ReadFile(baselineFile)
 			if e != nil {
@@ -121,5 +124,7 @@ func newQualityCommand(opts *options) *cobra.Command {
 	c.Flags().StringVar(&baselineFile, "baseline", "", "quality report with the identical suite and fixture digest")
 	c.Flags().Float64Var(&precision, "min-precision", 1, "minimum rule-per-fixture precision")
 	c.Flags().Float64Var(&recall, "min-recall", 1, "minimum rule-per-fixture recall")
+	c.Flags().Float64Var(&maxFPR, "max-fpr", 1, "maximum false-positive rate across explicitly labeled safe cases")
+	c.Flags().BoolVar(&perRule, "per-rule", false, "also enforce precision, recall and false-positive thresholds for each rule")
 	return c
 }

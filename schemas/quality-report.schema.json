@@ -75,6 +75,41 @@
     },
     "passed": {
       "type": "boolean"
+    },
+    "rules": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "tp",
+          "fp",
+          "fn",
+          "tn"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "tp": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "fp": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "fn": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "tn": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      }
     }
   }
 }

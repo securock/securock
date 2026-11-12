@@ -1269,3 +1269,13 @@ server authorization remains authoritative. Views refresh periodically without
 interrupting focused form edits. Sign-out invalidates in-flight rendering so an
 older response cannot repopulate the cleared workspace. Scripts and styles are
 embedded with CSP content hashes; customer fields use DOM text rendering only.
+
+## Per-rule accuracy gates
+
+`quality suite.json --fixture-root fixtures --per-rule --max-fpr 0.02`
+applies the configured precision and recall minimums to each labeled rule and
+limits false positives to 2% of explicitly safe labels, both overall and per rule.
+JSON reports retain deterministic per-rule TP/FP/FN/TN counts. A rule with no
+positive or safe labels has no recall or false-positive estimate respectively.
+Keep independent evaluation sources and labels separate from development fixtures;
+this command does not establish that a suite is independent or representative.
