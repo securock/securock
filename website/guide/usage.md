@@ -1255,3 +1255,13 @@ non-root execution and protected runtime credentials; configure and validate it
 on your target host before enabling it. The enterprise operations guide covers
 data flows, retention, recovery, incident handling, acceptance checks and explicit
 implementation limits. See [enterprise operations](/reference/enterprise).
+
+## Exception review console
+
+The shared console now includes an authenticated exception request/review queue,
+separate-reviewer action controls, UTC expiry, audit export, queued-job cancellation
+and workspace counts. Reader/reviewer/developer controls follow their roles;
+server authorization remains authoritative. Views refresh periodically without
+interrupting focused form edits. Sign-out invalidates in-flight rendering so an
+older response cannot repopulate the cleared workspace. Scripts and styles are
+embedded with CSP content hashes; customer fields use DOM text rendering only.
