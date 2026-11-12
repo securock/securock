@@ -3,6 +3,8 @@ package cli
 import (
 	"errors"
 	"fmt"
+
+	"github.com/securock/securock/internal/finding"
 )
 
 const (
@@ -37,4 +39,21 @@ func opErr(err error) error {
 
 func asExit(err error, target *exitError) bool {
 	return errors.As(err, target)
+}
+
+// incompleteErr is the fail-closed result for a source analysis that left files
+// unanalyzed. Severity ranks vulnerabilities, not whether the scan finished, so this
+// is not gated by --fail-on or --no-fail: an unfinished scan must not read as a pass.
+// Accepting the finding with an exception is the explicit way to allow it.
+func incompleteErr(report finding.Report) error {
+	n := 0
+	for _, f := range report.Findings {
+		if f.ID == "sast:analysis-incomplete" && f.Suppressed == nil {
+			n++
+		}
+	}
+	if n == 0 {
+		return nil
+	}
+	return exitError{code: exitFail, msg: fmt.Sprintf("source analysis incomplete: %d file(s) not analyzed; vulnerabilities in them are unknown, not absent", n)}
 }

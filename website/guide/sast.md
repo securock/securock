@@ -88,7 +88,11 @@ false, `Digest::MD5`) by its arguments. A call that states
 `usedforsecurity=False` is not flagged.
 
 `sast:analysis-incomplete` (info) marks a file that could not be analyzed, including
-analysis that exhausted its convergence budget.
+analysis that exhausted its convergence budget. Severity ranks vulnerabilities, not
+whether the scan finished, so `sast` and `security` exit 2 while any such finding is
+unaccepted, regardless of `--fail-on` and `--no-fail`. The report is still written. Fix
+the file, or accept the finding with [`accept`](/guide/reports#accept-findings) when
+leaving it unanalyzed is deliberate.
 
 ## Third-party code in the tree
 

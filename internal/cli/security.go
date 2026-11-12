@@ -191,6 +191,9 @@ combined report. Operational failures still exit 2, even with --no-fail.`,
 			if scanErr != nil {
 				return opErr(scanErr)
 			}
+			if err := incompleteErr(report); err != nil {
+				return err
+			}
 			if !opts.noFail {
 				if n := report.AtLeast(threshold); n > 0 {
 					return trustErr("findings at or above %s: %d", threshold, n)

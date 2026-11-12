@@ -57,6 +57,9 @@ into the API it calls; the package's own findings are not reported.`,
 			if err := finding.Write(cmd.OutOrStdout(), report, opts.format); err != nil {
 				return opErr(err)
 			}
+			if err := incompleteErr(report); err != nil {
+				return err
+			}
 			if opts.noFail {
 				return nil
 			}

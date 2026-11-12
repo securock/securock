@@ -108,3 +108,28 @@ func TestSASTFailsOnFindingUnlessNoFail(t *testing.T) {
 		t.Fatalf("output = %s", out)
 	}
 }
+
+// A file that cannot be analyzed is info-severity, below the default --fail-on high, so
+// only the incomplete-analysis check keeps an unfinished scan from reading as a pass.
+func TestAnalysisIncompleteFailsClosed(t *testing.T) {
+	isolateHome(t)
+	dir := writeGo(t, "package main\n\nfunc broken( {\n")
+	for _, cmd := range []string{"sast", "security"} {
+		t.Run(cmd, func(t *testing.T) {
+			out, err := runCLIErr(t, cmd, dir, "--offline", "--format", "json")
+			if err == nil || !strings.Contains(err.Error(), "source analysis incomplete") {
+				t.Fatalf("incomplete analysis must fail: err=%v\n%s", err, out)
+			}
+			if !strings.Contains(out, "sast:analysis-incomplete") {
+				t.Fatalf("report must still list the unanalyzed file:\n%s", out)
+			}
+			if _, err := runCLIErr(t, cmd, dir, "--offline", "--no-fail", "--format", "json"); err == nil {
+				t.Fatal("--no-fail must not hide an unfinished analysis")
+			}
+		})
+	}
+	runCLI(t, "accept", "sast:analysis-incomplete", dir, "--reason", "generated file", "--approver", "alice", "--expires", "2999-12-31", "--subject", "main.go")
+	if out, err := runCLIErr(t, "sast", dir, "--offline", "--format", "json"); err != nil {
+		t.Fatalf("an accepted unanalyzed file must pass: %v\n%s", err, out)
+	}
+}
