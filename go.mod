@@ -10,6 +10,7 @@ require (
 	github.com/sigstore/protobuf-specs v0.5.2
 	github.com/sigstore/sigstore-go v1.3.0
 	github.com/spf13/cobra v1.10.2
+	github.com/spf13/pflag v1.0.10
 	golang.org/x/mod v0.42.0
 	google.golang.org/protobuf v1.36.12
 	gopkg.in/yaml.v3 v3.0.1
@@ -64,7 +65,6 @@ require (
 	github.com/sigstore/rekor-tiles/v2 v2.3.0 // indirect
 	github.com/sigstore/sigstore v1.10.8 // indirect
 	github.com/sigstore/timestamp-authority/v2 v2.1.3 // indirect
-	github.com/spf13/pflag v1.0.10 // indirect
 	github.com/theupdateframework/go-tuf/v2 v2.4.2 // indirect
 	github.com/transparency-dev/formats v0.1.1 // indirect
 	github.com/transparency-dev/merkle v0.0.2 // indirect
