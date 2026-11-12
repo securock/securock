@@ -239,3 +239,11 @@ GitHub/GitLab/Jira/ServiceNow API origins. Issue polling reads remote status.
 Credentials come from the configured environment variable. Redirects are refused,
 response bodies and tokens are not logged, and offline mode refuses serving.
 Only queue content approved for the destination; no automatic source upload occurs.
+
+## Live deployment inventory
+
+`inventory --collect-kubernetes --network allow-all` invokes installed `kubectl`
+with the current context and operator credentials to read pods across namespaces.
+Offline mode refuses live collection; `--pods` reads an existing local export.
+Only inventory JSON is retained; reports include namespace/pod/service-account
+identities and image digests. Treat exports as sensitive infrastructure data.

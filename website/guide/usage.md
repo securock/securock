@@ -1018,3 +1018,21 @@ and the audit chain before accepting a restore; destination must be absent.
 Perform restore drills and compare externally stored audit checkpoints before
 returning to service. Define availability, RTO/RPO and support commitments from
 measured deployments; no availability certification is implied.
+
+## Repository and deployment inventory
+
+`inventory ROOT --pods pods.json --offline` discovers materialized Git repositories,
+HEAD revisions and global `*` CODEOWNERS defaults, then records Kubernetes pods,
+service accounts and running container image digests. Repository IDs are relative
+to ROOT. `--collect-kubernetes --network allow-all` reads pods using installed
+`kubectl` and its current operator-selected context; no cluster writes occur.
+It requires pod-list privileges across namespaces.
+
+JSON follows `inventory-report.schema.json`. Edges distinguish observed runtime
+image identity from declared `securock.dev/project` annotations. Missing running
+digests, scan coverage, source/build linkage, network exposure, effective IAM
+and data access are explicit gaps. A source annotation never proves build
+provenance or exploitability. Tag-only desired images are not reported as verified
+runtime digests. Init/ephemeral containers and non-Kubernetes deployments remain
+outside this collector. Repository discovery is bounded to 1,000 repos and pod
+imports to 10,000 pods.
