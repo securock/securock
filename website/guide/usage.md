@@ -748,7 +748,10 @@ remediation: rerun their original commands with identical scopes.
 reads authentication from the environment without writing it to reports.
 `--openapi api.json` expands up to 100 static GET paths from local OpenAPI 3 JSON;
 parameterized paths are explicitly reported as incomplete. Only the supplied
-origin is used; OpenAPI server declarations cannot redirect scans.
+origin is used. Same-origin server declarations preserve their base paths;
+operation servers override path servers, then document servers. Without a server
+declaration, the supplied URL path is the base. Foreign or variable-based servers
+are skipped and reported as incomplete; they cannot redirect scans.
 `--browser` additionally uses installed Node.js, Playwright and Chromium to inspect
 rendered forms. Browser requests are limited to 100 same-origin GET/HEAD requests;
 mutating, cross-origin and WebSocket requests are blocked and reported as gaps.
