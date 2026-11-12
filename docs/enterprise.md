@@ -76,8 +76,12 @@ trusted. Fully valid older backups still need external checkpoints to detect
 rollback. File sync and atomic rename protect process-crash recovery; qualify
 power-loss durability on the target filesystem separately.
 
-Key rotation must be planned: the current store does not expose automatic
-encryption/signing rekeying or a multi-key historical trust registry. Keep the
+Encryption keys can be rotated with `control-rekey` while service and workers
+are stopped, using mounted current/new keys and the existing audit seed. Update
+the service credential before restart. Rotation atomically rewrites authenticated
+state in either backend and preserves audit signatures. Historical backups still
+need their original encryption keys. Signing-key rotation and a multi-key
+historical trust registry are not implemented. Keep the
 existing keys available for historical restore; provision a reviewed migration
 before retiring them. No software command can recover a lost encryption key.
 

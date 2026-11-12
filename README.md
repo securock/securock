@@ -35,7 +35,7 @@ and policy decisions become visible in code review and enforceable in CI.
   before optional PR creation.
   See [remediation workflows](website/guide/usage.md#finding-lifecycle-and-responsibility).
 - **Work as a team.** Use OIDC SSO, role-based access, SCIM user provisioning,
-  private runners, expiring approvals, signed audit records, and SCM/ticket
+  private runners, expiring approvals, signed audit records, encryption-key rotation with `control-rekey`, and SCM/ticket
   connectors. See [enterprise operations](docs/enterprise.md).
 - **Verify delivered software.** Bind releases to signed artifact and SBOM
   identities, track customer impact, and detect deployment drift. See

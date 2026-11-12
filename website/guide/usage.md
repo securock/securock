@@ -1348,3 +1348,15 @@ with a 64 MiB tenant limit. This local embedded database remains single-instance
 backups, use `control BACKUP --restore --database --state-dir ABSENT_DIRECTORY`.
 Legacy snapshot restores retain their original syntax. Database restores accept
 up to 1 GiB and authenticate the encryption and audit history before succeeding.
+
+## Control-plane encryption-key rotation
+
+Stop service and workers, retain an authenticated backup, then run
+`control-rekey --state-dir DIRECTORY --key-file CURRENT --new-key-file NEXT --audit-key-file AUDIT`.
+All files contain base64-encoded 32-byte keys. Environment equivalents are
+`--key-env`, `--new-key-env` and `--audit-key-env`. State and audit history must
+authenticate before rotation. The legacy snapshot or database is rewritten
+atomically; existing audit signatures and independently recorded checkpoints
+remain valid. Update service credentials to the new key before restarting.
+Retain the old key for historical backups. This rotates encryption keys, not
+audit-signing keys.
