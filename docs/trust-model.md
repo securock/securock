@@ -206,3 +206,11 @@ approver.
 - that non-npm ecosystems collect provenance or signature evidence
 - that capability heuristics catch every malicious behavior
 - that a present trust chain proves the artifact was built from that source
+
+### Additional registry health evidence
+
+Public Go proxy `.info` records supply release dates. Cargo version metadata
+supplies release dates, normalized licenses and yanked status; NuGet catalog
+entries supply available release dates, licenses and deprecation status. Failed
+or mismatched responses leave health unknown. This is registry metadata, not
+cryptographic artifact authentication: signatures and provenance remain unknown.

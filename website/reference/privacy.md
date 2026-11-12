@@ -333,3 +333,14 @@ cookies and captured JSON strings remain in memory. Reports identify the origin
 and scenario step, without paths containing captures or response contents.
 Redirects are not followed, bodies are capped at 1 MiB, and each scenario is
 bounded to 100 requests and two minutes. Use an authorized test deployment.
+
+## Public release metadata
+
+For dependencies already admitted by the network policy, Securock queries
+`proxy.golang.org` module-version `.info`, `crates.io/api/v1/crates/NAME/VERSION`,
+and `api.nuget.org` registration/catalog metadata for release dates, licenses
+and yanked/deprecated status where available. Only the matching public registry
+is supported; private, file, Git and unresolved sources do not use these APIs.
+NuGet catalog references stay on the configured registry origin. Offline mode
+makes none of these requests. These responses do not establish package signatures
+or build provenance, which remain unknown without separate verified evidence.

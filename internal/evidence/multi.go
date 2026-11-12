@@ -14,9 +14,9 @@ type Multi struct {
 }
 
 // NewDefault returns the built-in evidence collectors for supported
-// ecosystems (npm family and PyPI).
+// ecosystems (npm family and PyPI), plus public Go/Cargo/NuGet release metadata.
 func NewDefault() Collector {
-	return &Multi{Collectors: []Collector{NewNPM(), NewPyPI()}}
+	return &Multi{Collectors: []Collector{NewNPM(), NewPyPI(), NewRegistryHealth()}}
 }
 
 func (m *Multi) Collect(ctx context.Context, deps []ecosystem.Dependency) (map[string]Record, error) {

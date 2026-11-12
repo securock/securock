@@ -156,3 +156,11 @@ approver.
 - [Policy](/guide/policy) — encode these floors in YAML
 - [Evidence](/guide/evidence) — operator-facing state guide
 - [Threat model](/reference/threat-model) — what drift does and does not catch
+
+### Additional registry health evidence
+
+Public Go proxy `.info` records supply release dates. Cargo version metadata
+supplies release dates, normalized licenses and yanked status; NuGet catalog
+entries supply available release dates, licenses and deprecation status. Failed
+or mismatched responses leave health unknown. This is registry metadata, not
+cryptographic artifact authentication: signatures and provenance remain unknown.

@@ -153,7 +153,8 @@ trust check is available.
 | Haskell / Dart / Elixir | Cabal, Pub, Mix            |
 
 npm-family resolvers collect npm trust evidence. PyPI resolvers can verify
-PEP 740 attestations. Other evidence may remain `unknown`, including when a
+PEP 740 attestations. Public Go, Cargo and NuGet releases also collect available
+release-date, license and deprecation metadata. Other evidence may remain `unknown`, including when a
 package's public source cannot be established. See the
 [ecosystem guide](website/guide/ecosystems.md) for lockfile formats, supported
 versions, and resolver-specific limits.
