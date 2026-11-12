@@ -2,7 +2,6 @@ package cli
 
 import (
 	"context"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"github.com/securock/securock/internal/control"
@@ -17,7 +16,7 @@ import (
 )
 
 func newServeCommand(opts *options) *cobra.Command {
-	var listen, dir, keyEnv, cert, key, auditEnv, connectors, ssoFile string
+	var listen, dir, keyEnv, cert, key, auditEnv, connectors, ssoFile, keyFile, auditFile string
 	var local bool
 	var rpm int
 	c := &cobra.Command{Use: "serve OIDC.json", Short: "Run the authenticated, tenant-isolated control plane", Args: cobra.ExactArgs(1), RunE: func(c *cobra.Command, a []string) error {
@@ -43,16 +42,16 @@ func newServeCommand(opts *options) *cobra.Command {
 		if (cert == "" || key == "") && (!local || ip == nil || !ip.IsLoopback()) {
 			return opErr(fmt.Errorf("TLS certificate and key required; --local-http permits only literal loopback"))
 		}
-		material, e := base64.StdEncoding.DecodeString(os.Getenv(keyEnv))
+		material, e := serviceSecret(keyEnv, keyFile)
 		if e != nil || len(material) != 32 {
-			return opErr(fmt.Errorf("key environment variable must contain a base64 32-byte key"))
+			return opErr(fmt.Errorf("state encryption secret must contain a base64 32-byte key"))
 		}
 		store, e := control.Open(dir, material, id.Bindings)
 		if e != nil {
 			return opErr(e)
 		}
 		defer store.Close()
-		seed, err := base64.StdEncoding.DecodeString(os.Getenv(auditEnv))
+		seed, err := serviceSecret(auditEnv, auditFile)
 		if err != nil {
 			return opErr(fmt.Errorf("invalid audit seed"))
 		}
@@ -134,6 +133,8 @@ func newServeCommand(opts *options) *cobra.Command {
 		return opErr(e)
 	}}
 	c.Flags().IntVar(&rpm, "requests-per-minute", 600, "per-subject fixed-window request limit; peer limit is ten times this value")
+	c.Flags().StringVar(&keyFile, "key-file", "", "mounted base64 state key; overrides --key-env")
+	c.Flags().StringVar(&auditFile, "audit-key-file", "", "mounted base64 signing seed; overrides --audit-key-env")
 	c.Flags().StringVar(&ssoFile, "sso", "", "operator-pinned OIDC browser login configuration JSON")
 	c.Flags().StringVar(&connectors, "connectors", "", "operator-owned connector configuration JSON")
 	c.Flags().StringVar(&auditEnv, "audit-key-env", "SECUROCK_AUDIT_SEED", "base64 Ed25519 32-byte seed from a separate secret")

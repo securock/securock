@@ -121,6 +121,7 @@ export default defineConfig({
         items: [
           { text: "Lockfile", link: "/reference/lockfile" },
           { text: "Privacy", link: "/reference/privacy" },
+          { text: "Enterprise operations", link: "/reference/enterprise" },
           { text: "Trust model", link: "/reference/trust-model" },
           { text: "Threat model", link: "/reference/threat-model" },
           { text: "SAST benchmarks", link: "/reference/sast-benchmarks" },

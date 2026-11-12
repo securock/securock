@@ -1244,3 +1244,14 @@ The worker performs a read-only provider lookup and requires the matching marker
 before accepting the remote ID/state. Missing or mismatched objects remain
 uncertain. This does not replay a create. PR/check reconciliation remains a
 manual provider-side operation; those uncertain records are never auto-replayed.
+
+## Production deployment guide
+
+`serve --key-file FILE --audit-key-file FILE` reads bounded base64 secrets from
+file-mounted secret-manager credentials instead of environment variables. Each
+file overrides the corresponding environment setting and must contain exactly
+a 32-byte decoded key. The systemd template in `deploy/securock.service` uses
+non-root execution and protected runtime credentials; configure and validate it
+on your target host before enabling it. The enterprise operations guide covers
+data flows, retention, recovery, incident handling, acceptance checks and explicit
+implementation limits. See [enterprise operations](/reference/enterprise).

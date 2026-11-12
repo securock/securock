@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"encoding/base64"
 	"fmt"
 	"github.com/securock/securock/internal/control"
 	"github.com/spf13/cobra"
@@ -9,14 +8,14 @@ import (
 )
 
 func newControlCommand(opts *options) *cobra.Command {
-	var dir, keyEnv, seedEnv string
+	var dir, keyEnv, seedEnv, keyFile, seedFile string
 	var restore bool
 	c := &cobra.Command{Use: "control BACKUP.enc", Short: "Back up or restore authenticated encrypted control-plane state while stopped", Args: cobra.ExactArgs(1), RunE: func(c *cobra.Command, a []string) error {
-		key, e := base64.StdEncoding.DecodeString(os.Getenv(keyEnv))
+		key, e := serviceSecret(keyEnv, keyFile)
 		if e != nil || len(key) != 32 {
 			return opErr(fmt.Errorf("invalid encryption key"))
 		}
-		seed, e := base64.StdEncoding.DecodeString(os.Getenv(seedEnv))
+		seed, e := serviceSecret(seedEnv, seedFile)
 		if e != nil || len(seed) != 32 {
 			return opErr(fmt.Errorf("invalid audit signing seed"))
 		}
@@ -40,6 +39,8 @@ func newControlCommand(opts *options) *cobra.Command {
 		fmt.Fprintln(c.OutOrStdout(), "encrypted backup authenticated and written")
 		return nil
 	}}
+	c.Flags().StringVar(&keyFile, "key-file", "", "mounted base64 state key; overrides key environment")
+	c.Flags().StringVar(&seedFile, "audit-key-file", "", "mounted base64 signing seed; overrides seed environment")
 	c.Flags().StringVar(&dir, "state-dir", ".securock/control", "stopped control-plane state directory")
 	c.Flags().StringVar(&keyEnv, "key-env", "SECUROCK_STATE_KEY", "encryption key environment variable")
 	c.Flags().StringVar(&seedEnv, "audit-key-env", "SECUROCK_AUDIT_SEED", "signing seed environment variable")

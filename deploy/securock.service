@@ -1,0 +1,32 @@
+[Unit]
+Description=Securock security control plane
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+DynamicUser=yes
+StateDirectory=securock
+StateDirectoryMode=0700
+WorkingDirectory=/var/lib/securock
+LoadCredential=state.key:/etc/securock/secrets/state.key
+LoadCredential=audit.seed:/etc/securock/secrets/audit.seed
+LoadCredential=tls.key:/etc/securock/secrets/tls.key
+ExecStart=/usr/local/bin/securock serve /etc/securock/oidc.json --state-dir /var/lib/securock --key-file %d/state.key --audit-key-file %d/audit.seed --listen 127.0.0.1:8443 --tls-cert /etc/securock/tls.crt --tls-key %d/tls.key
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=30
+NoNewPrivileges=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectSystem=strict
+ProtectHome=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target
