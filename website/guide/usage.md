@@ -800,3 +800,14 @@ proof of runtime safety; anonymous scopes cannot certify comparable coverage.
 Development builds use an executable fingerprint when version metadata is unknown.
 Record checksums detect accidental changes, not producer authenticity; use trusted
 CI artifacts and protect records as security evidence.
+
+## Finding lifecycle and responsibility
+
+`triage run.json --state issues.json --format json` maintains stable occurrence
+keys and new/active/resolved/reopened/unobserved states. Only matching engine,
+configuration and explicit complete source scope, with the source file present
+in both inventories, can resolve a missing SAST finding. Other missing findings
+remain unobserved. Reprocessing the same record is idempotent.
+Use `--finding KEY --owner TEAM --due YYYY-MM-DD` to assign responsibility and
+`--as-of YYYY-MM-DD` to evaluate overdue status without machine-clock output.
+State is private JSON, atomically replaced; use a single writer per registry.

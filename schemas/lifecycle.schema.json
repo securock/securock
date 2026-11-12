@@ -1,0 +1,90 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://securock.dev/schema/lifecycle.schema.json",
+  "type": "object",
+  "required": [
+    "version",
+    "previous",
+    "entries"
+  ],
+  "properties": {
+    "version": {
+      "const": 1
+    },
+    "previous": {
+      "$ref": "https://securock.dev/schema/run-record.schema.json"
+    },
+    "entries": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "key",
+          "finding",
+          "state",
+          "overdue"
+        ],
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "finding": {
+            "type": "object"
+          },
+          "state": {
+            "enum": [
+              "new",
+              "active",
+              "resolved",
+              "reopened",
+              "unobserved"
+            ]
+          },
+          "owner": {
+            "type": "string"
+          },
+          "due": {
+            "type": "string"
+          },
+          "overdue": {
+            "type": "boolean"
+          },
+          "previously_resolved": {
+            "type": "boolean"
+          },
+          "evidence": {
+            "type": "object",
+            "required": [
+              "engine",
+              "configuration",
+              "scopes",
+              "complete",
+              "file_observed"
+            ],
+            "properties": {
+              "engine": {
+                "type": "string"
+              },
+              "configuration": {
+                "type": "string"
+              },
+              "scopes": {
+                "type": "string"
+              },
+              "complete": {
+                "type": "boolean"
+              },
+              "file_observed": {
+                "type": "boolean"
+              }
+            }
+          }
+        }
+      }
+    },
+    "evaluated_on": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+    }
+  }
+}
