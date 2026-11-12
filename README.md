@@ -10,7 +10,6 @@
 <strong>Security for dependencies, source code, secrets, and infrastructure.</strong>  
 <a href="https://securock.dev">Learn more →</a>
 
-<a href="https://securock.dev">Documentation</a> ·
 <a href="#install">Install</a> ·
 <a href="#quick-start">Quick start</a> ·
 <a href="#github-action">GitHub Action</a> ·
