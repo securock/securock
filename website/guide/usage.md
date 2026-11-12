@@ -1279,3 +1279,21 @@ JSON reports retain deterministic per-rule TP/FP/FN/TN counts. A rule with no
 positive or safe labels has no recall or false-positive estimate respectively.
 Keep independent evaluation sources and labels separate from development fixtures;
 this command does not establish that a suite is independent or representative.
+
+## Go advisory function reachability
+
+`securock reachability symbols.json --project . --entry example.org/app.main --offline`
+traces resolved direct calls across project Go functions to fully qualified API
+symbols. Repeat `--entry` for reviewed application entrypoints, including handlers
+registered as callbacks. A manifest has the form
+`{"version":1,"symbols":[{"id":"GO-EXAMPLE","symbol":"net/http.ListenAndServe"}]}`.
+Supply advisory symbols for the exact dependency versions in the project; this
+command does not fetch advisories or infer affected version ranges.
+
+A `reachability:symbol-reachable` result includes the shortest deterministic call
+trace and establishes a potential static path, not execution or exploitability.
+Absent paths remain `reachability:symbol-unknown`: interface dispatch, reflection,
+escaping closures, external bodies and build variants are not exhaustively
+modeled. An unresolved entrypoint or an unparsed source file exits 2. No result
+automatically downgrades a vulnerability or changes `securock.lock`. All standard
+finding output formats are available.

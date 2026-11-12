@@ -26,6 +26,8 @@ and policy decisions become visible in code review and enforceable in CI.
   [scanner reference](website/guide/usage.md).
 - **Track dependency trust.** Record deterministic snapshots, review drift,
   inspect provenance and signatures, and export CycloneDX/SPDX SBOMs and VEX.
+  Use `reachability SYMBOLS.json --project . --entry example.org/app.main`
+  for offline Go call paths to explicitly identified advisory APIs.
   See the [trust model](docs/trust-model.md).
 - **Manage remediation.** Compare baselines, assign owners and deadlines,
   prioritize findings, and test supported Go, Python and JavaScript TLS fixes
