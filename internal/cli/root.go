@@ -37,8 +37,8 @@ func NewRoot(version, commit, date string) *cobra.Command {
 
 	root := &cobra.Command{
 		Use:           "securock",
-		Short:         "Supply-chain trust layer for software dependencies",
-		Long:          "Securock scans language lockfiles, evaluates trust, and writes a language-agnostic securock.lock.",
+		Short:         "Security analysis for dependencies, source code, secrets, and infrastructure",
+		Long:          "Securock combines dependency trust, source code analysis, secret detection, and infrastructure checks. Run security for a unified report, or lock and verify to track dependency trust drift.",
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		Version:       formatVersion(version, commit, date),
@@ -64,7 +64,7 @@ func NewRoot(version, commit, date string) *cobra.Command {
 	root.PersistentFlags().BoolVar(&opts.reachability, "reachability", false, "record package scope and dependencies, and mark each vulnerability reachable, unreachable, or unknown")
 	root.PersistentFlags().BoolVar(&opts.noCache, "no-cache", false, "do not read or write the on-disk cache of registry and OSV responses")
 	root.PersistentFlags().DurationVar(&opts.cacheTTL, "cache-ttl", 0, "how long a cached response is used, such as 10m or 24h (default 1h)")
-	root.PersistentFlags().BoolVar(&opts.noFail, "no-fail", false, "always exit 0")
+	root.PersistentFlags().BoolVar(&opts.noFail, "no-fail", false, "do not fail on findings or trust violations; operational errors still fail")
 
 	root.AddCommand(newScanCommand(opts))
 	root.AddCommand(newInitCommand(opts))
@@ -75,6 +75,7 @@ func NewRoot(version, commit, date string) *cobra.Command {
 	root.AddCommand(newExplainCommand(opts))
 	root.AddCommand(newGraphCommand(opts))
 	root.AddCommand(newAuditCommand(opts))
+	root.AddCommand(newSecurityCommand(opts))
 	root.AddCommand(newSASTCommand(opts))
 	root.AddCommand(newChainCommand(opts))
 	root.AddCommand(newImportCommand(opts))

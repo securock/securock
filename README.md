@@ -1,6 +1,6 @@
 # Securock
 
-**A lockfile for trust, not just versions.**
+**Security for dependencies, source code, secrets, and infrastructure.**
 
 | [Docs](https://securock.dev) | [Install](#install) | [Quick start](#quick-start) | [Usage](#usage) | [Ecosystems](#supported-ecosystems) | [Privacy](docs/privacy.md) |
 | ---------------------------- | ------------------- | --------------------------- | --------------- | ----------------------------------- | -------------------------- |
@@ -11,6 +11,29 @@ decision_ you accepted for those versions.
 Securock records digest, provenance, signature, vulnerability,
 malicious-package, capability, behavior, ownership, and trust-chain
 evidence for each artifact, then fails CI when that trust state drifts.
+
+Run `securock security` for a single security report across dependencies,
+source code, committed credentials, and infrastructure configuration.
+Review findings by severity, follow remediation advice, and use expiring
+exceptions to record accepted risks.
+
+```sh
+securock security .
+securock security . --offline
+securock security . --format sarif --output security.sarif
+securock security . --import other-scanner.sarif --fail-on medium
+```
+
+The security command uses existing package-manager lockfiles without writing
+`securock.lock`. Source, secret, and infrastructure analysis runs offline;
+dependency evidence follows the network policy. Unchecked evidence is explicit.
+Without a supported lockfile in the selected directory, source analysis still
+runs and dependency coverage is marked unchecked. Run in each dependency project
+directory for a monorepo. `--fail-on` defaults to `high`; accepted findings do
+not fail CI. Operational failures exit `2` even with `--no-fail`, and a failed
+dependency scan preserves source results with an incomplete-analysis finding.
+Text, JSON (`schemas/security-report.schema.json`), SARIF, JUnit, and Markdown
+reports share the same findings and exceptions.
 
 ```text
 securock lock     # snapshot the current tree
@@ -242,6 +265,7 @@ Cargo under [`examples/`](examples/).
 | `securock explain` | Explain why a package is trusted                            |
 | `securock graph`   | Draw the dependency graph colored by trust status           |
 | `securock audit`   | Report dependency findings by severity                      |
+| `securock security` | Audit dependencies, source code, secrets, and infrastructure together |
 | `securock sast`    | Find vulnerabilities in your own source code                |
 | `securock chain`   | Correlate source findings into attack chains                |
 | `securock import`  | Bring another tool's SARIF results under securock's policy  |
@@ -273,10 +297,10 @@ Cargo under [`examples/`](examples/).
 | `--scorecard`           | `audit`. Look up Scorecards and apply `rules.health.scorecard_checks` from the policy; sends names to deps.dev                     |
 | `--fail-on`             | `audit`, `sast`, `chain`, `import` and `doctor`. Exit `1` at or above this severity (default `high`)                               |
 | `--assume-params`       | `sast` and `chain`. Treat string parameters of Go functions nothing calls directly as untrusted (registry handlers)                |
-| `--import`              | `sast`. Merge another scanner's SARIF report into the sast report (repeatable)                                                     |
+| `--import`              | `sast` / `security`. Merge another scanner's SARIF report into the combined report (repeatable)                                                     |
 | `--exceptions`          | Accepted-findings file (default `.securock/exceptions.yaml`)                                                                       |
 | `--reachability`        | Record package scope and dependencies; mark vulnerabilities reachable, unreachable, or unknown                                     |
-| `--no-fail`             | Always exit `0`                                                                                                                    |
+| `--no-fail`             | Suppress finding and trust failures; operational errors still exit `2`                                                                                                                    |
 
 ### Exit codes
 

@@ -1,15 +1,15 @@
 ---
 layout: home
-title: Securock — a lockfile for trust, not just versions
-description: Securock records dependency digests, provenance, signatures, vulnerability and malware evidence, and policy decisions in securock.lock, then fails CI when that trust state drifts. Single static binary, 19 resolvers, public-only network mode.
+title: Securock — security for your software
+description: Scan dependencies, source code, secrets, and infrastructure in one security report. Track dependency trust drift, review findings, and enforce severity thresholds in CI.
 hero:
   name: Securock
-  text: A lockfile for trust, not just versions.
-  tagline: Snapshot digest, provenance, signature, vulnerability, malware, capability, and ownership evidence for every dependency. Fail CI when that trust state drifts — not just when a version does.
+  text: Security for your software.
+  tagline: Check dependencies, source code, secrets, and infrastructure in one report. Follow remediation advice, record reviewed risks, and enforce security checks in CI.
   actions:
     - theme: brand
-      text: Quick start
-      link: /guide/quickstart
+      text: Run a security check
+      link: /guide/usage#security
     - theme: alt
       text: Why Securock
       link: /guide/why

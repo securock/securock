@@ -1,12 +1,13 @@
 ---
 title: Usage
-description: Securock CLI commands, flags, and exit codes — the lock, diff, verify, and update loop over securock.lock, plus audit, explain, doctor, JSON and SARIF output.
+description: Securock CLI commands, flags, and exit codes — unified security checks for dependencies, source, secrets, and infrastructure, plus trust drift tracking and JSON and SARIF reports.
 ---
 
 # Usage
 
-Securock reads language lockfiles, applies a policy, and either writes
-or compares against `securock.lock`.
+Securock checks dependencies, source code, secrets, and infrastructure with
+`security`. It also reads language lockfiles, applies a policy, and writes
+or compares against `securock.lock` to track dependency trust drift.
 
 ```sh
 securock scan [path]
@@ -18,6 +19,7 @@ securock verify [path]
 securock explain PACKAGE [path]
 securock graph [path]
 securock audit [path]
+securock security [path]
 securock sast [path]
 securock chain [path]
 securock doctor [path]
@@ -36,27 +38,66 @@ securock version
 
 ## Commands
 
-| Command   | What it does                                                 | More                                                        |
-| --------- | ------------------------------------------------------------ | ----------------------------------------------------------- |
-| `scan`    | Inspect the current tree under the active policy (default)   | [scan / verify](#scan-vs-verify)                            |
-| `init`    | Detect lockfiles and write the first `securock.lock`         | [init](#init)                                               |
-| `lock`    | Write a deterministic `securock.lock`                        | [Lockfile](/reference/lockfile)                             |
-| `diff`    | Show trust drift versus the lockfile                         | [scan / verify](#scan-vs-verify)                            |
-| `update`  | Review trust changes, then refresh the lockfile              | [update](#update)                                           |
-| `verify`  | Fail on trust-relevant drift versus the lockfile             | [scan / verify](#scan-vs-verify)                            |
-| `explain` | Print a trust checklist for one package                      | [explain](#explain)                                         |
-| `graph`   | Draw the dependency graph colored by trust status            | [graph](#graph)                                             |
-| `audit`   | Report dependency findings ranked by severity                | [audit](#audit)                                             |
-| `sast`    | Find vulnerabilities in your own source code                 | [Source code analysis](/guide/sast)                         |
-| `chain`   | Correlate source findings into attack chains                 | [Source code analysis](/guide/sast)                         |
-| `import`  | Bring another tool's SARIF results under securock's policy   | [import](#import)                                           |
-| `doctor`  | Check the project setup for security problems                | [doctor](#doctor)                                           |
-| `sbom`    | Export the lockfile as an SBOM, or verify an SBOM against it | [Triage and exports](/guide/reports#sbom-export-and-verify) |
-| `accept`  | Accept a finding until a date, with a reason                 | [Triage and exports](/guide/reports#accept-findings)        |
-| `vex`     | Export accepted vulnerabilities as OpenVEX or CycloneDX VEX  | [Triage and exports](/guide/reports#vex-export)             |
-| `version` | Print the build version                                      |                                                             |
+| Command    | What it does                                                              | More                                                        |
+| ---------- | ------------------------------------------------------------------------- | ----------------------------------------------------------- |
+| `scan`     | Inspect the current tree under the active policy (default)                | [scan / verify](#scan-vs-verify)                            |
+| `init`     | Detect lockfiles and write the first `securock.lock`                      | [init](#init)                                               |
+| `lock`     | Write a deterministic `securock.lock`                                     | [Lockfile](/reference/lockfile)                             |
+| `diff`     | Show trust drift versus the lockfile                                      | [scan / verify](#scan-vs-verify)                            |
+| `update`   | Review trust changes, then refresh the lockfile                           | [update](#update)                                           |
+| `verify`   | Fail on trust-relevant drift versus the lockfile                          | [scan / verify](#scan-vs-verify)                            |
+| `explain`  | Print a trust checklist for one package                                   | [explain](#explain)                                         |
+| `graph`    | Draw the dependency graph colored by trust status                         | [graph](#graph)                                             |
+| `audit`    | Report dependency findings ranked by severity                             | [audit](#audit)                                             |
+| `security` | Combine dependency, source, secret, infrastructure, and imported findings | [security](#security)                                       |
+| `sast`     | Find vulnerabilities in your own source code                              | [Source code analysis](/guide/sast)                         |
+| `chain`    | Correlate source findings into attack chains                              | [Source code analysis](/guide/sast)                         |
+| `import`   | Bring another tool's SARIF results under securock's policy                | [import](#import)                                           |
+| `doctor`   | Check the project setup for security problems                             | [doctor](#doctor)                                           |
+| `sbom`     | Export the lockfile as an SBOM, or verify an SBOM against it              | [Triage and exports](/guide/reports#sbom-export-and-verify) |
+| `accept`   | Accept a finding until a date, with a reason                              | [Triage and exports](/guide/reports#accept-findings)        |
+| `vex`      | Export accepted vulnerabilities as OpenVEX or CycloneDX VEX               | [Triage and exports](/guide/reports#vex-export)             |
+| `version`  | Print the build version                                                   |                                                             |
 
 ## The core commands
+
+### `security`
+
+Run all built-in security scanners together and review one report, sorted by
+severity, with remediation advice and source dataflow traces:
+
+```sh
+securock security .
+securock security . --offline
+securock security . --fail-on medium --format json --output security.json
+securock security . --format sarif --output security.sarif
+securock security . --import semgrep.sarif --import trivy.sarif
+```
+
+Dependency auditing uses supported package-manager lockfiles in the selected
+directory, including the policy's release cooldown and internal package names.
+It honors `--policy`, `--profile`, `--network`, `--offline`, and `--reachability`.
+Source analysis includes the SAST command's languages, secret detection, and IaC
+rules; `--assume-params` enables its optional Go parameter heuristic.
+`--import` accepts SARIF 2.1.0 and is repeatable (`-` reads standard input).
+
+No `securock.lock` is required or written. Without a supported lockfile in the
+selected directory, source checks still run and a
+`security:dependencies-unchecked` info finding explains the missing coverage.
+For a monorepo, run in each dependency project directory. Offline or private
+dependency evidence stays unknown, with the same unchecked findings as `audit`.
+Dependency auditing does not replace `verify` for detecting trust drift.
+
+`--fail-on` defaults to `high`. One threshold and `.securock/exceptions.yaml`
+apply to the entire report; use `accept` with the finding ID and subject to
+record a reviewed risk. Accepted findings remain visible but do not fail CI.
+Exit codes are `0` for no findings at the threshold, `1` for findings, and `2`
+for operational errors. `--no-fail` suppresses severity failures only. If a
+dependency scan fails, source findings are still written together with
+`security:dependencies-incomplete`, and the command exits `2`.
+
+Formats: text, JSON (`security-report.schema.json`), SARIF, JUnit, and Markdown.
+Use `--output` to save a report, including reports from failed CI checks.
 
 ### `update`
 
@@ -342,7 +383,7 @@ pre-commit:
 | `--output`       | Write the report to a file instead of stdout                                                |
 | `--exceptions`   | Path to the accepted-findings file (`accept`, `audit`, `sast`, `chain`, `import`, `doctor`) |
 | `--reachability` | Record scope and dependencies and mark vulnerabilities reachable, unreachable, or unknown   |
-| `--no-fail`      | Always exit `0`                                                                             |
+| `--no-fail`      | Suppress finding and trust failures; operational errors still exit `2`                      |
 
 `--offline` records vulnerability, malicious, capability, behavior,
 ownership, provenance, signature, and chain evidence as `unknown`.
