@@ -1131,3 +1131,22 @@ status suppress a block. Unavailable authority fails closed. This is an exact
 exception to one finding identity, not a reusable bypass token. No credential
 validation, remote fetch, rotation or history rewrite is performed by `protect`.
 JSON follows `protect-report.schema.json`.
+
+## Credential validity and lifecycle
+
+`credential github|gitlab --action check --token-env SECUROCK_CREDENTIAL
+--network allow-all` checks a deliberately supplied token against its provider.
+GitHub defaults to api.github.com; GitLab defaults to gitlab.com. `--origin`
+selects an operator-approved self-hosted HTTPS API origin. HTTP 401 means inactive;
+403, redirects, rate limits and network failures remain unknown. No token is
+automatically extracted from source or sent for validation.
+
+`--action revoke` explicitly revokes a GitLab personal access token, or an OAuth
+token owned by the supplied GitHub `--client-id` and `--client-secret-env`.
+GitHub PAT mutation is not supported by the OAuth endpoint. `--action rotate
+--replacement-file PRIVATE_NEW_FILE` requires a new exclusive 0600 file before
+contacting the provider. The new token is written only there, never to reports
+or errors. Update consumers through your secret manager; this command cannot
+atomically update external applications. Provider changes can already have taken
+effect on communication/write failure: reconcile in the provider console.
+JSON follows `credential-report.schema.json`; all operations refuse offline.

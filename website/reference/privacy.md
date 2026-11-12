@@ -298,3 +298,12 @@ from the configured HTTPS control-plane origin (literal loopback HTTP is permitt
 for tests). No matched secrets or Git blobs are sent. Offline protection is local
 and cannot fetch online exceptions. Git receive quarantine variables are inherited;
 lazy fetch and interactive Git prompts are disabled.
+
+## Explicit credential operations
+
+`credential` sends an environment-supplied token to api.github.com, gitlab.com,
+or the explicit HTTPS `--origin` for check/revoke/rotate. It requires allow-all
+and refuses offline; redirects are disabled. GitHub OAuth mutation also sends
+the owning app's client credentials. Checks do not imply mutation; revoke and
+rotate require their explicit action. Replacement tokens go only to an exclusive
+private local file. No scanned source token is submitted automatically.
