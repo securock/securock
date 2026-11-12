@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://securock.dev/schema/release-impact.schema.json",
+  "type": "object",
+  "required": [
+    "version",
+    "affected",
+    "unknown"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "version": {
+      "const": 1
+    },
+    "affected": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "customer",
+          "product",
+          "release",
+          "advisory",
+          "purl"
+        ]
+      }
+    },
+    "unknown": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}

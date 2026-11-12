@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://securock.dev/schema/release-attestation.schema.json",
+  "type": "object",
+  "required": [
+    "payload",
+    "public_key",
+    "signature"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "payload": {
+      "type": "string"
+    },
+    "public_key": {
+      "type": "string"
+    },
+    "signature": {
+      "type": "string"
+    }
+  }
+}

@@ -1076,3 +1076,36 @@ and invokes installed/authenticated `gh` or `glab` to create a PR/MR. Without
 that flag there is no push or remote write. `--remote` and `--base` select the
 push remote and target branch. Human review and normal protected-branch checks
 remain required before merging.
+
+## Delivered release assurance
+
+`release sign release.json --sbom bom.json --seed-env SECUROCK_RELEASE_SEED`
+signs an immutable product/release/artifact/repository/revision/SBOM-digest
+statement with Ed25519. Input fields are `product`, `release`, `artifact`
+(`sha256:` plus 64 hex characters), `repository` (inventory node ID), `revision`
+(Git SHA). Version/type/SBOM digest are set by the signer. `release verify
+attestation.json --sbom bom.json --public-key BASE64` requires an independently
+trusted key and exact SBOM bytes. A signature authenticates the trusted signer's
+claim; it does not establish isolated-builder/SLSA compliance. Use existing
+provenance verification to assess external builder evidence.
+
+`release register attestation.json --sbom bom.json --public-key BASE64
+--catalog PRIVATE/catalog.json --customer CUSTOMER` adds a verified shipment
+using a locked, atomic private catalog. Product/release artifact identities are
+immutable; existing entries are verified before updates. The catalog contains
+customer-sensitive data and is not encrypted; protect the directory and backups.
+
+`release impact catalog.json --advisories exact-purls.json --public-key BASE64`
+returns affected customers/releases for advisory objects with `id` and exact
+versioned `purl`. This offline mapping does not expand version ranges, discover
+new advisories or assume missing purls safe. VEX exports remain separate reviewed
+statements; they do not silently remove impacts.
+
+`release link catalog.json --inventory inventory.json --public-key BASE64`
+adds signature-verified build edges only when repository ID and revision match.
+`release drift` with the same arguments fails on observed images without an
+approved attestation or incomplete runtime identities. It never changes workloads.
+Keep signing keys in trusted CI/secret infrastructure; protect catalog updates
+and externally retain signer revocations/checkpoints. JSON uses the release
+attestation/catalog/impact schemas, inventory schema for link, and release
+finding schema for drift. No command contacts an external service.

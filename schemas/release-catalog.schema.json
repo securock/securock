@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://securock.dev/schema/release-catalog.schema.json",
+  "type": "object",
+  "required": [
+    "version",
+    "shipments"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "version": {
+      "const": 1
+    },
+    "shipments": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "customer",
+          "attestation",
+          "sbom"
+        ]
+      }
+    }
+  }
+}
