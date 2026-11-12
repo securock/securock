@@ -871,3 +871,25 @@ except literal loopback fixtures. Tokens come only from environment variables;
 bodies, expected values and credentials are absent from findings. Output uses
 `dast-report.schema.json`. These tests validate configured contracts, not every
 API or every business-logic authorization path.
+
+## Verified remediation branches and pull requests
+
+`fix-pr report.json --project REPO --branch securock/tls-fix --tests tests.json`
+creates an isolated Git worktree and new branch, applies supported TLS verification
+fixes, runs the operator's test commands, rescans for remaining target findings
+and new high findings, and commits only the expected source files. `tests.json`
+contains `commands`, an array of executable/argument arrays (no shell expansion).
+Output follows `fix-workflow.schema.json`. A clean starting tree is mandatory.
+The original checkout stays on its branch. Failure may leave a new branch at the original revision; no automatic merge or original-checkout reset occurs.
+
+Run tests only for repositories you trust, inside your own sandbox: test commands
+execute repository code and may use network or inherited credentials. Offline
+controls Securock lookups/publication, not arbitrary trusted test programs.
+Only the currently supported Go TLS fix is automated; other findings remain
+manual. Stale locations, unsupported fixes and failed tests stop the workflow.
+
+`--publish github|gitlab --network allow-all` explicitly pushes the new branch
+and invokes installed/authenticated `gh` or `glab` to create a PR/MR. Without
+that flag there is no push or remote write. `--remote` and `--base` select the
+push remote and target branch. Human review and normal protected-branch checks
+remain required before merging.

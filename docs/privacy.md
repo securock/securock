@@ -256,3 +256,10 @@ URL. It never redirects or replays cookies. HTTPS is required except literal
 loopback fixtures. Response JSON is checked in memory against the local contract;
 response bodies and expected values are not written to reports. Offline refuses
 all requests. Use operator-approved staging records, paths and accounts.
+
+## Explicit remediation publication
+
+`fix-pr --publish` requires allow-all networking and uses operator-configured Git
+remotes plus installed GitHub/GitLab CLI authentication to push a branch and
+create a PR/MR. Only explicit publication performs remote writes. Local test
+commands are operator-trusted executables, not network-sandboxed by Securock.

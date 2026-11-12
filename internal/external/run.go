@@ -19,9 +19,13 @@ func (b *limited) Write(p []byte) (int, error) {
 	return b.data.Write(p)
 }
 func Run(ctx context.Context, name string, args ...string) ([]byte, error) {
+	return RunAt(ctx, "", name, args...)
+}
+func RunAt(ctx context.Context, dir, name string, args ...string) ([]byte, error) {
 	ctx, cancel := context.WithTimeout(ctx, 2*time.Minute)
 	defer cancel()
 	c := exec.CommandContext(ctx, name, args...)
+	c.Dir = dir
 	var out limited
 	c.Stdout = &out
 	c.Stderr = io.Discard
