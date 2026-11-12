@@ -736,7 +736,8 @@ Trivy's normal environment.
 
 `securock remediate report.json --project .` lists actionable fixes and recommended
 versions already included in findings. `--patch-dir patches` drafts narrowly
-supported Go TLS-verification fixes, refusing stale locations and paths outside
+supported Go, Python requests/httpx and JavaScript/TypeScript TLS-verification
+fixes, refusing stale locations, ambiguous syntax and paths outside
 the project. Review patches before `git apply --unidiff-zero`; source files are
 never automatically changed. `--verify` reruns offline SAST, emits its full report
 and gates new high source findings. It does not certify dependency, cloud or DAST

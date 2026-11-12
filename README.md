@@ -28,7 +28,8 @@ and policy decisions become visible in code review and enforceable in CI.
   inspect provenance and signatures, and export CycloneDX/SPDX SBOMs and VEX.
   See the [trust model](docs/trust-model.md).
 - **Manage remediation.** Compare baselines, assign owners and deadlines,
-  prioritize findings, and test supported fixes before optional PR creation.
+  prioritize findings, and test supported Go, Python and JavaScript TLS fixes
+  before optional PR creation.
   See [remediation workflows](website/guide/usage.md#finding-lifecycle-and-responsibility).
 - **Work as a team.** Use OIDC SSO, role-based access, SCIM user provisioning,
   private runners, expiring approvals, signed audit records, and SCM/ticket

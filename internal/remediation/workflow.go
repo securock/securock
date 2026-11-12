@@ -140,7 +140,7 @@ func Fix(ctx context.Context, project, branch string, report finding.Report, tes
 		return out, e
 	}
 	for _, f := range after {
-		if f.ID == "sast:go/tls-verification-disabled" {
+		if supportedFix(f.ID) && f.Location != nil && slices.Contains(out.Files, f.Location.File) {
 			return out, fmt.Errorf("targeted TLS finding remains")
 		}
 	}

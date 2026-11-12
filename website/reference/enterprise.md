@@ -105,7 +105,8 @@ report, ISO 27001 certification or an independently audited production SLA.
 - Release signatures authenticate the trusted signer's claims, not a SLSA
   builder guarantee. Advisory impact input uses exact versioned purls, not
   automatic version-range expansion or live threat intelligence.
-- Automatic fixes currently cover the supported Go TLS setting. Tests and source
+- Automatic fixes cover literal Go `InsecureSkipVerify`, Python HTTP-client
+  `verify=False` and JavaScript/TypeScript `rejectUnauthorized: false` settings. Tests and source
   rechecks precede optional PR publication; human review remains necessary.
 - Secret detection is pattern-based and limited to supported text. Provider
   validity/revocation/rotation requires explicit operator actions and scopes.
