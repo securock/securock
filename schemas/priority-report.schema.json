@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://securock.dev/schema/priority-report.schema.json",
+  "type": "object",
+  "required": [
+    "version",
+    "limitation",
+    "items"
+  ],
+  "properties": {
+    "version": {
+      "const": 1
+    },
+    "limitation": {
+      "type": "string"
+    },
+    "items": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "key",
+          "score",
+          "finding",
+          "reasons",
+          "evidence"
+        ],
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "score": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "finding": {
+            "type": "object"
+          },
+          "reasons": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "evidence": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "owner": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}

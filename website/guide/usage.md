@@ -811,3 +811,15 @@ remain unobserved. Reprocessing the same record is idempotent.
 Use `--finding KEY --owner TEAM --due YYYY-MM-DD` to assign responsibility and
 `--as-of YYYY-MM-DD` to evaluate overdue status without machine-clock output.
 State is private JSON, atomically replaced; use a single writer per registry.
+
+## Contextual risk priority
+
+`prioritize report.json --assets assets.json --format json` ranks all findings
+without changing their original severity or CI threshold. Asset context uses
+`{"version":1,"assets":[{"match":"src/payments/","owner":"payments","criticality":5,"internet_exposed":true,"reachable":true,"evidence":["inventory:edge-service"]}]}`.
+Matches are explicit subject prefixes (longest wins), with criticality 1–5.
+Optional `privileged` and `known_exploited` signals also raise the score. Every
+asset requires evidence references; missing signals remain unknown. References
+are not fetched or independently verified, and no attack chain is inferred from
+co-location. Accepted findings remain visible at priority zero.
+JSON follows `priority-report.schema.json`.
