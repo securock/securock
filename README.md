@@ -1,12 +1,25 @@
-<p align="center">
-  <img src="docs/assets/logo.svg" alt="Securock" height="64">
-</p>
+<div align="center">
 
-**Security for dependencies, source code, secrets, and infrastructure.**
+<br>
 
-[Documentation](https://securock.dev) · [Install](#install) ·
-[Quick start](#quick-start) · [GitHub Action](#github-action) ·
-[Enterprise operations](docs/enterprise.md)
+<img src="docs/assets/logo.svg" alt="Securock" height="64">
+
+<br>
+<br>
+
+<strong>Security for dependencies, source code, secrets, and infrastructure.</strong>
+
+<br>
+
+<a href="https://securock.dev">Documentation</a> ·
+<a href="#install">Install</a> ·
+<a href="#quick-start">Quick start</a> ·
+<a href="#github-action">GitHub Action</a> ·
+<a href="docs/enterprise.md">Enterprise operations</a>
+
+<br>
+
+</div>
 
 Securock brings security findings into one report and helps teams track them
 through review, remediation, and verification. Use it locally, in CI, or with
