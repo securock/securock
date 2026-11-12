@@ -21,7 +21,8 @@ and policy decisions become visible in code review and enforceable in CI.
   `security`. See [source analysis](website/guide/sast.md) and
   [unified reports](website/guide/usage.md#security).
 - **Inspect running environments.** Check HTTP security settings, test explicit
-  API authorization contracts, inspect cloud configuration, and discover
+  API authorization contracts and explicit authenticated HTTP scenarios
+  (`dast-scenario`), inspect cloud configuration, and discover
   Kubernetes workload image identities. See the
   [scanner reference](website/guide/usage.md).
 - **Track dependency trust.** Record deterministic snapshots, review drift,

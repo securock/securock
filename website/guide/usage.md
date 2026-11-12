@@ -1297,3 +1297,40 @@ escaping closures, external bodies and build variants are not exhaustively
 modeled. An unresolved entrypoint or an unparsed source file exits 2. No result
 automatically downgrades a vulnerability or changes `securock.lock`. All standard
 finding output formats are available.
+
+## Stateful HTTP DAST scenarios
+
+`dast-scenario https://staging.example/api scenario.json --network allow-all`
+runs 1–100 explicit same-origin steps with an isolated in-memory cookie jar.
+Each step has `id`, uppercase `method`, a relative `path` starting with `/`, and
+an expected HTTP `status`. Paths append to the supplied base path. Redirects
+are never followed; represent an expected redirect and its next request explicitly.
+
+```json
+{
+  "version": 1,
+  "steps": [
+    {
+      "id": "login",
+      "method": "POST",
+      "path": "/login",
+      "body_env": "LOGIN_JSON",
+      "content_type": "application/json",
+      "status": 200,
+      "capture": { "item": "/item_id" }
+    },
+    { "id": "read", "method": "GET", "path": "/items/{{item}}", "status": 200 }
+  ]
+}
+```
+
+Non-GET/HEAD operations require `--allow-mutations`; the complete contract and
+required environment variables are checked before the first request. `body_env`
+reads a request body from an environment variable; `bearer_env` supplies an
+optional token. `capture` maps names to JSON object pointers in the response,
+retaining only bounded strings. Captured path components are escaped, and dot
+segments or path separators are rejected. Queries and foreign origins are
+refused. Credentials, cookies, captures and response bodies do not enter reports.
+A status mismatch stops the scenario and exits 1; transport, scope or capture
+failures exit 2. This is a user-authored HTTP contract, not automatic exploit
+discovery or a browser interaction recorder.

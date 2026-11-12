@@ -323,3 +323,13 @@ Service access logs contain peer IP, authenticated subject/tenant, normalized
 route, status and time. Raw URLs/queries/object IDs, bodies, tokens and cookies
 are not logged. Logs go to the operator's stderr collector; configure its region,
 access controls, deletion and retention separately from encrypted application state.
+
+## Explicit stateful DAST scenarios
+
+`dast-scenario` requires allow-all networking and HTTPS (or loopback HTTP for
+local fixtures). It executes only listed same-origin HTTP operations; writes
+require `--allow-mutations`. Environment-supplied bodies and bearer tokens,
+cookies and captured JSON strings remain in memory. Reports identify the origin
+and scenario step, without paths containing captures or response contents.
+Redirects are not followed, bodies are capped at 1 MiB, and each scenario is
+bounded to 100 requests and two minutes. Use an authorized test deployment.
