@@ -773,3 +773,18 @@ Azure pagination tokens fail closed: provide complete exports if a subscription
 exceeds the 1000-resource query limit. No provider settings are modified.
 Save comparable JSON reports and use `baseline` to detect newly observed cloud
 risks. This does not track every benign configuration change or prove resolution.
+
+## Continuous monitoring
+
+`securock watch . --interval 1h --state monitor.json -- --offline` repeatedly
+runs unified scans and prints newly observed findings. Use `--runs 1` for cron
+or another scheduler; `--runs 0` continues until cancellation. Scope-specific
+security flags follow `--`, for example cloud inventory or live target flags.
+Operational scan errors retain the previous baseline. Successful scans retain
+unobserved risks in state and never claim missing risks are fixed. State is stored with private permissions and atomic replacement.
+`--webhook-env SECURITY_WEBHOOK --network allow-all` posts new unsuppressed
+findings at the `--fail-on` threshold as a Securock JSON report to an HTTPS
+receiver. The URL comes from the environment and is not printed. Configure your
+receiver to route alerts to an owner or team; this is a generic JSON webhook,
+not a Slack-specific payload. Delivery failures exit 2 without advancing state.
+Do not run multiple writers against the same state file.

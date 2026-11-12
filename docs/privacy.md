@@ -211,3 +211,12 @@ configured credential endpoints. `gcloud asset list --content-type resource`
 contacts cloudasset.googleapis.com and configured Google authentication endpoints.
 Their existing credential providers and proxy settings apply. Resource exports
 are parsed in memory; raw properties and provider stderr are not printed.
+
+## Monitoring notifications
+
+Only explicit `watch --webhook-env` enables notification delivery, and requires
+allow-all. New findings at the configured threshold, including resource/target
+identities and remediation, are POSTed as JSON to that environment variable's
+HTTPS URL. Redirects are not followed. URLs are not copied into reports. Local
+monitoring state contains prior finding reports and is created with private
+permissions; protect it as project security data.
