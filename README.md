@@ -267,6 +267,7 @@ Cargo under [`examples/`](examples/).
 | `securock audit`   | Report dependency findings by severity                      |
 | `securock security` | Audit dependencies, source code, secrets, and infrastructure together |
 | `securock dast` | Inspect live HTTP transport, security headers, and cookies |
+| `securock cspm` | Audit recorded AWS cloud configuration and permissions |
 | `securock sast`    | Find vulnerabilities in your own source code                |
 | `securock chain`   | Correlate source findings into attack chains                |
 | `securock import`  | Bring another tool's SARIF results under securock's policy  |
@@ -299,6 +300,33 @@ same-origin redirects are followed; cross-origin redirects, HTTP errors,
 timeouts, and TLS failures produce incomplete-analysis findings and exit `2`,
 even with `--no-fail`. Target URLs cannot contain credentials, queries, or
 fragments. See [Privacy](docs/privacy.md#live-application-checks-dast).
+
+### Cloud security posture (CSPM)
+
+Inspect an AWS Config snapshot offline, or collect recorded configuration with
+an existing AWS CLI v2 setup:
+
+```sh
+securock cspm inventory.json --offline
+securock cspm --aws-region ap-northeast-1 --aws-profile audit --network allow-all
+securock security . --cloud-inventory inventory.json --offline
+securock security . --aws-region ap-northeast-1 --network allow-all
+```
+
+The initial AWS checks cover S3 public access settings/ACLs/policies, internet
+access to administrative or database ports in EC2 security groups, RDS public
+access/encryption/backups, broad IAM policies and trust principals, and CloudTrail
+region coverage/log validation. Missing settings and unrepresented resource types
+are reported as unknown. Reports use the existing exceptions, severity thresholds,
+and formats, with `schemas/cspm-report.schema.json` for standalone JSON.
+
+Input accepts AWS Config `configurationItems` snapshots or CLI
+`select-resource-config` JSON `Results`. Live collection requires AWS Config
+recording, `config:SelectResourceConfig` permission, and allow-all network mode.
+It is read-only, limited to the selected region's recorded resources, and cannot
+establish account-wide completeness or freshness. No cloud settings are changed.
+Effective permissions, reachability, and compliance are not proven by these
+configuration checks. See [Privacy](docs/privacy.md#aws-cloud-posture-checks-cspm).
 
 ### Flags
 

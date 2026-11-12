@@ -39,6 +39,36 @@ can trigger application-specific behavior. For `security --target`, allow-all
 also applies to dependency evidence as described below; use standalone `dast`
 when you only want live application checks.
 
+## AWS cloud posture checks (CSPM)
+
+`securock cspm inventory.json --offline` and `security --cloud-inventory` read
+local AWS Config JSON exports without contacting a cloud service. Resource IDs,
+account IDs, regions, evaluated setting names, and finding summaries appear in
+reports. Configuration values, policy documents, credentials, and raw inventories
+are not included in reports. Treat the inventory itself as sensitive input.
+
+`--aws-region REGION` explicitly enables read-only collection through an installed
+AWS CLI v2 using `configservice select-resource-config`. It requires
+`--network allow-all` or that mode in the selected policy. Offline and public-only
+modes refuse collection before starting the CLI. The registry allowlist is not
+an AWS endpoint allowlist. The CLI contacts the region's AWS Config endpoint
+(normally `config.REGION.amazonaws.com`, or the partition's equivalent), and its
+configured credential providers may contact STS, IAM Identity Center/SSO,
+instance metadata, or other configured credential endpoints. Environment proxy,
+AWS endpoint, credential, and profile settings remain in effect.
+
+Securock passes a fixed SELECT query for supported resource types, the region,
+and optional profile as separate process arguments; it does not invoke a shell
+or modify resources. Collection has a 60-second timeout and a 16 MiB output
+limit, uses AWS CLI auto-pagination, and does not save the raw result to disk.
+CLI stderr is omitted from reports because it can contain sensitive details.
+Credentials are managed through the existing AWS CLI configuration, not flags
+or chat. Provider configuration and network policy must permit the intended
+endpoints. Live AWS Config data is recorded state, not a real-time API inspection
+of every resource. Account coverage and freshness are explicitly not established.
+For `security --aws-region`, allow-all also applies to dependency evidence;
+standalone `cspm` performs only the selected cloud posture checks.
+
 ## Default: public-only
 
 The default network mode is `public-only`. Securock only queries:

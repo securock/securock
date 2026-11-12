@@ -23,6 +23,8 @@ func newSecurityCommand(opts *options) *cobra.Command {
 	var imports []string
 	var targets []string
 	var dastTimeout time.Duration
+	var inventories []string
+	var awsRegion, awsProfile string
 	cmd := &cobra.Command{
 		Use:   "security [path]",
 		Short: "Audit dependencies, source code, secrets, and infrastructure together",
@@ -48,6 +50,9 @@ combined report. Operational failures still exit 2, even with --no-fail.`,
 				return err
 			}
 			if err := validateDAST(targets, dastTimeout, net); err != nil {
+				return opErr(err)
+			}
+			if err := validateCSPM(awsRegion, awsProfile, net); err != nil {
 				return opErr(err)
 			}
 			cooldown, err := parseAge("", pol.Rules.Health.MinReleaseAge)
@@ -106,6 +111,9 @@ combined report. Operational failures still exit 2, even with --no-fail.`,
 			live, liveErr := scanDAST(cmd.Context(), targets, dastTimeout)
 			found = append(found, live...)
 			scanErr = errors.Join(scanErr, liveErr)
+			cloud, cloudErr := scanCSPM(cmd.Context(), inventories, awsRegion, awsProfile)
+			found = append(found, cloud...)
+			scanErr = errors.Join(scanErr, cloudErr)
 			if abs, err := filepath.Abs(path); err == nil {
 				finding.RelativeTo(found, abs)
 			}
@@ -129,5 +137,8 @@ combined report. Operational failures still exit 2, even with --no-fail.`,
 	cmd.Flags().BoolVar(&assumeParams, "assume-params", false, "treat string parameters of otherwise uncalled Go functions as untrusted")
 	cmd.Flags().StringArrayVar(&targets, "target", nil, "also inspect this live HTTP application URL (repeatable; requires --network allow-all)")
 	cmd.Flags().DurationVar(&dastTimeout, "dast-timeout", dast.DefaultTimeout, "total DAST request timeout per target, including redirects")
+	cmd.Flags().StringArrayVar(&inventories, "cloud-inventory", nil, "also inspect an AWS Config inventory JSON file (repeatable; works offline)")
+	cmd.Flags().StringVar(&awsRegion, "aws-region", "", "collect recorded AWS Config resources through the AWS CLI in this region (requires allow-all)")
+	cmd.Flags().StringVar(&awsProfile, "aws-profile", "", "AWS CLI profile for --aws-region")
 	return cmd
 }

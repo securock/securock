@@ -21,6 +21,7 @@ securock graph [path]
 securock audit [path]
 securock security [path]
 securock dast URL...
+securock cspm [inventory.json...]
 securock sast [path]
 securock chain [path]
 securock doctor [path]
@@ -52,6 +53,7 @@ securock version
 | `audit`    | Report dependency findings ranked by severity                             | [audit](#audit)                                             |
 | `security` | Combine dependency, source, secret, infrastructure, and imported findings | [security](#security)                                       |
 | `dast`     | Inspect live HTTP transport, security headers, and cookies                | [Live application checks](#live-application-checks-dast)    |
+| `cspm`     | Audit recorded AWS cloud configuration and permissions                    | [Cloud security posture](#cloud-security-posture-cspm)      |
 | `sast`     | Find vulnerabilities in your own source code                              | [Source code analysis](/guide/sast)                         |
 | `chain`    | Correlate source findings into attack chains                              | [Source code analysis](/guide/sast)                         |
 | `import`   | Bring another tool's SARIF results under securock's policy                | [import](#import)                                           |
@@ -115,6 +117,107 @@ Text, JSON (`dast-report.schema.json`), SARIF, JUnit, and Markdown formats are
 supported. `--output` writes reports even when findings or incomplete scans
 cause failure. Accepting an incomplete finding never suppresses the exit-2
 operational error.
+
+## Cloud security posture (`cspm`)
+
+```sh
+securock cspm inventory.json --offline
+securock cspm inventory.json --offline --format json --output cspm.json
+securock cspm --aws-region ap-northeast-1 --aws-profile audit --network allow-all
+securock security . --cloud-inventory inventory.json --offline
+securock security . --aws-region ap-northeast-1 --network allow-all
+```
+
+This initial CSPM implementation supports AWS Config recorded configuration.
+Standalone `cspm` takes one or more JSON files; `security --cloud-inventory FILE`
+is repeatable and merges cloud findings with dependency, source, and optional
+DAST findings. Files are resolved from the current working directory. No cloud
+collection runs unless `--aws-region` is supplied.
+
+### Checks
+
+| Resource type             | Recorded settings inspected                                                                                      |
+| ------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `AWS::EC2::SecurityGroup` | IPv4/IPv6 world ingress to all protocols or TCP/UDP ports 22, 445, 1433, 3306, 3389, 5432, 6379, 9200, and 27017 |
+| `AWS::RDS::DBInstance`    | Public accessibility, storage encryption, and automated backup retention                                         |
+| `AWS::S3::Bucket`         | Public access block flags, public ACL groups, and wildcard principals in bucket policies                         |
+| `AWS::IAM::Policy`        | Allow statements with wildcard actions and resources in the default policy version                               |
+| `AWS::IAM::Role`          | Wildcard trust principals and wildcard inline-policy permissions                                                 |
+| `AWS::CloudTrail::Trail`  | Multi-region configuration and log file validation                                                               |
+
+IAM statements are evaluated independently; Deny statements do not grant access.
+Policy conditions are noted as context; their effect is not evaluated and does
+not lower the severity of wildcard-policy findings. Effective permissions, permission
+boundaries, SCPs, account-level S3 blocks, other trails, and network reachability
+are not evaluated. These checks neither certify compliance nor establish actual
+exploitation or public reachability.
+
+### Inventory and collection
+
+Input must be an AWS Config snapshot with `configurationItems`, or an AWS CLI
+`select-resource-config` response with JSON strings in `Results`. Configuration
+may be a JSON object or JSON-encoded string. S3 supplementary
+`PublicAccessBlockConfiguration`, `AccessControlList` (with `grants`), and
+`BucketPolicy` (with `policyText`) are used when present. Otherwise those S3
+checks remain unknown; the live query may not contain supplementary settings.
+Unrecognized or missing fields are never interpreted as secure defaults.
+
+For example:
+
+```json
+{
+  "configurationItems": [
+    {
+      "resourceType": "AWS::RDS::DBInstance",
+      "resourceId": "db-1",
+      "accountId": "123456789012",
+      "awsRegion": "ap-northeast-1",
+      "configuration": {
+        "publiclyAccessible": true,
+        "storageEncrypted": true,
+        "backupRetentionPeriod": 7
+      }
+    }
+  ]
+}
+```
+
+`--aws-region` uses an installed AWS CLI v2 and its existing credentials;
+`--aws-profile` optionally selects a profile and requires `--aws-region`. AWS
+Config recording must be enabled for the intended resource types in that region,
+and the identity needs `config:SelectResourceConfig` permission. The CLI's normal
+credential-provider permissions also apply. The fixed read-only SELECT query
+uses auto-pagination, a 60-second total timeout, and a 16 MiB output cap. No cloud
+resources are changed. Only allow-all network mode permits collection; offline
+and public-only modes refuse it before invoking the CLI. See [Privacy](/reference/privacy#aws-cloud-posture-checks-cspm).
+
+Exports are point-in-time evidence, and AWS Config live collection is still
+recorded state. Freshness and full account/region coverage are not established;
+`cspm:snapshot-scope` states that limitation in every evaluated inventory.
+Unrepresented supported types produce `cspm:coverage-unavailable`, omitted
+settings produce `cspm:check-unavailable`, and unsupported resources are explicit.
+No returned resources does not mean the account is secure.
+
+### Reports and failures
+
+The usual text, JSON (`cspm-report.schema.json`), SARIF, JUnit, and Markdown formats
+are supported. Findings include resource identity and remediation, without raw
+configuration or policy documents. `--fail-on` defaults to `high`. Accepted
+findings remain visible and are excluded from severity failures; use their
+resource subject when accepting a cloud risk:
+
+```sh
+securock accept cspm:rds-public --subject AWS::RDS::DBInstance/123456789012/ap-northeast-1/db-1 --reason 'Reviewed endpoint' --expires 30d
+```
+
+Malformed/oversized inventories, duplicate identities within one inventory,
+uncollected pages (`NextToken`), unavailable resource configurations, missing
+AWS CLI/credentials, and failed collections exit `2`, including with `--no-fail`.
+An inventory without any evaluable supported resources also exits `2`.
+Completed findings remain in the report with `cspm:analysis-incomplete`, and
+other supplied inventories are still processed. `--output` saves partial reports.
+Standalone exceptions come from the current directory; unified exceptions come
+from the selected project. `--exceptions` overrides either.
 
 ## The core commands
 
