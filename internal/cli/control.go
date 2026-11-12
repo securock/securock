@@ -23,7 +23,7 @@ func newControlCommand(opts *options) *cobra.Command {
 		if restore {
 			return opErr(control.Restore(a[0], dir, key, seed))
 		}
-		if _, e = os.Stat(dir); e != nil {
+		if _, e = os.Stat(dir + string(os.PathSeparator) + "state.enc"); e != nil {
 			return opErr(e)
 		}
 		s, e := control.Open(dir, key, nil)

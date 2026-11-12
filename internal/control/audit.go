@@ -50,12 +50,45 @@ func (s *Store) SetSigner(seed []byte) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	key := ed25519.NewKeyFromSeed(seed)
+	changed := false
 	for _, t := range s.state.Tenants {
-		if e := VerifyAudit(AuditExport{Version: 1, PublicKey: base64.StdEncoding.EncodeToString(key.Public().(ed25519.PublicKey)), Events: t.Audit}, key.Public().(ed25519.PublicKey)); e != nil {
-			return fmt.Errorf("audit signer does not match existing history")
+		if len(t.Audit) == 0 {
+			if !s.newState {
+				return fmt.Errorf("existing state is missing its signed checkpoint")
+			}
+			copy := *t
+			copy.Audit = nil
+			event := AuditEvent{Sequence: 1, Actor: "operator:bootstrap", Action: "tenant.initialize", Time: UTC(), StateDigest: digest(copy)}
+			raw, _ := json.Marshal(event)
+			event.Signature = base64.StdEncoding.EncodeToString(ed25519.Sign(key, raw))
+			t.Audit = []AuditEvent{event}
+			changed = true
+		} else if e := verifyState(t, key.Public().(ed25519.PublicKey)); e != nil {
+			return e
 		}
 	}
+	if changed {
+		if e := s.save(s.state); e != nil {
+			return e
+		}
+	}
+	s.newState = false
+
 	s.signer = key
+	return nil
+}
+func verifyState(t *Tenant, key ed25519.PublicKey) error {
+	if len(t.Audit) == 0 {
+		return fmt.Errorf("signed state checkpoint required")
+	}
+	if e := VerifyAudit(AuditExport{1, base64.StdEncoding.EncodeToString(key), t.Audit}, key); e != nil {
+		return e
+	}
+	copy := *t
+	copy.Audit = nil
+	if digest(copy) != t.Audit[len(t.Audit)-1].StateDigest {
+		return fmt.Errorf("state does not match the signed checkpoint")
+	}
 	return nil
 }
 func VerifyAudit(v AuditExport, pinned ed25519.PublicKey) error {
@@ -157,6 +190,9 @@ func (s *Server) auditAPI(w http.ResponseWriter, r *http.Request, p identity.Pri
 			exp, te := time.Parse(time.RFC3339, req.Expires)
 			if !identity.ValidID(req.ID) || e != nil || len(raw) != 32 || req.Rule == "" || req.Reason == "" || len(req.Reason) > 2048 || te != nil || !exp.After(time.Now()) || exp.After(time.Now().Add(30*24*time.Hour)) {
 				return fmt.Errorf("invalid approval scope or expiry")
+			}
+			if len(t.Approvals) >= 10000 {
+				return fmt.Errorf("approval quota reached")
 			}
 			if _, ok := t.Approvals[req.ID]; ok {
 				return fmt.Errorf("approval exists")

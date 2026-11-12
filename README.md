@@ -1024,3 +1024,14 @@ with `key`, `owner`, `due` assigns a finding; the shared console provides these
 controls. Authenticated mutations are audited. `GET /api/v1/connectors` lists
 only tenant connector IDs/provider/project metadata, never credentials. A closed
 external ticket still cannot bypass evidence-based resolution.
+
+## Signed-state recovery boundary
+
+Startup and backup now verify that each encrypted tenant snapshot matches the
+last signed audit state digest, in addition to checking the event chain. Restoring
+a snapshot that has valid encryption but altered contents or missing checkpoints
+is rejected. Bootstrap subject bindings initialize a new state only; later users
+are provisioned through audited APIs. Changing the original configuration cannot
+reactivate a deprovisioned subject or silently add an administrator. Keep an
+independently retained audit sequence/digest checkpoint: signatures alone cannot
+detect replacement with an older fully valid snapshot.

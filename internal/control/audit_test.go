@@ -34,7 +34,7 @@ func TestApprovalsAndSignedAudit(t *testing.T) {
 	if e := control.VerifyAudit(envelope.Data, public); e != nil {
 		t.Fatal(e)
 	}
-	if len(envelope.Data.Events) != 1 {
+	if len(envelope.Data.Events) != 2 {
 		t.Fatal("failed mutations audited as successful")
 	}
 	envelope.Data.Events[0].Actor = "forged"

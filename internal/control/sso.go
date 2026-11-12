@@ -214,13 +214,17 @@ func (s *Server) browserAuth(w http.ResponseWriter, r *http.Request) bool {
 		idPrincipal, e := conf.Verify(tokens.ID, time.Now())
 		parts := strings.Split(tokens.ID, ".")
 		var claims struct {
-			Nonce string `json:"nonce"`
+			Nonce           string          `json:"nonce"`
+			AuthorizedParty string          `json:"azp"`
+			Audience        json.RawMessage `json:"aud"`
 		}
 		if len(parts) == 3 {
 			body, _ := base64.RawURLEncoding.DecodeString(parts[1])
 			_ = json.NewDecoder(bytes.NewReader(body)).Decode(&claims)
 		}
-		if e != nil || idPrincipal.Subject != apiPrincipal.Subject || claims.Nonce != pending.Nonce {
+		var audiences []string
+		_ = json.Unmarshal(claims.Audience, &audiences)
+		if e != nil || idPrincipal.Subject != apiPrincipal.Subject || claims.Nonce != pending.Nonce || claims.AuthorizedParty != "" && claims.AuthorizedParty != b.Config.ClientID || len(audiences) > 1 && claims.AuthorizedParty != b.Config.ClientID {
 			reply(w, 401, nil)
 			return true
 		}

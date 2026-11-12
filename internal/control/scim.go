@@ -90,7 +90,7 @@ func (s *Server) scim(w http.ResponseWriter, r *http.Request, p identity.Princip
 			return
 		}
 	} else if r.Method == "PATCH" {
-		if decode(w, r, &patch) != nil || len(patch.Operations) == 0 || len(patch.Operations) > 10 {
+		if decode(w, r, &patch) != nil || !slices.Contains(patch.Schemas, "urn:ietf:params:scim:api:messages:2.0:PatchOp") || len(patch.Operations) == 0 || len(patch.Operations) > 10 {
 			scimError(w, 400)
 			return
 		}

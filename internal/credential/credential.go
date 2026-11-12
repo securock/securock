@@ -116,8 +116,7 @@ func Execute(ctx context.Context, o Options) (Report, error) {
 		return out, fmt.Errorf("rotation response unavailable; reconcile with provider")
 	}
 	var token struct {
-		Token       string `json:"token"`
-		AccessToken string `json:"token_unused"`
+		Token string `json:"token"`
 	}
 	if json.Unmarshal(body, &token) != nil {
 		return out, fmt.Errorf("invalid rotation response")

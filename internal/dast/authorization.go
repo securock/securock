@@ -43,7 +43,7 @@ func ReadMatrix(r io.Reader) (Matrix, error) {
 	}
 	d := json.NewDecoder(bytes.NewReader(raw))
 	d.DisallowUnknownFields()
-	if d.Decode(&m) != nil || m.Version != 1 || len(m.Actors) < 2 || len(m.Actors) > 20 || len(m.Cases) == 0 || len(m.Cases) > 200 {
+	if d.Decode(&m) != nil || d.Decode(new(any)) != io.EOF || m.Version != 1 || len(m.Actors) < 2 || len(m.Actors) > 20 || len(m.Cases) == 0 || len(m.Cases) > 200 {
 		return m, fmt.Errorf("invalid authorization matrix")
 	}
 	actors := map[string]bool{}

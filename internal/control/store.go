@@ -56,11 +56,12 @@ type State struct {
 	Tenants map[string]*Tenant `json:"tenants"`
 }
 type Store struct {
-	signer ed25519.PrivateKey
-	mu     sync.Mutex
-	dir    string
-	aead   cipher.AEAD
-	state  State
+	newState bool
+	signer   ed25519.PrivateKey
+	mu       sync.Mutex
+	dir      string
+	aead     cipher.AEAD
+	state    State
 }
 
 func ID() string {
@@ -90,7 +91,12 @@ func Open(dir string, key []byte, bindings []identity.Binding) (*Store, error) {
 	block, _ := aes.NewCipher(key)
 	aead, _ := cipher.NewGCM(block)
 	s := &Store{dir: dir, aead: aead, state: State{Version: 1, Tenants: map[string]*Tenant{}}}
+	if info, err := os.Stat(filepath.Join(dir, "state.enc")); err == nil && info.Size() > 65<<20 {
+		s.Close()
+		return nil, fmt.Errorf("encrypted state exceeds limit")
+	}
 	raw, e := os.ReadFile(filepath.Join(dir, "state.enc"))
+	s.newState = os.IsNotExist(e)
 	if e == nil {
 		if len(raw) < aead.NonceSize() {
 			s.Close()
@@ -105,15 +111,21 @@ func Open(dir string, key []byte, bindings []identity.Binding) (*Store, error) {
 		s.Close()
 		return nil, e
 	}
-	for _, b := range bindings {
-		t := s.state.Tenants[b.Tenant]
-		if t == nil {
-			t = &Tenant{Members: map[string]Member{}, Projects: map[string]Project{}, Jobs: map[string]Job{}}
-			s.state.Tenants[b.Tenant] = t
+	if s.newState {
+		for _, b := range bindings {
+			t := s.state.Tenants[b.Tenant]
+			if t == nil {
+				t = &Tenant{Members: map[string]Member{}, Projects: map[string]Project{}, Jobs: map[string]Job{}}
+				s.state.Tenants[b.Tenant] = t
+			}
+			if _, ok := t.Members[b.Subject]; !ok {
+				t.Members[b.Subject] = Member{ID: ID(), Subject: b.Subject, Active: true, Roles: b.Roles}
+			}
 		}
-		if _, ok := t.Members[b.Subject]; !ok {
-			t.Members[b.Subject] = Member{ID: ID(), Subject: b.Subject, Active: true, Roles: b.Roles}
-		}
+	}
+	if e = validateState(s.state); e != nil {
+		s.Close()
+		return nil, e
 	}
 	if e = s.save(s.state); e != nil {
 		s.Close()

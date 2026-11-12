@@ -2,7 +2,6 @@ package control
 
 import (
 	"crypto/ed25519"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -19,7 +18,7 @@ func (s *Store) Backup(path string) error {
 	}
 	public := s.signer.Public().(ed25519.PublicKey)
 	for _, t := range s.state.Tenants {
-		if e := VerifyAudit(AuditExport{1, base64.StdEncoding.EncodeToString(public), t.Audit}, public); e != nil {
+		if e := verifyState(t, public); e != nil {
 			return e
 		}
 	}
