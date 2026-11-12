@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"github.com/securock/securock/internal/finding"
 	"github.com/securock/securock/internal/identity"
+	"github.com/securock/securock/internal/lifecycle"
 	"os"
 	"path/filepath"
 	"sync"
@@ -24,9 +25,10 @@ type Member struct {
 	Roles   []string `json:"roles"`
 }
 type Project struct {
-	ID    string `json:"id"`
-	Name  string `json:"name"`
-	Owner string `json:"owner"`
+	SLADays map[string]int `json:"sla_days,omitempty"`
+	ID      string         `json:"id"`
+	Name    string         `json:"name"`
+	Owner   string         `json:"owner"`
 }
 type Job struct {
 	LeaseUntil  string          `json:"lease_until,omitempty"`
@@ -41,12 +43,13 @@ type Job struct {
 	Attempts    int             `json:"attempts"`
 }
 type Tenant struct {
-	Deliveries map[string]Delivery `json:"deliveries,omitempty"`
-	Approvals  map[string]Approval `json:"approvals,omitempty"`
-	Audit      []AuditEvent        `json:"audit,omitempty"`
-	Members    map[string]Member   `json:"members"`
-	Projects   map[string]Project  `json:"projects"`
-	Jobs       map[string]Job      `json:"jobs"`
+	Registries map[string]lifecycle.Registry `json:"registries,omitempty"`
+	Deliveries map[string]Delivery           `json:"deliveries,omitempty"`
+	Approvals  map[string]Approval           `json:"approvals,omitempty"`
+	Audit      []AuditEvent                  `json:"audit,omitempty"`
+	Members    map[string]Member             `json:"members"`
+	Projects   map[string]Project            `json:"projects"`
+	Jobs       map[string]Job                `json:"jobs"`
 }
 type State struct {
 	Version int                `json:"version"`

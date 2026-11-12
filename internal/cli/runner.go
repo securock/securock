@@ -6,6 +6,7 @@ import (
 	"github.com/securock/securock/internal/control"
 	"github.com/securock/securock/internal/external"
 	"github.com/securock/securock/internal/finding"
+	"github.com/securock/securock/internal/runrecord"
 	"github.com/spf13/cobra"
 	"net"
 	"net/url"
@@ -63,13 +64,34 @@ func newRunnerCommand(opts *options) *cobra.Command {
 				return opErr(e)
 			}
 			if job.ID != "" {
-				raw, scanErr := external.Run(c.Context(), exe, "security", projects[job.Project], "--offline", "--no-fail", "--format", "json")
+				temp, e := os.MkdirTemp("", "securock-run-*")
+				if e != nil {
+					return opErr(e)
+				}
+				recordFile := filepath.Join(temp, "record.json")
+				raw, scanErr := external.Run(c.Context(), exe, "security", projects[job.Project], "--offline", "--no-fail", "--format", "json", "--record", recordFile, "--scope-id", job.Project)
+				var record *runrecord.Record
+				if scanErr == nil {
+					fd, e := os.Open(recordFile)
+					if e != nil {
+						scanErr = e
+					} else {
+						v, e := runrecord.Read(fd)
+						fd.Close()
+						if e != nil {
+							scanErr = e
+						} else {
+							record = &v
+						}
+					}
+				}
+				_ = os.RemoveAll(temp)
 				var report finding.Report
 				if scanErr == nil {
 					scanErr = json.Unmarshal(raw, &report)
 				}
 				var result control.Job
-				if e := client.Call(c.Context(), "POST", "/api/v1/runner/complete", map[string]any{"id": job.ID, "lease": job.Lease, "report": report, "failed": scanErr != nil}, &result); e != nil {
+				if e := client.Call(c.Context(), "POST", "/api/v1/runner/complete", map[string]any{"id": job.ID, "lease": job.Lease, "report": report, "failed": scanErr != nil, "record": record}, &result); e != nil {
 					return opErr(e)
 				}
 				fmt.Fprintf(c.OutOrStdout(), "job %s %s\n", job.ID, result.Status)

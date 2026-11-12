@@ -1,9 +1,13 @@
 package control
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
 	"github.com/securock/securock/internal/finding"
 	"github.com/securock/securock/internal/identity"
+	"github.com/securock/securock/internal/lifecycle"
+	"github.com/securock/securock/internal/runrecord"
 	"net/http"
 	"slices"
 	"strings"
@@ -73,10 +77,11 @@ func (s *Server) runnerAPI(w http.ResponseWriter, r *http.Request, p identity.Pr
 		})
 	case "/api/v1/runner/complete":
 		var req struct {
-			ID     string          `json:"id"`
-			Lease  string          `json:"lease"`
-			Report *finding.Report `json:"report"`
-			Failed bool            `json:"failed"`
+			Record *runrecord.Record `json:"record,omitempty"`
+			ID     string            `json:"id"`
+			Lease  string            `json:"lease"`
+			Report *finding.Report   `json:"report"`
+			Failed bool              `json:"failed"`
 		}
 		if decode(w, r, &req) != nil {
 			reply(w, 400, nil)
@@ -98,6 +103,32 @@ func (s *Server) runnerAPI(w http.ResponseWriter, r *http.Request, p identity.Pr
 						return fmt.Errorf("invalid finding")
 					}
 				}
+				record := runrecord.New("unknown", "", "legacy-report", j.Project, true, nil, *req.Report, false)
+				if req.Record != nil {
+					raw, _ := json.Marshal(req.Record)
+					parsed, e := runrecord.Read(bytes.NewReader(raw))
+					if e != nil || parsed.ReportDigest != runrecord.Digest(*req.Report) || len(parsed.Scopes) != 1 || parsed.Scopes[0].ID != "source:"+j.Project {
+						return fmt.Errorf("invalid execution record scope or report")
+					}
+					record = parsed
+				}
+				if t.Registries == nil {
+					t.Registries = map[string]lifecycle.Registry{}
+				}
+				registry := lifecycle.Step(t.Registries[j.Project], record)
+				project := t.Projects[j.Project]
+				for i := range registry.Entries {
+					entry := &registry.Entries[i]
+					if entry.Owner == "" {
+						entry.Owner = project.Owner
+					}
+					if entry.Due == "" && entry.State == "new" {
+						if days := project.SLADays[string(entry.Finding.Severity)]; days > 0 {
+							entry.Due = time.Now().UTC().AddDate(0, 0, days).Format("2006-01-02")
+						}
+					}
+				}
+				t.Registries[j.Project] = registry
 				j.Report = req.Report
 				j.Status = "completed"
 			} else {

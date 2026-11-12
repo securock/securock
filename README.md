@@ -1006,3 +1006,21 @@ and token expiry on every request. Logout invalidates the local session; IdP
 logout/revocation remains IdP-managed. Restarting signs sessions out. MFA and
 SAML federation remain IdP responsibilities. No implicit issuer discovery or
 untrusted remote key fetching occurs.
+
+## Shared remediation ownership and deadlines
+
+Runner completion now uploads a validated execution record alongside its report.
+The service keeps a per-project lifecycle registry with new/active/reopened/
+unobserved/resolved states. Only comparable complete source evidence can resolve
+source findings automatically; missing cloud/network coverage never closes an
+issue. Legacy report-only completions are explicitly incomplete evidence.
+Project creation accepts optional `sla_days` mapping severities to 1-3650 days;
+new issues inherit the project owner and configured deadline. No deadline is
+assumed when that severity has no configured SLA.
+
+`GET /api/v1/issues?as_of=YYYY-MM-DD` returns tenant work queues and overdue
+flags; default evaluation uses the service's UTC date. `PUT /api/v1/issues/PROJECT`
+with `key`, `owner`, `due` assigns a finding; the shared console provides these
+controls. Authenticated mutations are audited. `GET /api/v1/connectors` lists
+only tenant connector IDs/provider/project metadata, never credentials. A closed
+external ticket still cannot bypass evidence-based resolution.

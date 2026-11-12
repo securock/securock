@@ -3,6 +3,7 @@ package control
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/securock/securock/internal/finding"
 	"github.com/securock/securock/internal/identity"
 	"io"
 	"net/http"
@@ -74,6 +75,9 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		reply(w, 401, map[string]string{"error": "authentication required"})
 		return
 	}
+	if s.issueAPI(w, r, p) {
+		return
+	}
 	if s.opsAPI(w, r, p) {
 		return
 	}
@@ -113,6 +117,12 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			if decode(w, r, &v) != nil || !identity.ValidID(v.ID) || v.Name == "" || len(v.Name) > 256 || len(v.Owner) > 256 {
 				reply(w, 400, nil)
 				return
+			}
+			for severity, days := range v.SLADays {
+				if _, e := finding.ParseSeverity(severity); e != nil || days < 1 || days > 3650 {
+					reply(w, 400, nil)
+					return
+				}
 			}
 			e := s.Store.UpdateAs(p, r.Method+" "+r.URL.Path, func(st *State) error {
 				t := st.Tenants[p.Tenant]
