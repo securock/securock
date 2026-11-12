@@ -731,3 +731,13 @@ with exit 2. Exceptions, severity gates and finding formats apply. JSON uses
 `container-report.schema.json`. Image registries and Trivy database endpoints
 are contacted only in enabled network mode; configure registry credentials in
 Trivy's normal environment.
+
+## Remediation assistance
+
+`securock remediate report.json --project .` lists actionable fixes and recommended
+versions already included in findings. `--patch-dir patches` drafts narrowly
+supported Go TLS-verification fixes, refusing stale locations and paths outside
+the project. Review patches before `git apply --unidiff-zero`; source files are
+never automatically changed. `--verify` reruns offline SAST, emits its full report
+and gates new high source findings. It does not certify dependency, cloud or DAST
+remediation: rerun their original commands with identical scopes.
