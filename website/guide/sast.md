@@ -169,6 +169,11 @@ variable (`var.db_password`) is not a secret. A placeholder word such as `exampl
 or `dummy` excuses only the candidate value that contains it; a real credential on
 the same line as a comment saying "example" is still reported.
 
+The credential scan reads files up to 512 KiB and lines up to 2,000 characters. A text
+file beyond either limit is reported as `sast:secrets-unchecked` (info) with the reason,
+and appears under `gaps` in the `--coverage-output` summary, so it reads as unknown
+rather than clean. Binary files and the data files listed above are not reported.
+
 React's `dangerouslySetInnerHTML` is an `xss` sink in `.jsx` and `.tsx`. Values
 passed between components as props are not followed yet.
 

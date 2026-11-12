@@ -34,3 +34,15 @@ func TestIncompleteSourceAndExactTargetScope(t *testing.T) {
 		}
 	}
 }
+
+func TestUncheckedSecretFilesMakeSourceIncomplete(t *testing.T) {
+	r := coverage.Build(finding.New("security", []finding.Finding{{ID: "sast:secrets-unchecked", Subject: "dump.sh"}}), nil, nil, "")
+	if len(r.Gaps) != 1 || r.Gaps[0].ID != "sast:secrets-unchecked" {
+		t.Fatalf("unchecked file missing from gaps: %+v", r)
+	}
+	for _, scope := range r.Scopes {
+		if scope.Kind == "source" && scope.State != "incomplete" {
+			t.Fatalf("source scope must be incomplete: %+v", scope)
+		}
+	}
+}

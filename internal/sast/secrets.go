@@ -2,6 +2,7 @@ package sast
 
 import (
 	"bytes"
+	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -120,25 +121,62 @@ func scanSecrets(root, full, rel, name string) []finding.Finding {
 		return nil
 	}
 	st, err := os.Stat(full)
-	if err != nil || st.Size() == 0 || st.Size() > 512<<10 {
+	if err != nil {
+		return []finding.Finding{unchecked(rel, "it could not be read")}
+	}
+	if st.Size() == 0 {
 		return nil
+	}
+	if st.Size() > maxSecretFile {
+		return []finding.Finding{unchecked(rel, "it is larger than 512 KiB")}
 	}
 	src, err := os.ReadFile(full)
-	if err != nil || bytes.IndexByte(src[:min(len(src), 8192)], 0) >= 0 {
-		return nil
+	if err != nil {
+		return []finding.Finding{unchecked(rel, "it could not be read")}
 	}
-	return secretContent(rel, name, src, false)
+	if bytes.IndexByte(src[:min(len(src), 8192)], 0) >= 0 {
+		return nil // binary, not text
+	}
+	out, long := secretContent(rel, name, src, false)
+	if long > 0 {
+		out = append(out, unchecked(rel, fmt.Sprintf("%d line(s) are longer than %d characters", long, maxSecretLine)))
+	}
+	return out
+}
+
+const (
+	maxSecretFile = 512 << 10
+	maxSecretLine = 2000
+)
+
+// unchecked records a text file the credential scan could not cover, so that the limit
+// shows up in the report and the coverage summary instead of reading as "no secrets".
+// The ID avoids the "sast:secrets/" prefix, which marks an actual credential.
+func unchecked(rel, why string) finding.Finding {
+	rel = filepath.ToSlash(rel)
+	return finding.Finding{
+		ID:          "sast:secrets-unchecked",
+		Severity:    finding.SeverityInfo,
+		Title:       "File was not fully scanned for credentials",
+		Detail:      rel + " was not fully scanned because " + why + "; credentials in it are unknown, not absent",
+		Subject:     rel,
+		Remediation: "Split or exclude generated data, or scan this file with a dedicated secret scanner.",
+		Location:    &finding.Location{File: rel, Line: 1},
+	}
 }
 
 // SecretContent scans historical text in memory, including documents. It never
 // returns matched credential values. The working-tree scanner keeps its exclusions.
 func SecretContent(rel string, src []byte) []finding.Finding {
-	if len(src) == 0 || len(src) > 512<<10 || bytes.IndexByte(src[:min(len(src), 8192)], 0) >= 0 {
+	if len(src) == 0 || len(src) > maxSecretFile || bytes.IndexByte(src[:min(len(src), 8192)], 0) >= 0 {
 		return nil
 	}
-	return secretContent(rel, filepath.Base(rel), src, true)
+	out, _ := secretContent(rel, filepath.Base(rel), src, true)
+	return out
 }
-func secretContent(rel, name string, src []byte, history bool) []finding.Finding {
+
+// secretContent also returns how many lines were too long to scan.
+func secretContent(rel, name string, src []byte, history bool) ([]finding.Finding, int) {
 	keyed, isGo := keyedFile(name)
 	if history {
 		keyed = true
@@ -146,6 +184,7 @@ func secretContent(rel, name string, src []byte, history bool) []finding.Finding
 	}
 	rel = filepath.ToSlash(rel)
 	var out []finding.Finding
+	long := 0
 	seen := map[string]bool{}
 	add := func(kind string, line int, sev finding.Severity, detail string) {
 		key := kind + "|" + rel + "|" + string(rune(line))
@@ -164,7 +203,8 @@ func secretContent(rel, name string, src []byte, history bool) []finding.Finding
 		})
 	}
 	for i, line := range strings.Split(string(src), "\n") {
-		if len(line) > 2000 {
+		if len(line) > maxSecretLine {
+			long++
 			continue
 		}
 		// Placeholder words are judged on the candidate value, never on the whole
@@ -200,5 +240,5 @@ func secretContent(rel, name string, src []byte, history bool) []finding.Finding
 			}
 		}
 	}
-	return out
+	return out, long
 }

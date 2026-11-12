@@ -160,3 +160,30 @@ func TestProviderSecretShapes(t *testing.T) {
 		})
 	}
 }
+
+// A file the credential scan cannot cover is reported as unchecked rather than ignored,
+// while what it did read still produces findings.
+func TestSecretsUncheckedFiles(t *testing.T) {
+	token := "export AWS_ACCESS_KEY_ID=AKIAIOSFODNN7ABCDEFG\n"
+	tests := []struct {
+		name  string
+		files map[string]string
+		want  []string
+	}{
+		{"file over the size limit", map[string]string{"dump.sh": token + strings.Repeat("echo ok\n", 70000)}, []string{"sast:secrets-unchecked"}},
+		{"line over the length limit", map[string]string{"bundle.sh": token + "X=" + strings.Repeat("a", 2500) + "\n"}, []string{"sast:secrets-unchecked", "sast:secrets/aws-access-key"}},
+		{"ordinary file is fully scanned", map[string]string{"deploy.sh": token}, []string{"sast:secrets/aws-access-key"}},
+		{"data excluded by name is not reported", map[string]string{"package-lock.json": strings.Repeat("a", 3000) + "\n"}, nil},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := analyze(t, tt.files)
+			slices.Sort(got)
+			want := slices.Clone(tt.want)
+			slices.Sort(want)
+			if !slices.Equal(got, want) {
+				t.Fatalf("got %v, want %v", got, want)
+			}
+		})
+	}
+}
