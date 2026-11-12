@@ -2,6 +2,7 @@ package coverage
 
 import (
 	"github.com/securock/securock/internal/finding"
+	"net/url"
 	"slices"
 	"strings"
 )
@@ -23,7 +24,7 @@ func Build(report finding.Report, targets, files []string, region string) Report
 	for _, target := range targets {
 		state := "attempted"
 		for _, f := range report.Findings {
-			if strings.HasPrefix(f.Subject, target) && strings.Contains(f.ID, "incomplete") {
+			if targetContains(target, f.Subject) && isGap(f.ID) {
 				state = "incomplete"
 			}
 		}
@@ -37,7 +38,7 @@ func Build(report finding.Report, targets, files []string, region string) Report
 	}
 	seen := map[string]bool{}
 	for _, f := range report.Findings {
-		if strings.Contains(f.ID, "incomplete") || strings.Contains(f.ID, "unchecked") || strings.Contains(f.ID, "unavailable") {
+		if isGap(f.ID) {
 			out.Gaps = append(out.Gaps, f)
 		}
 		if strings.HasPrefix(f.Subject, "AWS::") {
@@ -51,6 +52,35 @@ func Build(report finding.Report, targets, files []string, region string) Report
 			}
 		}
 	}
+	for _, f := range out.Gaps {
+		if strings.HasPrefix(f.ID, "sast:") {
+			out.Scopes[0].State = "incomplete"
+		}
+	}
 	slices.SortFunc(out.Scopes, func(a, b Scope) int { return strings.Compare(a.Kind+a.Target, b.Kind+b.Target) })
 	return out
+}
+
+// Keep unsupported resources in the evidence-gap summary even when a scanner
+// can still return useful results for the rest of the inventory.
+func isGap(id string) bool {
+	for _, marker := range []string{"incomplete", "unchecked", "unavailable", "unsupported"} {
+		if strings.Contains(id, marker) {
+			return true
+		}
+	}
+	return false
+}
+
+func targetContains(target, subject string) bool {
+	a, e := url.Parse(target)
+	if e != nil {
+		return false
+	}
+	b, e := url.Parse(subject)
+	if e != nil || !strings.EqualFold(a.Scheme, b.Scheme) || !strings.EqualFold(a.Host, b.Host) {
+		return false
+	}
+	prefix := strings.TrimRight(a.Path, "/")
+	return b.Path == prefix || strings.HasPrefix(b.Path, prefix+"/")
 }
