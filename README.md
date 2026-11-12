@@ -537,3 +537,14 @@ formats are supported; JSON retains the current report's tool and schema.
 targets, recorded AWS account/regions, and incomplete/unchecked evidence to a
 separate JSON file (`coverage-report.schema.json`). Attempted scopes do not
 certify exhaustive source or route coverage; every gap remains visible.
+
+## Container images
+
+`securock container IMAGE --network allow-all` runs installed Trivy to scan OS
+packages, application dependencies, and secrets, importing its SARIF findings.
+`securock container image.tar --archive --offline` uses local input and existing
+Trivy databases with database updates disabled. Missing scanners/databases fail
+with exit 2. Exceptions, severity gates and finding formats apply. JSON uses
+`container-report.schema.json`. Image registries and Trivy database endpoints
+are contacted only in enabled network mode; configure registry credentials in
+Trivy's normal environment.

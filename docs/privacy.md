@@ -184,3 +184,12 @@ rules:
 ```
 
 Unknown policy fields are rejected.
+
+## Container scanners
+
+The explicit `container` command invokes installed Trivy. Online image scans
+require allow-all and may contact the selected registry and Trivy's configured
+vulnerability database repositories (normally ghcr.io). Local offline archives
+disable database updates and version checks and require preinstalled databases.
+Trivy manages registry authentication; Securock does not accept credential flags.
+Raw scanner stderr is not copied into reports.
