@@ -12,6 +12,8 @@ permissions:
 
 jobs:
   goreleaser:
+    # Releases publish to the upstream repository; the other jobs need this one.
+    if: github.repository == 'securock/securock'
     runs-on: ubuntu-latest
     outputs:
       pairs: ${{ steps.sboms.outputs.pairs }}

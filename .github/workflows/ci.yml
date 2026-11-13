@@ -65,7 +65,8 @@ jobs:
           go-version-file: go.mod
 
   dependency-review:
-    if: github.event_name == 'pull_request'
+    # The dependency graph this action reads is often off in forks.
+    if: github.repository == 'securock/securock' && github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -123,7 +124,8 @@ jobs:
         run: sh scripts/check-sbom-pairs.sh dist
 
   rulesets:
-    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
+    # Needs the upstream rulesets and an admin token, which forks do not have.
+    if: github.repository == 'securock/securock' && (github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository)
     runs-on: ubuntu-latest
     permissions:
       contents: read
