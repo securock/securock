@@ -8,12 +8,12 @@
 <br>
 
 <strong>Security for dependencies, source code, secrets, and infrastructure.</strong>  
-<a href="https://securock.dev">Learn more →</a>
+<strong><a href="https://securock.dev">Learn more →</a></strong>
 
-<a href="#install">Install</a> ·
-<a href="#quick-start">Quick start</a> ·
-<a href="#github-action">GitHub Action</a> ·
-<a href="docs/enterprise.md">Enterprise operations</a>
+<strong><a href="#install">Install</a></strong> ·
+<strong><a href="#quick-start">Quick start</a></strong> ·
+<strong><a href="#github-action">GitHub Action</a></strong> ·
+<strong><a href="docs/enterprise.md">Enterprise operations</a></strong>
 
 <br>
 
