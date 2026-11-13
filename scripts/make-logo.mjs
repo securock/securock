@@ -1,67 +1,65 @@
 #!/usr/bin/env node
-// Regenerate docs/assets/logo.svg: SECUROCK set in Barlow Black Italic.
+// Regenerate docs/assets/logo.svg: SECUROCK set in Barlow ExtraBold (800, upright).
 //
 // The text is converted to outlines, so the SVG renders the same everywhere
 // without the font installed. The output is deterministic.
 //
-//   cd scripts && pnpm install --frozen-lockfile && node make-logo.mjs [--font Barlow-BlackItalic.ttf]
+//   cd scripts && pnpm install --frozen-lockfile && node make-logo.mjs [--font Barlow-ExtraBold.ttf]
 //
-// Without --font it uses the static Barlow 900 italic from the pinned
+// Without --font it uses the static Barlow 800 from the pinned
 // @fontsource/barlow package (SIL OFL 1.1), so no network is needed.
 //
 // Spacing: Barlow has no kerning for these pairs, so each pair is placed from
-// the white space its two facing sides enclose (flat stems get more, round and
-// open sides less, with the depth capped, as in HT Letterspacer). ADJUST then
-// matches the blurred grey of every pair to Barlow's own H-H / O-O reference
-// pairs, and MIN_GAP keeps any pair from closing in tighter than the font's
-// round-round distance. TRACKING opens every pair evenly for display use.
-// Options: --tracking 0.01, --flat-gap, --depth, --weight, --min-gap,
-// --adjust SE=0.01,EC=-0.005, --text, --native, --debug.
+// the white space on its two facing sides, using the approach of HT Letterspacer
+// (Huerta Tipografica): for every side, measure how far the outline sits from the
+// side's extreme point on horizontal scanlines across the cap height, clamp that
+// depth, close open counters at 45 degrees, and take the mean. The gap between
+// the two extreme points is then
+//
+//   gap = BASE_GAP - SIDE_WEIGHT * (white area of right side + white area of left side)
+//
+// so a flat side (H, E, K stem) gets a wider gap and a round or open side (O, C, S)
+// a narrower one. BASE_GAP and SIDE_WEIGHT are not hand-picked: they are the
+// least-squares fit of this model to the spacing Barlow ExtraBold itself uses for
+// its 287 uppercase pairs that have no kerning (B C D E F G H K L M N O P Q R S T U).
+// The fit reproduces them with a root-mean-square error of 3.6 per 1000 em, and a
+// uniform minimum distance between letters made it worse, so none is imposed
+// beyond a collision guard. For another weight, fit the two constants again.
+// Options: --tracking 0.01, --adjust SE=0.005,EC=-0.005, --text, --native, --debug.
 import { readFile, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import opentype from 'opentype.js';
 
 const DEFAULT_FONT = fileURLToPath(
-	import.meta.resolve('@fontsource/barlow/files/barlow-latin-900-italic.woff'),
+	import.meta.resolve('@fontsource/barlow/files/barlow-latin-800-normal.woff'),
 );
 const TEXT = process.argv.includes('--text')
 	? process.argv[process.argv.indexOf('--text') + 1]
 	: 'SECUROCK';
 const HEIGHT = 72; // cap height in output units
 const PAD = 12;
-const FLAT_GAP = 0.09; // gap between two flat sides (stem to stem), in em
-const DEPTH = 0.1; // how deep a notch or curve counts as white space, in em
-const WEIGHT = 0.35; // how much of that notch space is taken off the gap
-const MIN_GAP = 0.058; // letters never come closer than this at any row, in em
-const TRACKING = 0; // extra space between every pair, in em (display sizes: try 0.01)
 const ROWS = 96; // horizontal scanlines used to measure outlines
-// Hand tuning per pair after the automatic pass, in em: positive widens,
-// negative tightens.
-const ADJUST = {
-	EC: -0.014,
-	UR: -0.012,
-};
-// Pairs whose open or round shapes would have to go closer than MIN_GAP to match
-// the grey of Barlow's own H-H / O-O reference pairs. They sit exactly at MIN_GAP.
-const AT_FLOOR = ['SE', 'CU', 'RO', 'OC', 'CK'];
+const DEPTH = 0.1; // deepest notch or curve that counts as white space, in em
+const SLOPE = 1; // open counters close at this slope (1 = 45 degrees)
+const BASE_GAP = 0.0971; // gap between two flat sides, in em (fitted)
+const SIDE_WEIGHT = 0.395; // how much of a side's white area narrows the gap (fitted)
+const GUARD = 0.04; // letters never come closer than this at any row, in em
+const TRACKING = 0; // extra space between every pair, in em (display sizes: try 0.01)
+// Hand tuning per pair after the model, in em: positive widens, negative tightens.
+const ADJUST = {};
 
 const args = process.argv.slice(2);
 const opt = (name) => {
 	const i = args.indexOf(name);
 	return i >= 0 ? args[i + 1] : undefined;
 };
-const num = (name, fallback) => (opt(name) === undefined ? fallback : Number(opt(name)));
 const adjust = { ...ADJUST };
 for (const part of (opt('--adjust') ?? '').split(',').filter(Boolean)) {
 	const [pair, value] = part.split('=');
 	adjust[pair] = Number(value);
 }
 const native = args.includes('--native');
-const tracking = num('--tracking', TRACKING);
-const flatGap = num('--flat-gap', FLAT_GAP);
-const depth = num('--depth', DEPTH);
-const weight = num('--weight', WEIGHT);
-const minGap = num('--min-gap', MIN_GAP);
+const tracking = opt('--tracking') === undefined ? TRACKING : Number(opt('--tracking'));
 const fontPath = opt('--font');
 const outPath = opt('--out') ?? fileURLToPath(new URL('../docs/assets/logo.svg', import.meta.url));
 
@@ -77,10 +75,7 @@ const capH = font.tables.os2.sCapHeight;
 // measured with this removed so a straight italic stem counts as a flat side.
 const slant = Math.tan((-font.tables.post.italicAngle * Math.PI) / 180);
 
-// The font ships no kerning for these pairs, so space them optically. Each
-// glyph is measured on a set of scanlines (left and right outline per row).
-// Because both neighbours are measured on the same rows, the gap per row is
-// the same whether or not the slant is removed.
+// Left and right outline x for each scanline across the cap height.
 function profile(glyph) {
 	const segs = [];
 	let cur = null;
@@ -130,68 +125,55 @@ function profile(glyph) {
 		left.push(lo - y * slant);
 		right.push(hi - y * slant);
 	}
-	return { left, right };
+	return { left, right, L: Math.min(...left), R: Math.max(...right) };
 }
 
-// White space a side contributes, in em: the mean distance from the outermost
-// point of that side to its outline, with each row capped at `depth` so a deep
-// notch (E, C, K) does not count as more than a shallow curve. Flat sides give
-// 0, round and open sides give more, so they get a smaller sidebearing.
-function sideArea(p) {
-	const L = Math.min(...p.left);
-	const R = Math.max(...p.right);
-	let left = 0;
-	let right = 0;
-	for (let r = 0; r < ROWS; r++) {
-		left += Math.min(p.left[r] - L, depth * em);
-		right += Math.min(R - p.right[r], depth * em);
-	}
-	return { L, R, left: left / ROWS, right: right / ROWS };
+// Mean white depth of one side, in em units: each row's distance from the side's
+// extreme point, clamped to DEPTH and with counters closed at SLOPE.
+function whiteDepth(p, side) {
+	const step = capH / ROWS;
+	const d = p[side].map((x) => Math.min(side === 'right' ? p.R - x : x - p.L, DEPTH * em));
+	for (let i = 1; i < d.length; i++) d[i] = Math.min(d[i], d[i - 1] + SLOPE * step);
+	for (let i = d.length - 2; i >= 0; i--) d[i] = Math.min(d[i], d[i + 1] + SLOPE * step);
+	return d.reduce((s, v) => s + v, 0) / d.length;
 }
 
 const glyphs = [...TEXT].map((ch) => font.charToGlyph(ch));
 const profiles = glyphs.map(profile);
-const areas = profiles.map(sideArea);
+const white = profiles.map((p) => ({ left: whiteDepth(p, 'left'), right: whiteDepth(p, 'right') }));
 const placed = [{ glyph: glyphs[0], x: 0 }];
 for (let i = 1; i < glyphs.length; i++) {
-	const a = areas[i - 1];
-	const b = areas[i];
-	// Outermost point to outermost point, so that the white space between the
-	// two letters (gap plus both sides' notches) is the same for every pair.
-	const extGap = flatGap * em - weight * (a.right + b.left);
-	const byArea = placed[i - 1].x + a.R + extGap - b.L;
-	// Balanced spacing must not make strokes collide where the gap is tight.
-	let tight = Infinity;
-	for (let r = 0; r < ROWS; r++) {
-		tight = Math.min(tight, profiles[i].left[r] - profiles[i - 1].right[r]);
-	}
-	const byGuard = placed[i - 1].x + minGap * em - tight;
-	const hand = (adjust[TEXT[i - 1] + TEXT[i]] ?? 0) * em;
+	const a = profiles[i - 1];
+	const b = profiles[i];
 	const pair = TEXT[i - 1] + TEXT[i];
-	const spaced = AT_FLOOR.includes(pair) ? byGuard : Math.max(byArea + hand, byGuard);
-	const x = native
-		? placed[i - 1].x + glyphs[i - 1].advanceWidth + tracking * em
-		: spaced + tracking * em;
-	placed.push({ glyph: glyphs[i], x });
+	const gap =
+		BASE_GAP * em - SIDE_WEIGHT * (white[i - 1].right + white[i].left) + (adjust[pair] ?? 0) * em;
+	let x = placed[i - 1].x + a.R + gap - b.L;
+	// The model must not make strokes collide where the gap is tight.
+	let tight = Infinity;
+	for (let r = 0; r < ROWS; r++) tight = Math.min(tight, b.left[r] - a.right[r]);
+	x = Math.max(x, placed[i - 1].x + GUARD * em - tight);
+	if (native) x = placed[i - 1].x + glyphs[i - 1].advanceWidth;
+	placed.push({ glyph: glyphs[i], x: x + tracking * em });
 }
 
 if (args.includes('--debug')) {
-	// Per-pair report in em/1000: gap between outermost points, tightest row,
-	// and the guard (true when MIN_GAP, not the area rule, set the position).
+	// Per-pair report in 1/1000 em: gap between the extreme points, the tightest
+	// row, and the white area the two facing sides contribute.
 	for (let i = 1; i < placed.length; i++) {
 		const g = [];
 		for (let r = 0; r < ROWS; r++) {
 			g.push(placed[i].x + profiles[i].left[r] - (placed[i - 1].x + profiles[i - 1].right[r]));
 		}
-		const ext = placed[i].x + areas[i].L - (placed[i - 1].x + areas[i - 1].R);
+		const ext = placed[i].x + profiles[i].L - (placed[i - 1].x + profiles[i - 1].R);
 		console.log(
 			TEXT[i - 1] + TEXT[i],
-			'ext',
+			'gap',
 			Math.round(ext),
-			'min',
+			'tightest',
 			Math.round(Math.min(...g)),
-			'notch',
-			Math.round(areas[i - 1].right + areas[i].left),
+			'white',
+			Math.round(white[i - 1].right + white[i].left),
 		);
 	}
 }
@@ -214,7 +196,7 @@ const d = placed
 const w = Math.round((maxX - minX) * scale + 2 * PAD);
 const h = HEIGHT + 2 * PAD;
 
-// One flat blue in both light and dark mode.
+// Flat blue; dark mode shifts it lighter so it keeps contrast on a dark page.
 const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" role="img" aria-label="Securock">
   <title>Securock</title>
   <path fill="#2563eb" d="${d}"/>
