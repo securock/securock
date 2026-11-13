@@ -13,6 +13,7 @@ import (
 	"github.com/securock/securock/internal/evidence"
 	"github.com/securock/securock/internal/network"
 	"github.com/securock/securock/internal/osv"
+	"github.com/securock/securock/internal/progress"
 	"github.com/securock/securock/internal/provenance"
 	"github.com/securock/securock/internal/reachability"
 	"github.com/securock/securock/internal/trust"
@@ -49,6 +50,7 @@ func Scan(ctx context.Context, opts Options) (*Result, error) {
 		opts.Policy = policy.Default()
 	}
 
+	progress.Report(ctx, "dependencies: reading package lockfiles")
 	deps, err := ecosystem.Collect(path)
 	if err != nil {
 		return nil, err
@@ -96,6 +98,7 @@ func Scan(ctx context.Context, opts Options) (*Result, error) {
 		ev      map[string]evidence.Record
 	)
 	if len(query) > 0 {
+		progress.Report(ctx, "dependencies: querying vulnerabilities and registry evidence")
 		client := opts.Client
 		if client == nil {
 			client = osv.New()
@@ -140,6 +143,7 @@ func Scan(ctx context.Context, opts Options) (*Result, error) {
 		}
 	}
 
+	progress.Report(ctx, "dependencies: evaluating trust and policy")
 	fp, err := policy.Fingerprint(opts.Policy)
 	if err != nil {
 		return nil, err
@@ -246,6 +250,7 @@ func Scan(ctx context.Context, opts Options) (*Result, error) {
 
 	lockfile.Canonicalize(&doc)
 	if opts.Reachability {
+		progress.Report(ctx, "dependencies: checking reachability")
 		reachability.Annotate(&doc)
 	}
 	return &Result{Document: doc}, nil

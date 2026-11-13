@@ -527,6 +527,20 @@ pre-commit:
       run: securock verify
 ```
 
+## Analysis progress
+
+Interactive text runs of `security`, `sast`, `chain`, and dependency analysis
+commands show a spinner and the current stage on a single updating stderr line.
+For example, SAST reports source loading, Go type resolution, and data-flow
+analysis; dependency scans report lockfile loading, remote vulnerability and
+registry lookups, and trust evaluation. The line is cleared before results or
+errors appear and adapts to the terminal width without adding scrollback.
+
+Use `--no-progress` to hide it. Progress is automatically disabled in CI (when
+`CI` is set), with `TERM=dumb`, for non-text formats, and when stdout or stderr
+is redirected. An interactive text run with `--output` can still show progress
+on stderr while saving the report to the specified file.
+
 ## Shared flags
 
 | Flag             | Meaning                                                                                     |
@@ -543,6 +557,7 @@ pre-commit:
 | `--output`       | Write the report to a file instead of stdout                                                |
 | `--exceptions`   | Path to the accepted-findings file (`accept`, `audit`, `sast`, `chain`, `import`, `doctor`) |
 | `--reachability` | Record scope and dependencies and mark vulnerabilities reachable, unreachable, or unknown   |
+| `--no-progress`  | Hide the interactive analysis status line                                                   |
 | `--no-fail`      | Suppress finding and trust failures; operational errors still exit `2`                      |
 
 `--offline` records vulnerability, malicious, capability, behavior,

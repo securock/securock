@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/securock/securock/internal/baseline"
 	"github.com/securock/securock/internal/finding"
+	"github.com/securock/securock/internal/progress"
 	"github.com/securock/securock/internal/remediation"
 	"github.com/securock/securock/internal/sast"
 	"github.com/spf13/cobra"
@@ -20,7 +21,7 @@ func newRemediateCommand(opts *options) *cobra.Command {
 			return opErr(e)
 		}
 		if verify {
-			found, e := sast.Analyze(project)
+			found, e := sast.AnalyzeWith(project, sast.Options{Progress: func(stage string) { progress.Report(c.Context(), stage) }})
 			if e != nil {
 				return opErr(e)
 			}

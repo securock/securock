@@ -6,6 +6,7 @@ import (
 
 	"github.com/securock/securock/internal/exceptions"
 	"github.com/securock/securock/internal/finding"
+	"github.com/securock/securock/internal/progress"
 	"github.com/securock/securock/internal/sast"
 	"github.com/spf13/cobra"
 )
@@ -40,7 +41,7 @@ into the API it calls; the package's own findings are not reported.`,
 				return opErr(err)
 			}
 			path := projectPath(args)
-			found, err := sast.AnalyzeWith(path, sast.Options{AssumeParams: assumeParams})
+			found, err := sast.AnalyzeWith(path, sast.Options{AssumeParams: assumeParams, Progress: func(stage string) { progress.Report(cmd.Context(), stage) }})
 			if err != nil {
 				return opErr(err)
 			}

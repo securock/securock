@@ -17,6 +17,7 @@ import (
 	"github.com/securock/securock/internal/history"
 	"github.com/securock/securock/internal/organization"
 	"github.com/securock/securock/internal/policy"
+	"github.com/securock/securock/internal/progress"
 	"github.com/securock/securock/internal/runrecord"
 	"github.com/securock/securock/internal/sast"
 	"github.com/securock/securock/internal/scanner"
@@ -95,9 +96,12 @@ combined report. Operational failures still exit 2, even with --no-fail.`,
 			if err != nil {
 				return opErr(err)
 			}
-			found, err := sast.AnalyzeWith(path, sast.Options{AssumeParams: assumeParams})
+			found, err := sast.AnalyzeWith(path, sast.Options{AssumeParams: assumeParams, Progress: func(stage string) { progress.Report(cmd.Context(), stage) }})
 			if err != nil {
 				return opErr(err)
+			}
+			if len(imports) > 0 {
+				progress.Report(cmd.Context(), "security: importing SARIF reports")
 			}
 			external, err := importedFindings(cmd, path, imports)
 			if err != nil {
@@ -139,16 +143,26 @@ combined report. Operational failures still exit 2, even with --no-fail.`,
 					}
 				}
 			}
+			if len(targets) > 0 {
+				progress.Report(cmd.Context(), "security: checking live HTTP targets")
+			}
 			live, liveErr := scanDAST(cmd.Context(), targets, dastTimeout)
 			found = append(found, live...)
 			scanErr = errors.Join(scanErr, liveErr)
+			if len(inventories) > 0 || awsRegion != "" {
+				progress.Report(cmd.Context(), "security: checking cloud configuration")
+			}
 			cloud, cloudErr := scanCSPM(cmd.Context(), inventories, awsRegion, awsProfile)
 			found = append(found, cloud...)
 			scanErr = errors.Join(scanErr, cloudErr)
+			if scopes.count() > 0 {
+				progress.Report(cmd.Context(), "security: checking cloud scopes")
+			}
 			extra, extraErr := scopes.scan(cmd.Context())
 			found = append(found, extra...)
 			scanErr = errors.Join(scanErr, extraErr)
 			if gitHistory {
+				progress.Report(cmd.Context(), "security: scanning Git history for secrets")
 				historical, e := history.Scan(cmd.Context(), history.Options{Path: path, Revision: "HEAD", MaxCommits: 1000, MaxBlobs: 10000})
 				found = append(found, historical.Findings...)
 				scanErr = errors.Join(scanErr, e)
@@ -156,6 +170,7 @@ combined report. Operational failures still exit 2, even with --no-fail.`,
 			if abs, err := filepath.Abs(path); err == nil {
 				finding.RelativeTo(found, abs)
 			}
+			progress.Report(cmd.Context(), "security: preparing report")
 			report := exceptions.Apply(finding.New("security", found), accepted, time.Now().UTC())
 			if orgFile != "" {
 				governed, e := organization.Evaluate(report, orgPolicy, serviceID, orgDate)

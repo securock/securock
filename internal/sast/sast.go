@@ -57,6 +57,15 @@ type Options struct {
 	// table or reflection, so their callers are out of sight; the option trades
 	// precision for recall.
 	AssumeParams bool
+
+	// Progress receives coarse analysis stages synchronously; nil disables updates.
+	Progress func(string)
+}
+
+func (o Options) report(stage string) {
+	if o.Progress != nil {
+		o.Progress(stage)
+	}
 }
 
 // AnalyzeWith is Analyze with options.
@@ -71,12 +80,14 @@ func AnalyzeWith(root string, opts Options) ([]finding.Finding, error) {
 	fset := token.NewFileSet()
 	var out []finding.Finding
 
+	opts.report("sast: reading source, secrets and infrastructure")
 	pkgs, mods, props, templates, libs, incomplete, err := load(fset, abs)
 	if err != nil {
 		return nil, err
 	}
 	out = append(out, incomplete...)
 
+	opts.report("sast: resolving Go types and imports")
 	imp := &splitImporter{
 		fset:  fset,
 		other: importer.ForCompiler(fset, "source", nil).(types.ImporterFrom),
@@ -97,6 +108,7 @@ func AnalyzeWith(root string, opts Options) ([]finding.Finding, error) {
 		return filepath.ToSlash(r)
 	}
 	out = append(out, taint(fset, abs, pkgs, mods, props, templates, libs, rel, opts)...)
+	opts.report("sast: checking insecure API use")
 	for _, p := range pkgs {
 		out = append(out, astRules(fset, p, rel)...)
 	}
@@ -182,6 +194,7 @@ func taint(fset *token.FileSet, root string, pkgs []*pkg, mods []*module, props 
 		}
 	}
 	if len(libMods) > 0 {
+		opts.report("sast: analyzing bundled libraries")
 		libSh := &shared{
 			declTypes:  map[types.Object]ast.Expr{},
 			sums:       map[string]*summary{},
@@ -208,6 +221,7 @@ func taint(fset *token.FileSet, root string, pkgs []*pkg, mods []*module, props 
 			}
 		}
 	}
+	opts.report("sast: tracing data flow across functions")
 	jobs := goJobs(fset, fns, rel, sh)
 	jobs = append(jobs, irJobs(fset, ownMods, rel, sh, proj)...)
 	found, pending := runJobs(sh, jobs, root, min(1_000_000, max(10_000, len(jobs)*128)))

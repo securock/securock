@@ -101,6 +101,10 @@ securock security . --format sarif --output security.sarif
 package-manager lockfile, source analysis still runs and dependency coverage is
 marked unchecked. The default failure threshold is `high`.
 
+Interactive text scans show the current analysis stage on one updating line,
+which disappears when the report is ready. Use `--no-progress` to hide it.
+Progress is silent in CI, pipes, redirected streams, and non-text formats.
+
 Reports support text, JSON, SARIF, JUnit, and Markdown. Use `--help` on any
 command for its options, or read the [usage guide](website/guide/usage.md).
 

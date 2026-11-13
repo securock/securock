@@ -25,6 +25,7 @@ type options struct {
 	policy       string
 	profile      string
 	noFail       bool
+	noProgress   bool
 	output       string
 
 	exceptions string
@@ -69,6 +70,7 @@ func NewRoot(version, commit, date string) *cobra.Command {
 	root.PersistentFlags().BoolVar(&opts.reachability, "reachability", false, "record package scope and dependencies, and mark each vulnerability reachable, unreachable, or unknown")
 	root.PersistentFlags().BoolVar(&opts.noCache, "no-cache", false, "do not read or write the on-disk cache of registry and OSV responses")
 	root.PersistentFlags().DurationVar(&opts.cacheTTL, "cache-ttl", 0, "how long a cached response is used, such as 10m or 24h (default 1h)")
+	root.PersistentFlags().BoolVar(&opts.noProgress, "no-progress", false, "hide the interactive analysis status line")
 	root.PersistentFlags().BoolVar(&opts.noFail, "no-fail", false, "do not fail on findings or trust violations; operational errors still fail")
 
 	root.AddCommand(newScanCommand(opts))
@@ -126,6 +128,7 @@ func NewRoot(version, commit, date string) *cobra.Command {
 	})
 
 	root.RunE = newScanCommand(opts).RunE
+	withProgress(opts, root)
 	withRecursive(opts, root)
 	redirectOutput(opts, root)
 
