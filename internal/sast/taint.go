@@ -72,6 +72,91 @@ func merge(a, b taintSet) taintSet {
 	return out
 }
 
+// atomID is what merge identifies an atom by.
+type atomID struct{ key, field, path string }
+
+// taintAcc folds atoms and taint sets into one set and returns exactly what
+// calling merge on each of them in turn would return. merge copies and sorts the
+// whole set on every call, so folding n atoms that way costs n copies and n
+// sorts; the accumulator copies once, indexes the atoms, and sorts once.
+type taintAcc struct {
+	out   taintSet
+	index map[atomID]int
+	// merged is set once a real merge happened: the result is then a sorted copy,
+	// where before it is the first set as it was passed in.
+	merged bool
+	// exact is set when the first set holds duplicates. merge keeps them in an
+	// order of its own making, so the rest is folded with merge itself.
+	exact bool
+}
+
+func (c *taintAcc) addAtom(a atom) {
+	if len(c.out) == 0 {
+		c.out = taintSet{a}
+		return
+	}
+	c.add(taintSet{a})
+}
+
+func (c *taintAcc) add(b taintSet) {
+	if len(b) == 0 {
+		return
+	}
+	if len(c.out) == 0 {
+		c.out = b
+		return
+	}
+	if c.exact {
+		c.out = merge(c.out, b)
+		return
+	}
+	if c.index == nil {
+		own := make(taintSet, len(c.out), len(c.out)+len(b))
+		copy(own, c.out)
+		index := make(map[atomID]int, cap(own))
+		for i, a := range own {
+			id := atomID{a.key, a.field, a.path}
+			if _, dup := index[id]; dup {
+				c.exact = true
+				c.out = merge(c.out, b)
+				return
+			}
+			index[id] = i
+		}
+		c.out, c.index = own, index
+	}
+	c.merged = true
+	for _, x := range b {
+		id := atomID{x.key, x.field, x.path}
+		i, ok := c.index[id]
+		if !ok {
+			c.index[id] = len(c.out)
+			c.out = append(c.out, x)
+			continue
+		}
+		c.out[i].kinds |= x.kinds
+		c.out[i].xpathSafe = c.out[i].xpathSafe && x.xpathSafe
+		if flowLess(x.flow, c.out[i].flow) {
+			c.out[i].flow = x.flow
+		}
+	}
+}
+
+func (c *taintAcc) result() taintSet {
+	if c.merged {
+		slices.SortFunc(c.out, func(x, y atom) int {
+			if r := strings.Compare(x.key, y.key); r != 0 {
+				return r
+			}
+			if r := strings.Compare(x.field, y.field); r != 0 {
+				return r
+			}
+			return strings.Compare(x.path, y.path)
+		})
+	}
+	return c.out
+}
+
 func (t taintSet) clear(k kind) taintSet {
 	var out taintSet
 	for _, a := range t {

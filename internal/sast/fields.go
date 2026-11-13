@@ -42,7 +42,7 @@ func (t taintSet) selectField(field string) taintSet {
 	if field == "" {
 		return t
 	}
-	var out taintSet
+	var out taintAcc
 	for _, a := range t {
 		switch {
 		case a.path == field || strings.HasPrefix(a.path, field+"."):
@@ -55,30 +55,30 @@ func (t taintSet) selectField(field string) taintSet {
 		default:
 			continue
 		}
-		out = merge(out, taintSet{a})
+		out.addAtom(a)
 	}
-	return out
+	return out.result()
 }
 
 func (t taintSet) atField(field string) taintSet {
-	var out taintSet
+	var out taintAcc
 	for _, a := range t {
 		a.path = fieldJoin(field, a.path)
-		out = merge(out, taintSet{a})
+		out.addAtom(a)
 	}
-	return out
+	return out.result()
 }
 
 // String construction and unknown library transformations consume the whole
 // value, rather than preserving the shape of their input objects.
 func (t taintSet) scalar() taintSet {
-	var out taintSet
+	var out taintAcc
 	for _, a := range t {
 		a.path = ""
 		a.xpathSafe = false
-		out = merge(out, taintSet{a})
+		out.addAtom(a)
 	}
-	return out
+	return out.result()
 }
 
 func readField(t taintSet, stored, wanted string) taintSet {
@@ -119,15 +119,15 @@ func (c *funcCtx) fieldEffects() []fieldEffect {
 }
 
 func substitute(t taintSet, arg func(int, string) taintSet) taintSet {
-	var out taintSet
+	var out taintAcc
 	for _, a := range t {
 		if a.param < 0 {
-			out = merge(out, taintSet{a})
+			out.addAtom(a)
 			continue
 		}
-		out = merge(out, arg(a.param, a.field).keep(a.kinds).atField(a.path))
+		out.add(arg(a.param, a.field).keep(a.kinds).atField(a.path))
 	}
-	return out
+	return out.result()
 }
 
 func isMetadata(field string) bool { return strings.HasPrefix(field, "\x00") }

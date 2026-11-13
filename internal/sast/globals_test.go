@@ -3,6 +3,8 @@ package sast_test
 import (
 	"slices"
 	"testing"
+
+	"github.com/securock/securock/internal/sast"
 )
 
 // Taint stored in a package-level variable reaches only the functions that read
@@ -41,5 +43,15 @@ func write(r *http.Request) { stored = r.FormValue("q") }
 				t.Fatalf("got %v, want %v", got, tc.want)
 			}
 		})
+	}
+}
+
+// The accumulator behind scalar, substitute and the field projections must give
+// exactly what folding with merge gives, including for sets merge does not expect.
+func TestTaintAccumulatorMatchesMerge(t *testing.T) {
+	for seed := range int64(20) {
+		if msg := sast.CheckTaintAccumulator(seed, 5000); msg != "" {
+			t.Fatalf("seed %d: %s", seed, msg)
+		}
 	}
 }
