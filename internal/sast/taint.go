@@ -278,7 +278,12 @@ type shared struct {
 	sums      map[string]*summary
 	methods   map[string][]impl // method name -> concrete methods, for interface calls
 	globals   map[types.Object]taintSet
-	regexps   map[types.Object]string
+	// globalReaders are the jobs that have read each package-level variable, and
+	// changedGlobals the variables whose taint changed since runJobs last looked.
+	// Together they replace re-running every job when any global changes.
+	globalReaders  map[types.Object]map[string]bool
+	changedGlobals map[types.Object]bool
+	regexps        map[types.Object]string
 	// orphans are the functions nothing calls directly (Options.AssumeParams).
 	orphans map[string]bool
 }
@@ -384,6 +389,7 @@ func isGlobal(o types.Object) bool {
 func (a *analyzer) readVar(st state, obj types.Object, field string) taintSet {
 	t := st.read(obj, field)
 	if isGlobal(obj) {
+		a.noteGlobalRead(obj)
 		t = merge(t, a.globals[obj])
 	}
 	return t
@@ -952,7 +958,12 @@ func (a *analyzer) assign(lhs ast.Expr, t taintSet, st state) {
 				src = append(src, at)
 			}
 		}
-		a.globals[obj] = merge(a.globals[obj], src)
+		old, had := a.globals[obj]
+		merged := merge(old, src)
+		a.globals[obj] = merged
+		if !had || !sameGlobalTaint(old, merged) {
+			a.noteGlobalChange(obj)
+		}
 	}
 	st.write(obj, field, t, weak)
 	if isDeref(lhs) && field == "" {
@@ -1343,18 +1354,59 @@ func declName(fd *ast.FuncDecl) string {
 	}
 }
 
-func (sh *shared) globalSignature() string {
-	gl := make([]string, 0, len(sh.globals))
-	for o, t := range sh.globals {
-		var g strings.Builder
-		fmt.Fprintf(&g, "%s.%d", o.Name(), o.Pos())
-		for _, at := range t {
-			fmt.Fprintf(&g, ":%s/%d", atomKey(at), at.kinds)
-		}
-		gl = append(gl, g.String())
+// noteGlobalRead records that the running job depends on a package-level variable.
+func (sh *shared) noteGlobalRead(obj types.Object) {
+	if sh.current == "" {
+		return
 	}
-	sort.Strings(gl)
-	return strings.Join(gl, ";")
+	if sh.globalReaders == nil {
+		sh.globalReaders = map[types.Object]map[string]bool{}
+	}
+	if sh.globalReaders[obj] == nil {
+		sh.globalReaders[obj] = map[string]bool{}
+	}
+	sh.globalReaders[obj][sh.current] = true
+}
+
+// noteGlobalChange records that a package-level variable gained taint.
+func (sh *shared) noteGlobalChange(obj types.Object) {
+	if sh.changedGlobals == nil {
+		sh.changedGlobals = map[types.Object]bool{}
+	}
+	sh.changedGlobals[obj] = true
+}
+
+// takeGlobalReaders returns the keys of the jobs that have read a variable whose
+// taint changed, and forgets the changes.
+func (sh *shared) takeGlobalReaders() []string {
+	seen := map[string]bool{}
+	for obj := range sh.changedGlobals {
+		for key := range sh.globalReaders[obj] {
+			seen[key] = true
+		}
+	}
+	clear(sh.changedGlobals)
+	keys := make([]string, 0, len(seen))
+	for key := range seen {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	return keys
+}
+
+// sameGlobalTaint reports whether two taint sets of one variable are identical
+// as far as other functions can tell: the same atoms, in order, with the same kinds.
+func sameGlobalTaint(a, b taintSet) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		x, y := a[i], b[i]
+		if x.key != y.key || x.field != y.field || x.path != y.path || x.xpathSafe != y.xpathSafe || x.kinds != y.kinds {
+			return false
+		}
+	}
+	return true
 }
 
 func (sh *shared) dependsOn(key string) {

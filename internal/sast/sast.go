@@ -282,6 +282,7 @@ func runJobs(sh *shared, jobs []analysisJob, root string, budget int) (map[strin
 	queue := make([]int, len(jobs))
 	queued := make([]bool, len(jobs))
 	results := make([]map[string]finding.Finding, len(jobs))
+	sigs := map[string]string{}
 	for i, j := range jobs {
 		index[j.key] = i
 		queue[i] = i
@@ -303,7 +304,6 @@ func runJobs(sh *shared, jobs []analysisJob, root string, budget int) (map[strin
 		steps++
 		j := jobs[i]
 		sh.current = j.key
-		beforeGlobals := sh.globalSignature()
 		found := map[string]finding.Finding{}
 		sum, ok := j.run(found)
 		if !ok {
@@ -311,7 +311,15 @@ func runJobs(sh *shared, jobs []analysisJob, root string, budget int) (map[strin
 		} else {
 			old := sh.sums[j.key]
 			sh.sums[j.key] = sum
-			if old == nil || old.signature() != sum.signature() {
+			// A summary's signature is rebuilt with fmt, so keep the last one
+			// instead of formatting the previous summary again on every step.
+			oldSig, seen := sigs[j.key]
+			if old != nil && !seen {
+				oldSig = old.signature()
+			}
+			sig := sum.signature()
+			sigs[j.key] = sig
+			if old == nil || oldSig != sig {
 				var deps []string
 				for key := range sh.dependents[j.key] {
 					deps = append(deps, key)
@@ -325,8 +333,9 @@ func runJobs(sh *shared, jobs []analysisJob, root string, budget int) (map[strin
 			}
 		}
 		results[i] = found
-		if beforeGlobals != sh.globalSignature() {
-			for n := range jobs {
+		// Only the jobs that have read a changed global can see a different result.
+		for _, key := range sh.takeGlobalReaders() {
+			if n, ok := index[key]; ok {
 				enqueue(n)
 			}
 		}
