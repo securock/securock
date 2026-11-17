@@ -8,7 +8,7 @@
     "docs:preview": "vitepress preview"
   },
   "devDependencies": {
-    "lucide-static": "^1.70.0",
+    "lucide-static": "^1.73.0",
     "vitepress": "^2.0.0-alpha.21",
     "wrangler": "^4.158.0"
   },
